@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 const categories = [
   { id: 'cafe', title: '☕ 주말 카페 스몰톡', level: '일상 회화' },
