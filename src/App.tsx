@@ -3519,7 +3519,8 @@ export function buildDynamicDiagramSentence(
 }
 
 // ============================================================================
-// 6. 메인 컴포넌트 & 상태 관리 엔진
+// [마무리 3-B 파트] studyData.ts 대량 엔진 직결 + 0.0mm 펜슬 칼보정 + 1~5교시 전체 작동
+// (export default function App() 부터 시작합니다!)
 // ============================================================================
 export default function App() {
   const todayObj = new Date();
@@ -3533,19 +3534,25 @@ export default function App() {
   const [selectedThemeId, setSelectedThemeId] = useState<string>(
     THEMES[dayOfYear % THEMES.length].id
   );
-  // [업그레이드] 상단 모드에 'examMaster' (🎓 수능·내신 1등급 마스터) 정식 추가!
   const [activeMode, setActiveMode] = useState<
     'daily' | 'examMaster' | 'wordbook' | 'naverQuiz' | 'aiCoach' | 'weekly'
   >('daily');
   const [activeMediaPlatform, setActiveMediaPlatform] =
     useState<MediaPlatformId>('FASHION_MAGS');
 
-  // 🎓 수능·내신 1등급 마스터 전용 상태 (①수능완성반 ②어법서술형반 ③학교별내신반 & 5단계 스텝 & 서술형 답안)
+  // 🎓 수능·내신 1등급 마스터 & 1~5교시 독립 작동 상태
   const [selectedExamTrack, setSelectedExamTrack] = useState<ExamTrackId>('CSAT_MASTER');
-  const [schoolInternalStage, setSchoolInternalStage] = useState<number>(1);
+  const [schoolInternalStage, setSchoolInternalStage] = useState<number>(1); // 1교시~5교시 탭
+  const [syntaxSeed, setSyntaxSeed] = useState<number>(1); // 10,000문장 조합 생성 시드
+  const [vocabQuizSeed, setVocabQuizSeed] = useState<number>(1);
+  const [selectedVocabQuizAnswers, setSelectedVocabQuizAnswers] = useState<Record<number, number>>({});
+  const [selectedGrammarQuizAnswers, setSelectedGrammarQuizAnswers] = useState<Record<number, 'A' | 'B'>>({});
+  const [customSchoolText, setCustomSchoolText] = useState<string>(
+    'Not until we step out of our cognitive comfort zone can we genuinely broaden our perspective on complex phenomena. Consistent exposure to diverse viewpoints prevents confirmation bias and fosters intellectual flexibility. Streamlining the approval process makes the entire project feasible.'
+  );
   const [examEssayInput, setExamEssayInput] = useState<string>('');
   const [showExamModelAnswer, setShowExamModelAnswer] = useState<boolean>(false);
-  const [csatTimerMins, setCsatTimerMins] = useState<number>(180); // 주 1회 3시간(180분) 수업 타이머
+  const [csatTimerMins, setCsatTimerMins] = useState<number>(180);
 
   const [selectedLiveKeyword, setSelectedLiveKeyword] = useState<{
     platformName: string;
@@ -3636,6 +3643,7 @@ export default function App() {
     }
   };
 
+  // 📘 Day 1 ~ Day 100 (8,000+ 단어 규모) 대량 단어장 상태
   const [wordbookLevel, setWordbookLevel] = useState<
     '중등 필수' | '고등·수능 핵심' | '비즈니스·실무' | '오픽(OPIc)·구동사'
   >('고등·수능 핵심');
@@ -3701,7 +3709,7 @@ export default function App() {
     const savedDate = localStorage.getItem('yanadu_last_study_date');
     if (savedDate !== todayKey) {
       const nextTheme = THEMES[dayOfYear % THEMES.length].id;
-      const nextWbDay = (dayOfYear % 3) + 1;
+      const nextWbDay = (dayOfYear % 100) + 1;
       const todayPlat = INITIAL_MEDIA_PLATFORMS[dayOfYear % INITIAL_MEDIA_PLATFORMS.length];
       const todayKw = todayPlat.keywords[dayOfYear % todayPlat.keywords.length];
 
@@ -3783,10 +3791,176 @@ export default function App() {
   const [selectedComp, setSelectedComp] = useState<CompId | null>('DO');
   const [selectedPos, setSelectedPos] = useState<PosId | null>('N');
   const [selectedTokenIdx, setSelectedTokenIdx] = useState<number | null>(0);
-
   const [writingInputs, setWritingInputs] = useState<Record<string, string>>({});
+
+  // ==========================================================================
+  // ✏️ 애플 펜슬 0.0mm 초정밀 칼보정 + 따라다니는 락/락해제 메모장 엔진
+  // ==========================================================================
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [isDrawing, setIsDrawing] = useState<boolean>(false);
+  const isDrawingRef = useRef<boolean>(false);
+  const lastPointRef = useRef<{ x: number; y: number } | null>(null);
+
+  const [isFloatingPad, setIsFloatingPad] = useState<boolean>(true);
+  const [isPadLocked, setIsPadLocked] = useState<boolean>(true);
+  const [isPadMinimized, setIsPadMinimized] = useState<boolean>(false);
+  const [penOnlyMode, setPenOnlyMode] = useState<boolean>(false);
+  const [penColor, setPenColor] = useState<
+    '#2563eb' | '#10b981' | '#e11d48' | '#facc15' | 'eraser'
+  >('#2563eb');
+  const [penWidth, setPenWidth] = useState<number>(2.6);
+  const [padHeight, setPadHeight] = useState<number>(185);
+
+  const syncCanvasResolution = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    const dpr = window.devicePixelRatio || 1;
+    const targetW = Math.round(rect.width * dpr);
+    const targetH = Math.round(rect.height * dpr);
+
+    if (canvas.width !== targetW || canvas.height !== targetH) {
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = canvas.width;
+      tempCanvas.height = canvas.height;
+      const tempCtx = tempCanvas.getContext('2d');
+      if (tempCtx && canvas.width > 0 && canvas.height > 0) {
+        tempCtx.drawImage(canvas, 0, 0);
+      }
+
+      canvas.width = targetW;
+      canvas.height = targetH;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.scale(dpr, dpr);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        if (tempCanvas.width > 0 && tempCanvas.height > 0) {
+          ctx.drawImage(
+            tempCanvas,
+            0,
+            0,
+            tempCanvas.width,
+            tempCanvas.height,
+            0,
+            0,
+            rect.width,
+            rect.height
+          );
+        }
+      }
+    }
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => syncCanvasResolution(), 80);
+    window.addEventListener('resize', syncCanvasResolution);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', syncCanvasResolution);
+    };
+  }, [isFloatingPad, isPadMinimized, padHeight, layoutMode, activeMode]);
+
+  const getExactPointerPos = (
+    canvas: HTMLCanvasElement,
+    clientX: number,
+    clientY: number
+  ) => {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: clientX - rect.left,
+      y: clientY - rect.top,
+    };
+  };
+
+  const startDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isPadLocked) return;
+    if (penOnlyMode && e.pointerType !== 'pen') return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    syncCanvasResolution();
+
+    canvas.setPointerCapture(e.pointerId);
+    const pos = getExactPointerPos(canvas, e.clientX, e.clientY);
+    isDrawingRef.current = true;
+    lastPointRef.current = pos;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    if (penColor === 'eraser') {
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.lineWidth = 22;
+    } else if (penColor === '#facc15') {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = 'rgba(250, 204, 21, 0.38)';
+      ctx.lineWidth = 14;
+    } else {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = penColor;
+      const pressureBoost = e.pointerType === 'pen' && e.pressure > 0 ? e.pressure * 1.4 : 1;
+      ctx.lineWidth = penWidth * pressureBoost;
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+    ctx.lineTo(pos.x + 0.01, pos.y + 0.01);
+    ctx.stroke();
+  };
+
+  const draw = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isDrawingRef.current || !isPadLocked) return;
+    if (penOnlyMode && e.pointerType !== 'pen') return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const nativeEvt = e.nativeEvent as PointerEvent;
+    const events =
+      typeof nativeEvt.getCoalescedEvents === 'function'
+        ? nativeEvt.getCoalescedEvents()
+        : [nativeEvt];
+
+    ctx.beginPath();
+    if (lastPointRef.current) {
+      ctx.moveTo(lastPointRef.current.x, lastPointRef.current.y);
+    }
+
+    for (const ev of events) {
+      const pt = getExactPointerPos(canvas, ev.clientX, ev.clientY);
+      ctx.lineTo(pt.x, pt.y);
+      lastPointRef.current = pt;
+    }
+    ctx.stroke();
+  };
+
+  const endDrawing = (e?: React.PointerEvent<HTMLCanvasElement>) => {
+    if (e && canvasRef.current && canvasRef.current.hasPointerCapture(e.pointerId)) {
+      canvasRef.current.releasePointerCapture(e.pointerId);
+    }
+    isDrawingRef.current = false;
+    lastPointRef.current = null;
+  };
+
+  const clearCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  };
 
   const [quizLevelTab, setQuizLevelTab] = useState<
     'word' | 'beginner' | 'intermediate' | 'advanced'
@@ -3804,8 +3978,8 @@ export default function App() {
   const [chatHistory, setChatHistory] = useState<ChatTurn[]>([
     {
       role: 'coach',
-      text: 'Welcome! Switch between All-Level Speaking and our new [🎓 수능·내신 1등급 마스터] tab anytime to build the power to think and create answers in English!',
-      nuanceTip: '외운 답이 아닌 스스로 답을 만드는 영어! 수능 1등급과 406개교 내신 어법·서술형까지 완벽히 대비합니다.',
+      text: 'Welcome! With studyData.ts connected, you now have 8,000+ words (Day 1~100), 10,000+ combinatorial CSAT sentences, and a 0.0mm precision Floating Apple Pencil Pad!',
+      nuanceTip: '이제 단어장(Day 1~100)과 수능·내신 1~5교시 모듈을 누르면 수십·수백 개의 실전 훈련 문제가 끝없이 쏟아집니다!',
     },
   ]);
   const [correctionInput, setCorrectionInput] = useState<string>('');
@@ -3817,11 +3991,11 @@ export default function App() {
     opicUpgrade: string;
   } | null>(null);
   const [studyStats, setStudyStats] = useState({
-    masteredWords: 58,
-    completedSentences: 34,
+    masteredWords: 120,
+    completedSentences: 64,
     quizAccuracy: 96,
-    speakingMinutes: 45,
-    streakDays: 9,
+    speakingMinutes: 55,
+    streakDays: 12,
   });
 
   const baseTheme = THEMES.find((t) => t.id === selectedThemeId) || THEMES[0];
@@ -4071,41 +4245,6 @@ export default function App() {
     return `https://en.dict.naver.com/#/search?query=${encodeURIComponent(clean)}`;
   };
 
-  const startDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const rect = canvas.getBoundingClientRect();
-    ctx.strokeStyle = darkMode ? '#60a5fa' : '#2563eb';
-    ctx.lineWidth = 2.5;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
-    setIsDrawing(true);
-  };
-
-  const draw = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!isDrawing) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const rect = canvas.getBoundingClientRect();
-    ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
-    ctx.stroke();
-  };
-
-  const endDrawing = () => setIsDrawing(false);
-
-  const clearCanvas = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-  };
-
   const handleRunCorrection = (e: React.FormEvent) => {
     e.preventDefault();
     const raw = correctionInput.trim();
@@ -4177,10 +4316,14 @@ export default function App() {
       ? 'bg-amber-600'
       : 'bg-blue-600';
 
-  const filteredWordbook = WORDBOOK_DATA.filter(
-    (w) => w.level === wordbookLevel && w.day === wordbookDay
-  );
-
+  // [대량 데이터 엔진 직결!] Day 1 ~ Day 100 (각 20개 = 총 8,000단어) & 10,000+ 조합 구문 & 내 학교 지문 분석기
+  const filteredWordbook = getExpandedWordbookByDay(wordbookLevel, wordbookDay);
+  const generatedSyntaxList = generateCombinatorialSentences(syntaxSeed, 12);
+  const customPassageAnalysis = analyzeCustomSchoolPassage(customSchoolText);
+  const examVocabTestList = getExpandedWordbookByDay('고등·수능 핵심', vocabQuizSeed);
+  // ==========================================================================
+  // [마지막 4파트] 전체 화면 UI + 1~5교시 독립 작동 + Day 1~100 단어장 + 따라다니는 락 메모장
+  // ==========================================================================
   return (
     <div
       className={`${darkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'} ${fontClass} min-h-screen`}
@@ -4216,7 +4359,7 @@ export default function App() {
             <div>
               <div className="flex items-center gap-1.5">
                 <span className={`px-2 py-0.5 text-[10px] font-extrabold rounded text-white ${themeAccentBg}`}>
-                  회화+수능·내신1등급
+                  8,000단어+무한구문
                 </span>
                 <h1 className="text-base font-extrabold tracking-tight">나만의 야나두 PRO</h1>
               </div>
@@ -4232,20 +4375,19 @@ export default function App() {
                   : 'bg-slate-900 text-white border-slate-900'
               }`}
             >
-              {darkMode ? '☀️ 라이트 켜기' : '🌙 다크 켜기'}
+              {darkMode ? '☀️ 라이트' : '🌙 다크'}
             </button>
           </div>
 
-          {/* 좌측 상단: 수능·내신 1등급 전략 학습관 원클릭 배너 */}
           <div className="p-3 bg-gradient-to-r from-indigo-900 via-blue-900 to-slate-900 text-white border-b border-slate-800 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-amber-400 text-slate-950">
-                NEW 입시 1등급 전략
+                수능·내신 1등급 마스터
               </span>
-              <span className="text-[10px] text-blue-200 font-bold">406개교 6개년 기출</span>
+              <span className="text-[10px] text-blue-200 font-bold">1~5교시 무제한 문제</span>
             </div>
             <div className="text-xs font-extrabold leading-snug">
-              🎓 영어로 생각하고 표현하는 힘, 외운 답이 아닌 답을 만드는 영어!
+              🎓 외운 답이 아닌 스스로 답을 만드는 영어!
             </div>
             <div className="grid grid-cols-3 gap-1 pt-0.5">
               {[
@@ -4444,9 +4586,7 @@ export default function App() {
                           {kw.rank}
                         </span>
                         <div className="truncate">
-                          <div className="text-[11px] font-bold truncate">
-                            {kw.koTitle}
-                          </div>
+                          <div className="text-[11px] font-bold truncate">{kw.koTitle}</div>
                           <div
                             className={`text-[10px] font-semibold truncate ${
                               isKwActive ? 'text-yellow-300' : 'text-blue-600 dark:text-blue-400'
@@ -4588,9 +4728,9 @@ export default function App() {
         </aside>
 
         {/* ====================================================================
-            우측 메인 영역: 최상단 [🌱초급 · 🌿중급 · 🌳고급] + [🎓수능·내신 1등급 마스터] 탭
+            우측 메인 영역: 상단 헤더 + 본문 + 따라다니는 락/락해제 애플 펜슬 메모장
         ==================================================================== */}
-        <main className="flex-1 flex flex-col h-full overflow-hidden">
+        <main className="flex-1 flex flex-col h-full overflow-hidden relative">
           <header
             className={`no-print border-b px-5 py-3 space-y-2.5 transition-colors ${
               darkMode
@@ -4601,13 +4741,13 @@ export default function App() {
             <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200/70 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-extrabold text-slate-500 dark:text-slate-400">
-                  🎯 나의 학습 레벨 선택:
+                  🎯 레벨 스위치:
                 </span>
                 <div className="inline-flex p-1 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
                   {[
                     {
                       id: 'beginner' as LearningLevel,
-                      label: '🌱 초급 (기본 · 느린발음 & 뜻 도움)',
+                      label: '🌱 초급 (0.75x 느림 & 뜻 도움)',
                     },
                     {
                       id: 'intermediate' as LearningLevel,
@@ -4615,13 +4755,13 @@ export default function App() {
                     },
                     {
                       id: 'advanced' as LearningLevel,
-                      label: '🌳 고급 (뉘앙스 & 긴 대화 토론)',
+                      label: '🌳 고급 (뉘앙스 & 긴 대화)',
                     },
                   ].map((lvl) => (
                     <button
                       key={lvl.id}
                       onClick={() => handleSelectLevel(lvl.id)}
-                      className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition ${
+                      className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition ${
                         learningLevel === lvl.id
                           ? `${themeAccentBg} text-white shadow`
                           : 'text-slate-600 dark:text-slate-300 hover:bg-white/50 dark:hover:bg-slate-700'
@@ -4633,25 +4773,46 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 text-xs font-bold">
-                <span className="px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-300">
-                  ⭐ 단어장 기록 유지중 ({bookmarkedWords.length}개)
-                </span>
+              {/* 상단 메모장 따라다니기 & 락 스위치 */}
+              <div className="flex flex-wrap items-center gap-1.5 text-xs font-bold">
+                <button
+                  onClick={() => {
+                    setIsFloatingPad(!isFloatingPad);
+                    setIsPadMinimized(false);
+                  }}
+                  className={`px-3 py-1 rounded-lg border font-extrabold transition ${
+                    isFloatingPad
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                      : 'border-slate-300 dark:border-slate-700'
+                  }`}
+                >
+                  {isFloatingPad ? '📌 따라다니는 펜슬장 ON' : '📌 펜슬장 하단고정'}
+                </button>
+                <button
+                  onClick={() => setIsPadLocked(!isPadLocked)}
+                  className={`px-3 py-1 rounded-lg border font-extrabold transition ${
+                    isPadLocked
+                      ? 'bg-rose-600 text-white border-rose-600'
+                      : 'bg-emerald-600 text-white border-emerald-600'
+                  }`}
+                >
+                  {isPadLocked ? '🔒 메모장 락(필기고정)' : '🔓 락 해제(스크롤모드)'}
+                </button>
                 <button
                   onClick={() => setShowAllKoreanPron(!showAllKoreanPron)}
-                  className={`px-3 py-1 rounded-lg border font-extrabold ${
+                  className={`px-2.5 py-1 rounded-lg border font-extrabold ${
                     showAllKoreanPron
                       ? 'bg-amber-500 text-slate-950 border-amber-500'
                       : 'border-slate-300 dark:border-slate-700'
                   }`}
                 >
-                  {showAllKoreanPron ? '👁️ 한글발음 켜짐' : '🙈 한글발음 가림'}
+                  {showAllKoreanPron ? '👁️ 한글발음' : '🙈 발음가림'}
                 </button>
                 <button
                   onClick={() => window.print()}
-                  className="px-3 py-1 rounded-lg bg-slate-800 text-white font-extrabold"
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 text-white font-extrabold"
                 >
-                  🖨️ A4 인쇄
+                  🖨️ 인쇄
                 </button>
               </div>
             </div>
@@ -4660,10 +4821,10 @@ export default function App() {
               <div className="flex flex-wrap items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl">
                 {[
                   { id: 'daily', label: '📝 전 레벨 일일 강의 & 16매핑' },
-                  { id: 'examMaster', label: '🎓 수능·내신 1등급 마스터 (NEW)' },
-                  { id: 'wordbook', label: '📘 중·고등·실무·오픽 단어장' },
+                  { id: 'examMaster', label: '🎓 수능·내신 1등급 (1~5교시 대량문제)' },
+                  { id: 'wordbook', label: '📘 8,000단어장 (Day 1~100)' },
                   { id: 'naverQuiz', label: '💚 네이버 퀴즈 & 복습장' },
-                  { id: 'aiCoach', label: '🎙️ AI 음성회화(5~30분)·첨삭' },
+                  { id: 'aiCoach', label: '🎙️ AI 음성회화·첨삭' },
                   { id: 'weekly', label: '🗓️ 주간·월간 마스터' },
                 ].map((tab) => (
                   <button
@@ -4717,31 +4878,27 @@ export default function App() {
             </div>
           </header>
 
+          {/* 메인 스크롤 본문 (플로팅 메모장이 켜져 있을 때 하단 여백 확보) */}
           <div className="print-container flex-1 overflow-y-auto p-5 md:p-7">
             <div
               className={`${
                 layoutMode === 'split' ? 'max-w-4xl' : 'max-w-6xl'
-              } mx-auto space-y-7 pb-16`}
+              } mx-auto space-y-7 ${isFloatingPad && !isPadMinimized ? 'pb-72' : 'pb-20'}`}
             >
               {/* ==============================================================
-                  [모드 NEW] 🎓 수능·내신 1등급 마스터 전용관
-                  - 영어로 생각하고 표현하는 힘, 외운 답이 아닌 답을 만드는 영어!
-                  - ① 수능 정규 완성반 (고3 1등급 / 주 1회 3시간 루틴)
-                  - ② 고등 어법·서술형 완성반 (전국 406개교 6개년 기출 완전 분석)
-                  - ③ 학교별 내신 대비반 (전체 흐름 ▶ 세부 ▶ 심화 ▶ 변형 ▶ 서술형)
+                  [모드 NEW] 🎓 수능·내신 1등급 마스터 전용관 (1~5교시 완전 독립 대량 문제은행!)
               ============================================================== */}
               {activeMode === 'examMaster' && (
                 <div className="space-y-6">
-                  {/* 상단 헤더 & 슬로건 배너 */}
                   <section className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 shadow-lg border border-indigo-500/30 space-y-5">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="px-3 py-1 rounded-full bg-amber-400 text-slate-950 text-xs font-black">
-                            수능 & 내신 1등급 전략 시스템
+                            수능 & 내신 1등급 대량 문제은행 가동중
                           </span>
                           <span className="px-3 py-1 rounded-full bg-indigo-500/30 border border-indigo-400/40 text-indigo-200 text-xs font-extrabold">
-                            전국 406개교 최신 6개년 기출 + EBS 연계 심화
+                            10,000+ 조합 구문 · 406개교 6개년 기출 · 내 학교 지문 자동 생성기
                           </span>
                         </div>
                         <h2 className="text-2xl md:text-3xl font-black tracking-tight pt-1">
@@ -4750,12 +4907,8 @@ export default function App() {
                             외운 답이 아닌 답을 만드는 영어
                           </span>
                         </h2>
-                        <p className="text-xs md:text-sm text-slate-300">
-                          무조건적인 본문 암기와 양치기 학습을 지양하고, 구문 뼈대(16매핑) 이해와 지문 변형(Paraphrasing)·서술형 영작으로 고3 수능 1등급과 학교별 내신 1등급을 완성합니다.
-                        </p>
                       </div>
 
-                      {/* 주 1회 3시간(180분) 수능 완성반 수업 타이머 */}
                       <div className="bg-slate-900/90 border border-slate-700 rounded-2xl p-3.5 text-center min-w-[190px]">
                         <div className="text-[10px] font-extrabold text-amber-300 uppercase">
                           ⏱️ 주 1회 3시간(180분) 집중 루틴
@@ -4781,8 +4934,7 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* 3대 전문 반 선택 탭 */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-2">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-1">
                       {EXAM_MASTER_COURSES.map((course) => {
                         const isSel = course.id === selectedExamTrack;
                         return (
@@ -4799,17 +4951,13 @@ export default function App() {
                                 : 'bg-slate-900/70 hover:bg-slate-800/80 text-white border-slate-700'
                             }`}
                           >
-                            <div className="flex items-center justify-between text-[10px] font-extrabold">
-                              <span
-                                className={`px-2 py-0.5 rounded ${
-                                  isSel
-                                    ? 'bg-indigo-600 text-white'
-                                    : 'bg-indigo-500/30 text-indigo-200'
-                                }`}
-                              >
-                                {course.badge}
-                              </span>
-                            </div>
+                            <span
+                              className={`text-[10px] font-extrabold px-2 py-0.5 rounded ${
+                                isSel ? 'bg-indigo-600 text-white' : 'bg-indigo-500/30 text-indigo-200'
+                              }`}
+                            >
+                              {course.badge}
+                            </span>
                             <div className="text-sm font-black mt-1.5">{course.shortTabName}</div>
                             <div
                               className={`text-[11px] mt-1 font-semibold ${
@@ -4824,260 +4972,507 @@ export default function App() {
                     </div>
                   </section>
 
-                  {/* 선택된 반의 상세 수업 구성 & 5단계 프로세스 */}
+                  {/* 1교시 ~ 5교시 (STEP 01 ~ STEP 05) 독립 작동 스텝 바 */}
                   <section
-                    className={`border rounded-3xl p-6 shadow-sm space-y-5 ${
+                    className={`border rounded-3xl p-6 shadow-sm space-y-6 ${
                       darkMode
                         ? 'bg-slate-900 border-slate-800'
                         : 'bg-white border-slate-200'
                     }`}
                   >
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-4">
-                      <div>
-                        <span className="text-xs font-extrabold text-indigo-500">
-                          {currentExamCourse.badge}
-                        </span>
-                        <h3 className="text-xl font-black mt-0.5">{currentExamCourse.name}</h3>
-                        <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mt-1">
-                          📌 {currentExamCourse.scheduleRule}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => {
-                          const firstPassage = currentExamCourse.steps[0].originalPassageEn;
-                          const firstKo = currentExamCourse.steps[0].originalPassageKo;
-                          setCustomDissectSentence({
-                            en: firstPassage,
-                            ko: firstKo,
-                            title: `🎓 [${currentExamCourse.shortTabName}] 킬러 구문 16매핑 해부`,
-                          });
-                          setActiveMode('daily');
-                          speakText(firstPassage);
-                        }}
-                        className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-extrabold shadow"
-                      >
-                        🔍 이 지문 16개(7성분×9품사) 다이어그램으로 즉시 해부하기
-                      </button>
-                    </div>
-
-                    <p className="text-xs md:text-sm leading-relaxed font-semibold text-slate-700 dark:text-slate-200 bg-indigo-500/10 border border-indigo-500/20 p-3.5 rounded-2xl">
-                      💡 <strong>핵심 교육 철학:</strong> {currentExamCourse.philosophy}
-                    </p>
-
-                    {/* 수업 구성 5단계 스텝 바 (전체 흐름 ▶ 세부 내용 ▶ 심화 ▶ 변형 ▶ 서술형) */}
                     <div>
-                      <div className="text-xs font-extrabold text-slate-400 uppercase mb-2">
-                        📋 체계적 수업 구성 & 단계별 마스터 프로세스 (클릭하여 단계 확인)
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                        <span className="text-xs font-extrabold text-indigo-500">
+                          👇 아래 STEP 01 ~ STEP 05(1~5교시) 버튼을 누르면 각 교시별 대량 훈련 세트가 즉시 펼쳐집니다!
+                        </span>
+                        <span className="text-xs font-bold text-slate-400">
+                          현재 선택: STEP 0{schoolInternalStage} 교시
+                        </span>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-5 gap-2">
-                        {currentExamCourse.curriculumPills.map((pill, idx) => {
-                          const activeStage = schoolInternalStage === idx + 1;
+                        {[
+                          { step: 1, title: '1교시: 단어 스피드 테스트', sub: '20문항 무한 시험지' },
+                          { step: 2, title: '2교시: 10,000+ 킬러구문', sub: '도치·분사·강조 12문장씩' },
+                          { step: 3, title: '3교시: 독해심화 & 지문변형', sub: 'Paraphrasing 비교' },
+                          { step: 4, title: '4교시: 주요 학술소재 연계', sub: '철학·경제·뇌과학·환경' },
+                          { step: 5, title: '5교시: 406개교 어법·서술형', sub: '+내 학교 지문 자동생성기' },
+                        ].map((stObj) => {
+                          const activeStage = schoolInternalStage === stObj.step;
                           return (
                             <button
-                              key={idx}
-                              onClick={() => setSchoolInternalStage(idx + 1)}
-                              className={`p-3 rounded-2xl border text-left transition ${
+                              key={stObj.step}
+                              onClick={() => setSchoolInternalStage(stObj.step)}
+                              className={`p-3.5 rounded-2xl border text-left transition ${
                                 activeStage
-                                  ? 'bg-indigo-600 text-white border-indigo-500 shadow'
+                                  ? 'bg-indigo-600 text-white border-indigo-500 shadow-md ring-2 ring-amber-400'
                                   : darkMode
-                                  ? 'bg-slate-950 border-slate-800 text-slate-300'
-                                  : 'bg-slate-50 border-slate-200 text-slate-700'
+                                  ? 'bg-slate-950 hover:bg-slate-800 border-slate-800 text-slate-300'
+                                  : 'bg-slate-50 hover:bg-indigo-50 border-slate-200 text-slate-700'
                               }`}
                             >
                               <div className="text-[10px] font-black opacity-80">
-                                STEP 0{idx + 1}
+                                STEP 0{stObj.step}
                               </div>
-                              <div className="text-xs font-extrabold mt-0.5">{pill}</div>
+                              <div className="text-xs font-extrabold mt-0.5">{stObj.title}</div>
+                              <div className="text-[10px] opacity-75 mt-0.5">{stObj.sub}</div>
                             </button>
                           );
                         })}
                       </div>
                     </div>
 
-                    {/* 실전 지문 구문 학습 + 지문 변형(Paraphrasing) + 406개교 어법 함정 + 서술형 영작 */}
-                    <div className="space-y-6 pt-2">
-                      {currentExamCourse.steps.map((st) => (
-                        <div
-                          key={st.stepNum}
-                          className={`p-5 rounded-3xl border space-y-4 ${
-                            darkMode
-                              ? 'bg-slate-950 border-slate-800'
-                              : 'bg-slate-50 border-slate-200'
-                          }`}
-                        >
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <span className="px-3 py-1 rounded-full bg-indigo-600 text-white text-xs font-extrabold">
-                                {st.durationLabel}
-                              </span>
-                              <h4 className="text-base font-black">{st.stepTitle}</h4>
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                              <button
-                                onClick={() => speakText(st.originalPassageEn, accent, 0.85)}
-                                className="px-3 py-1 rounded-lg bg-slate-800 text-amber-300 text-xs font-bold"
-                              >
-                                🔊 원문 듣기
-                              </button>
-                              <button
-                                onClick={() => speakText(st.transformedEn, accent, 0.95)}
-                                className="px-3 py-1 rounded-lg bg-emerald-600 text-white text-xs font-bold"
-                              >
-                                🔊 변형문장 듣기
-                              </button>
-                            </div>
+                    {/* ========================================================
+                        [STEP 01 · 1교시] EBS·수능 핵심 어휘 20문항 연속 스피드 테스트
+                    ======================================================== */}
+                    {schoolInternalStage === 1 && (
+                      <div className="space-y-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2 p-4 rounded-2xl bg-indigo-950 text-white">
+                          <div>
+                            <h4 className="text-base font-black">
+                              ⚡ [1교시 단어학습 & 테스트] 고등·수능 1등급 핵심 어휘 20문항 실전 체크 (Set #{vocabQuizSeed})
+                            </h4>
+                            <p className="text-xs text-indigo-200">
+                              우측 버튼을 누를 때마다 Day 1 ~ Day 100 압축 사전에서 새로운 20문항 시험지가 끝없이 출제됩니다!
+                            </p>
                           </div>
+                          <button
+                            onClick={() => {
+                              setVocabQuizSeed((s) => (s % 100) + 1);
+                              setSelectedVocabQuizAnswers({});
+                            }}
+                            className="px-4 py-2 rounded-xl bg-amber-400 text-slate-950 text-xs font-black shadow"
+                          >
+                            🎲 새 20문항 시험지 즉시 생성 (Set #{(vocabQuizSeed % 100) + 1})
+                          </button>
+                        </div>
 
-                          <p className="text-xs text-slate-500 dark:text-slate-400">
-                            {st.goalDesc}
-                          </p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {examVocabTestList.map((item, idx) => {
+                            const picked = selectedVocabQuizAnswers[idx];
+                            const wrong1 = examVocabTestList[(idx + 3) % examVocabTestList.length].meaning;
+                            const wrong2 = examVocabTestList[(idx + 7) % examVocabTestList.length].meaning;
+                            const options = [item.meaning, wrong1, wrong2];
 
-                          {/* ① 원문 핵심 문장 vs ② 내신·수능 변형(Paraphrasing) 비교 카드 */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            return (
+                              <div
+                                key={idx}
+                                className={`p-4 rounded-2xl border space-y-2 ${
+                                  darkMode
+                                    ? 'bg-slate-950 border-slate-800'
+                                    : 'bg-slate-50 border-slate-200'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <span className="px-2 py-0.5 rounded bg-indigo-600 text-white text-[10px] font-black">
+                                      Q{idx + 1}
+                                    </span>
+                                    <strong className="text-base font-black">{item.word}</strong>
+                                    <span className="text-xs font-mono text-blue-500">
+                                      {item.ipa}
+                                    </span>
+                                  </div>
+                                  <button
+                                    onClick={() => speakText(item.word.split(' ')[0])}
+                                    className="w-7 h-7 rounded-full bg-blue-600 text-white text-xs"
+                                  >
+                                    🔊
+                                  </button>
+                                </div>
+                                <div className="text-xs text-slate-500 italic">
+                                  "{item.exampleEn}"
+                                </div>
+                                <div className="space-y-1 pt-1">
+                                  {options.map((opt, oIdx) => {
+                                    const isSel = picked === oIdx;
+                                    const isAns = oIdx === 0;
+                                    return (
+                                      <button
+                                        key={oIdx}
+                                        onClick={() =>
+                                          setSelectedVocabQuizAnswers((prev) => ({
+                                            ...prev,
+                                            [idx]: oIdx,
+                                          }))
+                                        }
+                                        className={`w-full text-left px-3 py-1.5 rounded-xl text-xs font-bold border transition ${
+                                          isSel
+                                            ? isAns
+                                              ? 'bg-emerald-600 text-white border-emerald-500'
+                                              : 'bg-rose-600 text-white border-rose-500'
+                                            : darkMode
+                                            ? 'bg-slate-900 border-slate-800 hover:bg-slate-800'
+                                            : 'bg-white border-slate-200 hover:bg-blue-50'
+                                        }`}
+                                      >
+                                        {oIdx + 1}) {opt}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ========================================================
+                        [STEP 02 · 2교시] 10,000+ 조합형 고난도 킬러 구문 무한 훈련소
+                    ======================================================== */}
+                    {schoolInternalStage === 2 && (
+                      <div className="space-y-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2 p-4 rounded-2xl bg-indigo-950 text-white">
+                          <div>
+                            <h4 className="text-base font-black">
+                              🧩 [2교시 핵심문장 구문 학습] 10,000+ 조합형 고3 킬러 구문 연속 훈련 (Batch #{syntaxSeed})
+                            </h4>
+                            <p className="text-xs text-indigo-200">
+                              부정어 도치·가정법 도치·복합관계사·분사구문이 조합된 12개의 문장이 연속 제시되며, 각 문장을 즉시 16개 다이어그램으로 해부할 수 있습니다!
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => setSyntaxSeed((s) => s + 1)}
+                            className="px-4 py-2 rounded-xl bg-amber-400 text-slate-950 text-xs font-black shadow"
+                          >
+                            🔄 새로운 킬러 구문 12문장 즉시 조합 생성 (Batch #{syntaxSeed + 1})
+                          </button>
+                        </div>
+
+                        <div className="space-y-3">
+                          {generatedSyntaxList.map((item, idx) => (
                             <div
-                              className={`p-4 rounded-2xl border space-y-1.5 ${
+                              key={item.id}
+                              className={`p-4 rounded-2xl border space-y-2 ${
                                 darkMode
-                                  ? 'bg-slate-900 border-slate-800'
-                                  : 'bg-white border-slate-200'
+                                  ? 'bg-slate-950 border-slate-800'
+                                  : 'bg-slate-50 border-slate-200'
                               }`}
                             >
-                              <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-extrabold text-blue-600 dark:text-blue-400">
-                                  📘 [1~2단계: 전체 흐름 & 핵심 구문 원문]
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-indigo-600 text-white">
+                                  킬러구문 #{idx + 1} · {item.openerRule}
                                 </span>
-                                <button
-                                  onClick={() => {
-                                    setCustomDissectSentence({
-                                      en: st.originalPassageEn,
-                                      ko: st.originalPassageKo,
-                                      title: st.stepTitle,
-                                    });
-                                    setActiveMode('daily');
-                                    speakText(st.originalPassageEn);
-                                  }}
-                                  className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-blue-500/15 text-blue-600 dark:text-blue-300"
-                                >
-                                  16매핑 해부↗
-                                </button>
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    onClick={() => {
+                                      setCustomDissectSentence({
+                                        en: item.sentenceEn,
+                                        ko: item.sentenceKo,
+                                        title: `킬러구문 #${idx + 1}: ${item.openerRule}`,
+                                      });
+                                      setActiveMode('daily');
+                                      speakText(item.sentenceEn);
+                                    }}
+                                    className="px-3 py-1 rounded-lg bg-blue-600 text-white text-xs font-extrabold"
+                                  >
+                                    🔍 16개(7성분×9품사) 다이어그램으로 즉시 해부↗
+                                  </button>
+                                  <button
+                                    onClick={() => speakText(item.sentenceEn)}
+                                    className="px-2.5 py-1 rounded-lg bg-slate-800 text-white text-xs font-bold"
+                                  >
+                                    🔊 듣기
+                                  </button>
+                                </div>
                               </div>
-                              <div className="text-sm font-black leading-relaxed">
-                                "{st.originalPassageEn}"
-                              </div>
-                              <div className="text-xs text-slate-500">{st.originalPassageKo}</div>
-                            </div>
 
-                            <div
-                              className={`p-4 rounded-2xl border space-y-1.5 ${
-                                darkMode
-                                  ? 'bg-emerald-950/20 border-emerald-800/60'
-                                  : 'bg-emerald-50/60 border-emerald-200'
-                              }`}
-                            >
-                              <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-extrabold text-emerald-600 dark:text-emerald-400">
-                                  🔄 [3~4단계: 독해 심화 & 학교 시험 지문 변형 (Paraphrasing)]
-                                </span>
+                              <div className="text-base font-black text-blue-600 dark:text-yellow-300">
+                                "{item.sentenceEn}"
                               </div>
-                              <div className="text-sm font-black text-emerald-700 dark:text-emerald-300 leading-relaxed">
-                                "{st.transformedEn}"
+                              <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                                🇰🇷 직독직해: {item.sentenceKo}
                               </div>
-                              <div className="text-xs text-slate-600 dark:text-slate-300 font-semibold">
-                                💡 {st.transformedPoint}
+                              <div className="text-xs text-emerald-600 dark:text-emerald-400 font-bold">
+                                🔄 [내신·수능 변형(Paraphrasing)]: "{item.paraphrasedEn}"
                               </div>
                             </div>
-                          </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
-                          {/* ③ 전국 406개교 6개년 기출 필수 어법 킬러 박스 */}
-                          <div className="p-4 rounded-2xl bg-slate-900 text-white border border-slate-800 space-y-2">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <span className="text-xs font-extrabold text-rose-400">
-                                🚨 [어법 1등급 치트키] {st.killerGrammarTrap.freqBadge}
-                              </span>
-                            </div>
-                            <div className="text-sm font-extrabold text-yellow-300">
-                              Q. {st.killerGrammarTrap.questionEn}
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs pt-1">
-                              <div className="p-2.5 rounded-xl bg-rose-950/50 border border-rose-500/30 text-rose-200">
-                                ❌ <strong>오답 함정:</strong> {st.killerGrammarTrap.wrongChoice}
-                              </div>
-                              <div className="p-2.5 rounded-xl bg-emerald-950/50 border border-emerald-500/30 text-emerald-200 font-bold">
-                                ✅ <strong>1등급 정답:</strong> {st.killerGrammarTrap.correctChoice}
-                              </div>
-                            </div>
-                            <div className="text-xs text-slate-300 pt-1">
-                              📐 <strong>어법 개념 총정리:</strong>{' '}
-                              {st.killerGrammarTrap.ruleExplanation}
-                            </div>
-                          </div>
-
-                          {/* ④ 5단계: 서술형(요약·조건 영작) 실전 훈련 */}
+                    {/* ========================================================
+                        [STEP 03 · 3교시] 독해심화 & 학교 시험 지문 변형(Paraphrasing)
+                    ======================================================== */}
+                    {schoolInternalStage === 3 && (
+                      <div className="space-y-5">
+                        {currentExamCourse.steps.map((st) => (
                           <div
-                            className={`p-4 rounded-2xl border space-y-3 ${
+                            key={st.stepNum}
+                            className={`p-5 rounded-3xl border space-y-4 ${
                               darkMode
-                                ? 'bg-slate-900 border-indigo-500/40'
-                                : 'bg-indigo-50/40 border-indigo-200'
+                                ? 'bg-slate-950 border-slate-800'
+                                : 'bg-slate-50 border-slate-200'
                             }`}
                           >
                             <div className="flex flex-wrap items-center justify-between gap-2">
-                              <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-indigo-600 text-white">
-                                ✍️ [5단계: 서술형 완성] {st.essayMission.typeBadge}
+                              <span className="px-3 py-1 rounded-full bg-indigo-600 text-white text-xs font-extrabold">
+                                {st.stepTitle}
                               </span>
-                              <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-300">
-                                외운 답이 아닌 어순 공식으로 스스로 답을 만들어 보세요!
-                              </span>
-                            </div>
-
-                            <div className="text-xs font-extrabold">
-                              📌 서술형 조건: {st.essayMission.koCondition}
-                            </div>
-                            <div className="text-xs font-mono text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-950 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800">
-                              보기 단어: {st.essayMission.givenWords}
-                            </div>
-
-                            <div className="flex flex-wrap gap-2">
-                              <input
-                                type="text"
-                                value={examEssayInput}
-                                onChange={(e) => setExamEssayInput(e.target.value)}
-                                placeholder="조건과 보기 단어를 활용해 서술형 답안을 직접 작성해 보세요..."
-                                className="flex-1 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs font-bold focus:outline-none focus:border-indigo-500"
-                              />
                               <button
-                                onClick={() => setShowExamModelAnswer(!showExamModelAnswer)}
-                                className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-extrabold"
+                                onClick={() => speakText(st.transformedEn)}
+                                className="px-3 py-1 rounded-lg bg-emerald-600 text-white text-xs font-bold"
                               >
-                                {showExamModelAnswer ? '정답 닫기' : '채점 기준 & 모범답안 확인'}
+                                🔊 변형 지문 발음 듣기
                               </button>
                             </div>
 
-                            {showExamModelAnswer && (
-                              <div className="p-3.5 rounded-xl bg-slate-900 text-white text-xs space-y-1.5">
-                                <div className="text-emerald-400 font-extrabold flex items-center justify-between">
-                                  <span>✅ 만점 서술형 모범답안: {st.essayMission.modelAnswerEn}</span>
-                                  <button
-                                    onClick={() => speakText(st.essayMission.modelAnswerEn)}
-                                    className="px-2 py-0.5 rounded bg-emerald-600 text-white text-[10px]"
-                                  >
-                                    🔊 발음 듣기
-                                  </button>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1.5">
+                                <div className="text-xs font-extrabold text-blue-500">
+                                  📘 [교과서·EBS 원문 지문]
                                 </div>
-                                <div className="text-amber-300">
-                                  ⚖️ <strong>학교 선생님 서술형 채점 기준:</strong>{' '}
-                                  {st.essayMission.scoringCriteria}
-                                </div>
+                                <div className="text-sm font-black">"{st.originalPassageEn}"</div>
+                                <div className="text-xs text-slate-500">{st.originalPassageKo}</div>
                               </div>
-                            )}
+
+                              <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-1.5">
+                                <div className="text-xs font-extrabold text-emerald-500">
+                                  🔄 [학교 시험 & 모의고사 변형 출제 문장]
+                                </div>
+                                <div className="text-sm font-black text-emerald-600 dark:text-emerald-300">
+                                  "{st.transformedEn}"
+                                </div>
+                                <div className="text-xs font-semibold">{st.transformedPoint}</div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* ========================================================
+                        [STEP 04 · 4교시] EBS 주요 학술·시사 소재 연계 (철학·경제·뇌과학·환경)
+                    ======================================================== */}
+                    {schoolInternalStage === 4 && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {EBS_MAJOR_TOPICS.map((tp) => (
+                          <div
+                            key={tp.id}
+                            className={`p-5 rounded-3xl border space-y-3 ${
+                              darkMode
+                                ? 'bg-slate-950 border-slate-800'
+                                : 'bg-slate-50 border-slate-200'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-extrabold text-indigo-500">
+                                {tp.category}
+                              </span>
+                              <button
+                                onClick={() => speakText(tp.passageEn)}
+                                className="px-2.5 py-1 rounded-lg bg-blue-600 text-white text-xs font-bold"
+                              >
+                                🔊 지문 듣기
+                              </button>
+                            </div>
+                            <h4 className="text-base font-black">{tp.title}</h4>
+                            <p className="text-xs font-bold leading-relaxed bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800">
+                              "{tp.passageEn}"
+                            </p>
+                            <p className="text-xs text-slate-500">{tp.passageKo}</p>
+                            <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs font-bold text-emerald-600 dark:text-emerald-300">
+                              📌 [수능 40번 한 줄 요약 변형]: "{tp.paraphraseSummary}"
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {tp.keywords.map((kw, kIdx) => (
+                                <span
+                                  key={kIdx}
+                                  className="px-2.5 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-[11px] font-bold"
+                                >
+                                  🔑 {kw}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* ========================================================
+                        [STEP 05 · 5교시] 전국 406개교 6개년 어법 문제은행 + 내 학교 지문 자동 생성기!
+                    ======================================================== */}
+                    {schoolInternalStage === 5 && (
+                      <div className="space-y-6">
+                        <div className="space-y-3">
+                          <h4 className="text-base font-black text-rose-500">
+                            🚨 1) 전국 406개교 6개년 최다 빈출 어법 양자택일 실전 테스트 (6연속 킬러 문항)
+                          </h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {GRAMMAR_406_QUIZ_BANK.map((q) => {
+                              const picked = selectedGrammarQuizAnswers[q.id];
+                              return (
+                                <div
+                                  key={q.id}
+                                  className={`p-4 rounded-2xl border space-y-2.5 ${
+                                    darkMode
+                                      ? 'bg-slate-950 border-slate-800'
+                                      : 'bg-slate-50 border-slate-200'
+                                  }`}
+                                >
+                                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-rose-500/15 text-rose-500">
+                                    {q.schoolTag}
+                                  </span>
+                                  <div className="text-xs font-bold leading-relaxed">
+                                    {q.sentenceBefore}{' '}
+                                    <span className="px-2 py-0.5 rounded bg-amber-400/20 text-amber-600 dark:text-amber-300 font-black">
+                                      [ (A) {q.choiceA} / (B) {q.choiceB} ]
+                                    </span>{' '}
+                                    {q.sentenceAfter}
+                                  </div>
+                                  <div className="flex gap-2">
+                                    {(['A', 'B'] as const).map((choice) => {
+                                      const isSel = picked === choice;
+                                      const isCorrect = q.correct === choice;
+                                      return (
+                                        <button
+                                          key={choice}
+                                          onClick={() =>
+                                            setSelectedGrammarQuizAnswers((prev) => ({
+                                              ...prev,
+                                              [q.id]: choice,
+                                            }))
+                                          }
+                                          className={`flex-1 py-1.5 rounded-xl text-xs font-extrabold border transition ${
+                                            isSel
+                                              ? isCorrect
+                                                ? 'bg-emerald-600 text-white border-emerald-500'
+                                                : 'bg-rose-600 text-white border-rose-500'
+                                              : darkMode
+                                              ? 'bg-slate-900 border-slate-700'
+                                              : 'bg-white border-slate-300'
+                                          }`}
+                                        >
+                                          ({choice}) {choice === 'A' ? q.choiceA : q.choiceB}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                  {picked && (
+                                    <div className="text-[11px] text-emerald-500 font-semibold pt-1 border-t border-slate-200 dark:border-slate-800">
+                                      ✅ 정답 ({q.correct}): {q.explanation}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
-                      ))}
-                    </div>
+
+                        {/* 📋 내 학교 교과서 / 모의고사 지문 직접 붙여넣어 즉시 문제 만들기 */}
+                        <div className="p-5 rounded-3xl bg-slate-900 text-white border border-indigo-500/40 space-y-4">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <span className="text-[10px] font-black px-2.5 py-0.5 rounded bg-amber-400 text-slate-950">
+                                무한 문제 생성기
+                              </span>
+                              <h4 className="text-base font-black mt-1">
+                                📋 2) 내 학교 내신 교과서 / 모의고사 지문 통째로 붙여넣기 ➔ 즉시 구문 해부 & 서술형 문제 자동 생성!
+                              </h4>
+                            </div>
+                          </div>
+
+                          <textarea
+                            rows={3}
+                            value={customSchoolText}
+                            onChange={(e) => setCustomSchoolText(e.target.value)}
+                            placeholder="여기에 학교 시험 범위 영어 지문이나 모의고사 지문 전체를 복사해서 붙여넣으세요..."
+                            className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-3.5 text-xs text-white focus:outline-none focus:border-amber-400"
+                          />
+
+                          <div className="space-y-3">
+                            {customPassageAnalysis.sentences.map((item) => (
+                              <div
+                                key={item.idx}
+                                className="p-4 rounded-2xl bg-slate-800/90 border border-slate-700 space-y-2 text-xs"
+                              >
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <span className="font-extrabold text-amber-300">
+                                    문장 #{item.idx} 자동 분석 완료
+                                  </span>
+                                  <div className="flex gap-1.5">
+                                    <button
+                                      onClick={() => {
+                                        setCustomDissectSentence({
+                                          en: item.rawEn,
+                                          ko: '내가 입력한 학교 내신·모의고사 지문 실시간 해부 모드',
+                                          title: `내 학교 지문 문장 #${item.idx}`,
+                                        });
+                                        setActiveMode('daily');
+                                        speakText(item.rawEn);
+                                      }}
+                                      className="px-3 py-1 rounded-lg bg-blue-600 text-white font-extrabold"
+                                    >
+                                      🔍 이 문장 16매핑 다이어그램으로 해부↗
+                                    </button>
+                                    <button
+                                      onClick={() => speakText(item.rawEn)}
+                                      className="px-2.5 py-1 rounded-lg bg-slate-700 text-white font-bold"
+                                    >
+                                      🔊 듣기
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className="text-emerald-300 font-bold">
+                                  🧱 소리블럭 직독직해: {item.soundBlockEn}
+                                </div>
+                                <div className="text-slate-200">
+                                  ✍️ <strong>[자동 생성 빈칸 추론 문제]:</strong>{' '}
+                                  {item.blankQuizSentence}{' '}
+                                  <span className="text-amber-300 font-bold">
+                                    (정답: {item.answerWord})
+                                  </span>
+                                </div>
+                                <div className="text-blue-300 font-mono text-[11px]">
+                                  🔀 [서술형 어순 배열 보기]: [ {item.scrambledWords.join(' / ')} ]
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* 서술형 조건 영작 */}
+                        <div className="p-4 rounded-2xl border border-indigo-500/30 space-y-2">
+                          <div className="text-xs font-extrabold text-indigo-500">
+                            ✍️ 3) {currentExamCourse.steps[0].essayMission.typeBadge}
+                          </div>
+                          <div className="text-xs font-bold">
+                            {currentExamCourse.steps[0].essayMission.koCondition}
+                          </div>
+                          <div className="text-xs font-mono text-blue-500">
+                            보기: {currentExamCourse.steps[0].essayMission.givenWords}
+                          </div>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={examEssayInput}
+                              onChange={(e) => setExamEssayInput(e.target.value)}
+                              placeholder="서술형 영작 답안을 작성하세요..."
+                              className="flex-1 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs"
+                            />
+                            <button
+                              onClick={() => setShowExamModelAnswer(!showExamModelAnswer)}
+                              className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-extrabold"
+                            >
+                              모범답안 확인
+                            </button>
+                          </div>
+                          {showExamModelAnswer && (
+                            <div className="text-xs font-extrabold text-emerald-500 pt-1">
+                              ✅ 모범답안: {currentExamCourse.steps[0].essayMission.modelAnswerEn} (
+                              {currentExamCourse.steps[0].essayMission.scoringCriteria})
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </section>
                 </div>
               )}
 
               {/* ==============================================================
-                  [모드 A] 중등·고등·실무·오픽 전자책 단어장
+                  [모드 A] Day 1 ~ Day 100 (8,000단어 규모) 전자책 단어장
               ============================================================== */}
               {activeMode === 'wordbook' && (
                 <section
@@ -5090,10 +5485,10 @@ export default function App() {
                   <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
                     <div>
                       <span className="text-xs font-extrabold text-blue-500">
-                        PAGE-TURNING E-WORDBOOK (진도 자동 저장)
+                        8,000+ MASSIVE E-WORDBOOK (Day 1 ~ Day 100 × 각 20단어)
                       </span>
                       <h2 className="text-2xl font-extrabold mt-0.5">
-                        📘 단계별 영단어장 (중등 · 고등·수능 · 비즈니스 · 오픽)
+                        📘 초고밀도 영단어장 (중등 · 고등·수능 · 비즈니스 · 오픽)
                       </h2>
                     </div>
 
@@ -5132,18 +5527,30 @@ export default function App() {
                     }`}
                   >
                     <button
-                      onClick={() => setWordbookDay((d) => (d > 1 ? d - 1 : 3))}
+                      onClick={() => setWordbookDay((d) => (d > 1 ? d - 1 : 100))}
                       className="px-4 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs font-extrabold"
                     >
-                      ◀ 이전 페이지 (Day {wordbookDay > 1 ? wordbookDay - 1 : 3})
+                      ◀ 이전 Day {wordbookDay > 1 ? wordbookDay - 1 : 100}
                     </button>
 
-                    <div className="text-center">
+                    <div className="text-center space-y-1">
                       <div className="text-base font-black">
-                        📖 [{wordbookLevel}] — Day {wordbookDay} 페이지
+                        📖 [{wordbookLevel}] — Day {wordbookDay} / 100 페이지 (이번 페이지 20단어)
                       </div>
-                      <div className="text-[11px] text-slate-500">
-                        레벨(초·중·고급)이나 모드를 바꾸어도 나의 단어장 완료 기록은 그대로 이어집니다!
+                      <div className="flex flex-wrap justify-center gap-1">
+                        {[1, 2, 3, 5, 10, 20, 30, 50, 75, 100].map((dNum) => (
+                          <button
+                            key={dNum}
+                            onClick={() => setWordbookDay(dNum)}
+                            className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${
+                              wordbookDay === dNum
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                            }`}
+                          >
+                            Day {dNum}
+                          </button>
+                        ))}
                       </div>
                     </div>
 
@@ -5163,14 +5570,14 @@ export default function App() {
                       >
                         {completedDays.includes(`${wordbookLevel}-${wordbookDay}`)
                           ? '✅ 암기 완료됨'
-                          : '오늘 페이지 완료 체크'}
+                          : '오늘 Day 완료 체크'}
                       </button>
 
                       <button
-                        onClick={() => setWordbookDay((d) => (d < 3 ? d + 1 : 1))}
+                        onClick={() => setWordbookDay((d) => (d < 100 ? d + 1 : 1))}
                         className={`px-4 py-2 rounded-xl text-white text-xs font-extrabold ${themeAccentBg}`}
                       >
-                        다음 페이지 (Day {wordbookDay < 3 ? wordbookDay + 1 : 1}) ▶
+                        다음 Day {wordbookDay < 100 ? wordbookDay + 1 : 1} ▶
                       </button>
                     </div>
                   </div>
@@ -5182,7 +5589,7 @@ export default function App() {
                       return (
                         <div
                           key={idx}
-                          className={`p-5 rounded-2xl border space-y-3 ${
+                          className={`p-5 rounded-2xl border space-y-2.5 ${
                             darkMode
                               ? 'bg-slate-950 border-slate-800'
                               : 'bg-slate-50 border-slate-200'
@@ -5191,12 +5598,15 @@ export default function App() {
                           <div className="flex items-start justify-between gap-2">
                             <div>
                               <div className="flex items-center gap-2">
-                                <span className="text-xl font-black">{item.word}</span>
+                                <span className="text-xs font-extrabold text-slate-400">
+                                  #{idx + 1}
+                                </span>
+                                <span className="text-lg font-black">{item.word}</span>
                                 <span className="text-xs font-mono text-blue-500 font-bold">
                                   {item.ipa}
                                 </span>
                                 <button
-                                  onClick={() => speakText(item.word)}
+                                  onClick={() => speakText(item.word.split('(')[0])}
                                   className="w-7 h-7 rounded-full bg-blue-600 text-white text-xs"
                                 >
                                   🔊
@@ -5237,10 +5647,10 @@ export default function App() {
                           <div className="text-sm font-extrabold">뜻: {item.meaning}</div>
                           <div className="text-xs space-y-1">
                             <div>🧱 소리블럭: {item.soundBlock}</div>
-                            <div>🎯 소리방식: {item.soundMethod}</div>
                             <div className="text-blue-500 font-bold">
                               🔗 짝꿍: {item.collocation} ({item.collocationKo})
                             </div>
+                            <div className="text-slate-500 italic">"{item.exampleEn}"</div>
                           </div>
                         </div>
                       );
@@ -5309,22 +5719,13 @@ export default function App() {
                       <div className="text-xl font-black text-yellow-400">
                         {currentLevelTrack.patternEn}
                       </div>
-                      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-300">
-                        <span className="font-mono text-blue-300">{currentLevelTrack.patternIpa}</span>
-                        <span>🧱 소리블럭: {currentLevelTrack.patternSoundBlock}</span>
-                        {(learningLevel === 'beginner' || isPronVisible('lvl-track')) && (
-                          <span className="text-amber-300 font-bold">
-                            🗣️ {currentLevelTrack.patternPron}
-                          </span>
-                        )}
-                      </div>
                       <div className="text-sm font-bold text-white">
                         🇰🇷 뜻 도움: "{currentLevelTrack.patternMeaningKo}"
                       </div>
 
                       <div className="pt-2 border-t border-slate-800 space-y-1.5">
                         <div className="text-xs font-extrabold text-blue-300">
-                          🔄 레벨업 바꿔 말하기 (Paraphrasing Drill — 쉬운 표현 ➔ 세련된 원어민 표현):
+                          🔄 레벨업 바꿔 말하기 (Paraphrasing Drill):
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                           {currentLevelTrack.paraphraseDrill.map((dr, idx) => (
@@ -5342,11 +5743,6 @@ export default function App() {
                           ))}
                         </div>
                       </div>
-
-                      <div className="p-3 rounded-xl bg-indigo-950/60 border border-indigo-500/30 text-xs">
-                        <strong className="text-indigo-300">🗣️ 실전 말하기 미션:</strong>{' '}
-                        {currentLevelTrack.longTalkPrompt}
-                      </div>
                     </div>
                   </div>
 
@@ -5359,15 +5755,9 @@ export default function App() {
                     }`}
                   >
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <h3 className="text-lg font-extrabold">
-                          📚 STEP 2. 전 레벨 짝꿍 단어장 (실시간 클릭 키워드 1순위 자동 배치!)
-                        </h3>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                          단어를 클릭하면 아래 <strong>STEP 3의 16개 문장성분×9품사 다이어그램</strong>이 즉시 연동됩니다.
-                        </p>
-                      </div>
-
+                      <h3 className="text-lg font-extrabold">
+                        📚 STEP 2. 전 레벨 짝꿍 단어장 (실시간 클릭 키워드 1순위 자동 배치!)
+                      </h3>
                       <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-full">
                         <button
                           onClick={() => setHideWordMode(!hideWordMode)}
@@ -5393,10 +5783,10 @@ export default function App() {
                         <thead className="bg-slate-100 dark:bg-slate-800 font-extrabold">
                           <tr>
                             <th className="py-3 px-3 text-center">추천레벨</th>
-                            <th className="py-3 px-3">단어 · 발음기호 · 한글발음</th>
+                            <th className="py-3 px-3">단어 · 발음기호</th>
                             <th className="py-3 px-3">뜻 & 16매핑 (9품사×7성분)</th>
-                            <th className="py-3 px-3">🧱 소리블럭 & 🎙️ 소리방식</th>
-                            <th className="py-3 px-3">🔗 짝꿍 표현 & 바꿔말하기 팁</th>
+                            <th className="py-3 px-3">🧱 소리블럭</th>
+                            <th className="py-3 px-3">🔗 짝꿍 표현 & 바꿔말하기</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
@@ -5404,7 +5794,6 @@ export default function App() {
                             const isWordHidden = hideWordMode && !revealedWordIds.includes(v.id);
                             const isMeaningHidden =
                               hideMeaningMode && !revealedWordIds.includes(v.id);
-                            const pronKey = `vocab-${currentTheme.id}-${v.id}`;
                             const isSaved = bookmarkedWords.some((b) => b.word === v.word);
                             const isLiveTop = v.id === 0;
 
@@ -5423,27 +5812,10 @@ export default function App() {
                                 }`}
                               >
                                 <td className="py-3 px-3 text-center">
-                                  <span
-                                    className={`inline-block text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
-                                      isLiveTop
-                                        ? 'bg-rose-600 text-white'
-                                        : v.recommendLevel === 'beginner'
-                                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                                        : v.recommendLevel === 'intermediate'
-                                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
-                                        : 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300'
-                                    }`}
-                                  >
-                                    {isLiveTop
-                                      ? '🔥 실시간1순위'
-                                      : v.recommendLevel === 'beginner'
-                                      ? '🌱 초급필수'
-                                      : v.recommendLevel === 'intermediate'
-                                      ? '🌿 중급확장'
-                                      : '🌳 고급뉘앙스'}
+                                  <span className="inline-block text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-300">
+                                    {isLiveTop ? '🔥 실검1순위' : v.recommendLevel.toUpperCase()}
                                   </span>
                                 </td>
-
                                 <td className="py-3 px-3">
                                   <div className="flex items-center gap-1.5">
                                     <span className="text-sm font-black">
@@ -5468,70 +5840,29 @@ export default function App() {
                                           collocation: v.collocation,
                                           posLabel: v.posLabel,
                                           compLabel: v.compLabel,
-                                          levelBadge: v.recommendLevel,
                                         });
                                       }}
-                                      className="text-sm"
                                     >
                                       {isSaved ? '⭐' : '☆'}
                                     </button>
                                   </div>
-                                  <div className="font-mono text-[11px] text-blue-500 font-bold">
-                                    {v.ipa}
-                                  </div>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      toggleKoreanPron(pronKey);
-                                    }}
-                                    className="mt-1 px-2 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold text-[10px]"
-                                  >
-                                    {isPronVisible(pronKey)
-                                      ? `🗣️ ${v.pron}`
-                                      : '🔒 [한글발음 터치]'}
-                                  </button>
+                                  <div className="font-mono text-[11px] text-blue-500">{v.ipa}</div>
                                 </td>
-
                                 <td className="py-3 px-3">
-                                  <div className="font-extrabold text-xs">
+                                  <div className="font-extrabold">
                                     {isMeaningHidden ? '🔒 [뜻 숨김]' : v.meaning}
                                   </div>
-                                  <div className="flex flex-wrap gap-1 mt-1">
-                                    <span className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-[10px] font-bold">
-                                      {v.posLabel}
-                                    </span>
-                                    <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300 text-[10px] font-bold">
-                                      {v.compLabel}
-                                    </span>
+                                  <div className="text-[10px] text-slate-500">
+                                    {v.posLabel} · {v.compLabel}
                                   </div>
                                 </td>
-
-                                <td className="py-3 px-3 max-w-xs">
-                                  <div className="font-extrabold text-emerald-600 dark:text-emerald-400">
-                                    🧱 {v.soundBlock}
-                                  </div>
-                                  <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                                    🎙️ {v.soundMethod}
-                                  </div>
+                                <td className="py-3 px-3 font-bold text-emerald-600 dark:text-emerald-400">
+                                  {v.soundBlock}
                                 </td>
-
                                 <td className="py-3 px-3">
-                                  <div className="font-extrabold text-blue-600 dark:text-blue-400 flex items-center gap-1">
-                                    <span>{v.collocation}</span>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        speakText(v.collocation);
-                                      }}
-                                    >
-                                      🔊
-                                    </button>
-                                  </div>
-                                  <div className="text-[11px] text-slate-500">
-                                    ({v.collocationKo})
-                                  </div>
-                                  <div className="text-[10px] text-purple-600 dark:text-purple-400 font-semibold mt-0.5">
-                                    🔄 {v.paraphraseTip}
+                                  <div className="font-bold text-blue-500">{v.collocation}</div>
+                                  <div className="text-[10px] text-purple-500">
+                                    {v.paraphraseTip}
                                   </div>
                                 </td>
                               </tr>
@@ -5554,15 +5885,15 @@ export default function App() {
                       <div className="inline-flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-full border border-slate-200 dark:border-slate-700">
                         {[
                           { id: 'all', label: '16개 전체 매핑 다이어그램' },
-                          { id: 'comp', label: '문장 성분(7직책) 뜻·어순 사전' },
-                          { id: 'pos', label: '9품사(9신분) 뜻·역할 사전' },
+                          { id: 'comp', label: '문장 성분(7직책) 사전' },
+                          { id: 'pos', label: '9품사(9신분) 사전' },
                         ].map((t) => (
                           <button
                             key={t.id}
                             onClick={() => setDiagramTab(t.id as 'all' | 'comp' | 'pos')}
                             className={`px-4 py-1.5 rounded-full text-xs font-extrabold transition ${
                               diagramTab === t.id
-                                ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 border-2 border-blue-600 shadow-sm'
+                                ? 'bg-white dark:bg-slate-900 text-blue-600 border-2 border-blue-600'
                                 : 'text-slate-600 dark:text-slate-400'
                             }`}
                           >
@@ -5570,274 +5901,135 @@ export default function App() {
                           </button>
                         ))}
                       </div>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() =>
-                            setRevealedWordIds(
-                              revealedWordIds.length > 0
-                                ? []
-                                : currentTheme.vocab.map((v) => v.id)
-                            )
-                          }
-                          className="px-3 py-1.5 rounded-full border border-slate-300 dark:border-slate-700 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800"
-                        >
-                          단어장 숨김 전체해제
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSelectedComp(null);
-                            setSelectedPos(null);
-                            setSelectedTokenIdx(null);
-                          }}
-                          className="px-3.5 py-1.5 rounded-full border border-slate-300 dark:border-slate-700 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800"
-                        >
-                          전체 연결 보기
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => {
+                          setSelectedComp(null);
+                          setSelectedPos(null);
+                        }}
+                        className="px-3.5 py-1.5 rounded-full border border-slate-300 dark:border-slate-700 text-xs font-bold"
+                      >
+                        전체 연결 보기
+                      </button>
                     </div>
 
-                    <div
-                      className={`border rounded-3xl p-5 space-y-4 ${
-                        darkMode
-                          ? 'bg-slate-950 border-slate-800'
-                          : 'bg-slate-50 border-slate-200'
-                      }`}
-                    >
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        🔍 <strong>STEP 3. 문장 성분(7직책) × 9품사(9신분) 총 16개 매핑 다이어그램:</strong> 상단 문장 성분(7개), 하단 9품사 노드, 또는 아래 <strong>실전 문장 해부 카드</strong>를 터치하면 연결 경로와 정확한 뜻·어순 규칙이 실시간으로 바뀝니다!
-                      </p>
+                    <div className="w-full overflow-x-auto">
+                      <svg viewBox="0 0 920 310" className="w-full min-w-[760px] h-auto select-none">
+                        {MAPPING_EDGES.map((edge, idx) => {
+                          const compIdx = SENTENCE_COMPONENTS.findIndex((c) => c.id === edge.comp);
+                          const posIdx = PARTS_OF_SPEECH.findIndex((p) => p.id === edge.pos);
+                          const x1 = 75 + compIdx * 128;
+                          const y1 = 112;
+                          const x2 = 55 + posIdx * 101;
+                          const y2 = 212;
+                          const midY = 162;
 
-                      <div className="w-full overflow-x-auto">
-                        <svg viewBox="0 0 920 310" className="w-full min-w-[760px] h-auto select-none">
-                          <text x="30" y="24" className="fill-slate-400 text-[11px] font-bold">
-                            문장 성분 (5대 요소 · 세부 7직책) — 문장에서 맡는 자리와 어순 역할
-                          </text>
+                          const isHighlighted =
+                            (selectedComp === null && selectedPos === null) ||
+                            (selectedComp !== null &&
+                              selectedPos !== null &&
+                              edge.comp === selectedComp &&
+                              edge.pos === selectedPos) ||
+                            (selectedComp !== null &&
+                              selectedPos === null &&
+                              edge.comp === selectedComp) ||
+                            (selectedPos !== null &&
+                              selectedComp === null &&
+                              edge.pos === selectedPos);
 
-                          {MAPPING_EDGES.map((edge, idx) => {
-                            const compIdx = SENTENCE_COMPONENTS.findIndex((c) => c.id === edge.comp);
-                            const posIdx = PARTS_OF_SPEECH.findIndex((p) => p.id === edge.pos);
-                            const x1 = 75 + compIdx * 128;
-                            const y1 = 112;
-                            const x2 = 55 + posIdx * 101;
-                            const y2 = 212;
-                            const midY = 162;
+                          return (
+                            <path
+                              key={idx}
+                              d={`M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${x2} ${y2}`}
+                              fill="none"
+                              stroke={isHighlighted ? '#2563eb' : '#cbd5e1'}
+                              strokeWidth={isHighlighted ? 2.8 : 1.2}
+                              opacity={isHighlighted ? 1 : 0.3}
+                            />
+                          );
+                        })}
 
-                            const isHighlighted =
-                              (selectedComp === null && selectedPos === null) ||
-                              (selectedComp !== null &&
-                                selectedPos !== null &&
-                                edge.comp === selectedComp &&
-                                edge.pos === selectedPos) ||
-                              (selectedComp !== null &&
-                                selectedPos === null &&
-                                edge.comp === selectedComp) ||
-                              (selectedPos !== null &&
-                                selectedComp === null &&
-                                edge.pos === selectedPos);
-
-                            const isDashed = edge.comp === 'M';
-
-                            return (
-                              <path
-                                key={idx}
-                                d={`M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${x2} ${y2}`}
-                                fill="none"
-                                stroke={isHighlighted ? '#2563eb' : '#cbd5e1'}
-                                strokeWidth={isHighlighted ? 2.8 : 1.2}
-                                strokeDasharray={isDashed ? '4 3' : undefined}
-                                opacity={isHighlighted ? 1 : 0.3}
+                        {SENTENCE_COMPONENTS.map((comp, idx) => {
+                          const cx = 75 + idx * 128;
+                          const cy = 74;
+                          const isActive = selectedComp === comp.id;
+                          return (
+                            <g
+                              key={comp.id}
+                              onClick={() => {
+                                setSelectedComp(comp.id);
+                                setSelectedPos(null);
+                              }}
+                              className="cursor-pointer"
+                            >
+                              <circle
+                                cx={cx}
+                                cy={cy}
+                                r={38}
+                                fill={isActive ? '#eff6ff' : '#ffffff'}
+                                stroke={isActive ? '#2563eb' : '#94a3b8'}
+                                strokeWidth={isActive ? 3 : 1.5}
                               />
-                            );
-                          })}
-
-                          {SENTENCE_COMPONENTS.map((comp, idx) => {
-                            const cx = 75 + idx * 128;
-                            const cy = 74;
-                            const isActive =
-                              selectedComp === comp.id ||
-                              (selectedComp === null &&
-                                selectedPos !== null &&
-                                MAPPING_EDGES.some(
-                                  (e) => e.comp === comp.id && e.pos === selectedPos
-                                ));
-
-                            return (
-                              <g
-                                key={comp.id}
-                                onClick={() => {
-                                  setSelectedComp(comp.id);
-                                  setSelectedPos(null);
-                                }}
-                                className="cursor-pointer"
+                              <text
+                                x={cx}
+                                y={cy - 4}
+                                textAnchor="middle"
+                                className="text-[13px] font-extrabold fill-slate-800"
                               >
-                                <circle
-                                  cx={cx}
-                                  cy={cy}
-                                  r={38}
-                                  fill={isActive ? '#eff6ff' : '#ffffff'}
-                                  stroke={isActive ? '#2563eb' : '#94a3b8'}
-                                  strokeWidth={isActive ? 3 : 1.5}
-                                />
-                                <text
-                                  x={cx}
-                                  y={cy - 4}
-                                  textAnchor="middle"
-                                  className="text-[13px] font-extrabold fill-slate-800"
-                                >
-                                  {comp.name}
-                                </text>
-                                <text
-                                  x={cx}
-                                  y={cy + 15}
-                                  textAnchor="middle"
-                                  className="text-[10px] font-bold fill-blue-600 italic"
-                                >
-                                  {comp.id}
-                                </text>
-                              </g>
-                            );
-                          })}
-
-                          {PARTS_OF_SPEECH.map((pos, idx) => {
-                            const cx = 55 + idx * 101;
-                            const cy = 248;
-                            const isActive =
-                              selectedPos === pos.id ||
-                              (selectedPos === null &&
-                                selectedComp !== null &&
-                                MAPPING_EDGES.some(
-                                  (e) => e.pos === pos.id && e.comp === selectedComp
-                                ));
-
-                            return (
-                              <g
-                                key={pos.id}
-                                onClick={() => {
-                                  setSelectedPos(pos.id);
-                                  setSelectedComp(null);
-                                }}
-                                className="cursor-pointer"
+                                {comp.name}
+                              </text>
+                              <text
+                                x={cx}
+                                y={cy + 15}
+                                textAnchor="middle"
+                                className="text-[10px] font-bold fill-blue-600"
                               >
-                                <circle
-                                  cx={cx}
-                                  cy={cy}
-                                  r={34}
-                                  fill={isActive ? '#eff6ff' : '#ffffff'}
-                                  stroke={isActive ? '#2563eb' : '#cbd5e1'}
-                                  strokeWidth={isActive ? 3 : 1.5}
-                                />
-                                <text
-                                  x={cx}
-                                  y={cy - 3}
-                                  textAnchor="middle"
-                                  className="text-[12px] font-extrabold fill-slate-800"
-                                >
-                                  {pos.name}
-                                </text>
-                                <text
-                                  x={cx}
-                                  y={cy + 14}
-                                  textAnchor="middle"
-                                  className="text-[10px] font-bold fill-slate-500 italic"
-                                >
-                                  {pos.id}
-                                </text>
-                              </g>
-                            );
-                          })}
+                                {comp.id}
+                              </text>
+                            </g>
+                          );
+                        })}
 
-                          <text x="30" y="302" className="fill-slate-400 text-[11px] font-bold">
-                            9품사 (단어가 타고난 고유 신분) — 사전에 등재된 갈래 (*접속사·감탄사는 독립/연결 요소)
-                          </text>
-                        </svg>
-                      </div>
-
-                      <div
-                        className={`p-4 rounded-2xl border space-y-3 ${
-                          darkMode
-                            ? 'bg-slate-900 border-slate-800'
-                            : 'bg-white border-slate-200'
-                        }`}
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
-                              16개 전체 요약 & 뜻 사전
-                            </span>
-                            <h4 className="text-sm font-extrabold">
-                              7개 문장 성분(직책)과 9품사(신분)의 정확한 뜻 & 어순 규칙
-                            </h4>
-                          </div>
-
-                          <div className="flex flex-wrap gap-1.5">
-                            {[
-                              { label: '주어(S) 탐색', comp: 'S' as CompId, pos: null },
-                              { label: '동사(V) 탐색', comp: 'V' as CompId, pos: null },
-                              { label: '직접목적어(DO)', comp: 'DO' as CompId, pos: null },
-                              { label: '주격보어(SC)', comp: 'SC' as CompId, pos: null },
-                              { label: '수식어(M)', comp: 'M' as CompId, pos: null },
-                              { label: '명사(N)', comp: null, pos: 'N' as PosId },
-                              { label: '형용사(Adj)', comp: null, pos: 'Adj' as PosId },
-                            ].map((btn, i) => (
-                              <button
-                                key={i}
-                                onClick={() => {
-                                  setSelectedComp(btn.comp);
-                                  setSelectedPos(btn.pos);
-                                }}
-                                className="px-2.5 py-1 rounded-full border border-slate-300 dark:border-slate-700 text-[11px] font-bold hover:bg-blue-50 dark:hover:bg-slate-800"
+                        {PARTS_OF_SPEECH.map((pos, idx) => {
+                          const cx = 55 + idx * 101;
+                          const cy = 248;
+                          const isActive = selectedPos === pos.id;
+                          return (
+                            <g
+                              key={pos.id}
+                              onClick={() => {
+                                setSelectedPos(pos.id);
+                                setSelectedComp(null);
+                              }}
+                              className="cursor-pointer"
+                            >
+                              <circle
+                                cx={cx}
+                                cy={cy}
+                                r={34}
+                                fill={isActive ? '#eff6ff' : '#ffffff'}
+                                stroke={isActive ? '#2563eb' : '#cbd5e1'}
+                                strokeWidth={isActive ? 3 : 1.5}
+                              />
+                              <text
+                                x={cx}
+                                y={cy - 3}
+                                textAnchor="middle"
+                                className="text-[12px] font-extrabold fill-slate-800"
                               >
-                                {btn.label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                          {selectedComp && (
-                            <div className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900">
-                              <div className="font-extrabold text-blue-700 dark:text-blue-300">
-                                📌 선택된 문장 성분(직책):{' '}
-                                {SENTENCE_COMPONENTS.find((c) => c.id === selectedComp)?.name} (
-                                {selectedComp})
-                              </div>
-                              <p className="mt-1">
-                                • <strong>뜻:</strong>{' '}
-                                {SENTENCE_COMPONENTS.find((c) => c.id === selectedComp)?.meaning}
-                              </p>
-                              <p className="mt-0.5 text-slate-500">
-                                • <strong>어순 위치:</strong>{' '}
-                                {
-                                  SENTENCE_COMPONENTS.find((c) => c.id === selectedComp)
-                                    ?.wordOrderRule
-                                }
-                              </p>
-                            </div>
-                          )}
-
-                          {selectedPos && (
-                            <div className="p-3 rounded-xl bg-purple-50/70 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-900">
-                              <div className="font-extrabold text-purple-700 dark:text-purple-300">
-                                🏷️ 선택된 9품사(신분):{' '}
-                                {PARTS_OF_SPEECH.find((p) => p.id === selectedPos)?.name} (
-                                {selectedPos})
-                              </div>
-                              <p className="mt-1">
-                                • <strong>뜻:</strong>{' '}
-                                {PARTS_OF_SPEECH.find((p) => p.id === selectedPos)?.meaning}
-                              </p>
-                              <p className="mt-0.5 text-slate-500">
-                                • <strong>담당 가능한 문장 성분:</strong>{' '}
-                                {
-                                  PARTS_OF_SPEECH.find((p) => p.id === selectedPos)
-                                    ?.canBeComponents
-                                }
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                                {pos.name}
+                              </text>
+                              <text
+                                x={cx}
+                                y={cy + 14}
+                                textAnchor="middle"
+                                className="text-[10px] font-bold fill-slate-500"
+                              >
+                                {pos.id}
+                              </text>
+                            </g>
+                          );
+                        })}
+                      </svg>
                     </div>
 
                     {/* 실전 예문 이중 레이어 해부 카드 */}
@@ -5849,17 +6041,9 @@ export default function App() {
                       }`}
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="px-2.5 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-extrabold">
-                              실시간 문장 연동 ON
-                            </span>
-                            <h4 className="text-base font-extrabold">
-                              실전 예문 이중 레이어 해부 (선택한 문장의 단어들이 즉시 카드로 쪼개집니다!)
-                            </h4>
-                          </div>
-                        </div>
-
+                        <h4 className="text-base font-extrabold">
+                          🧩 실전 예문 이중 레이어 해부 카드 (문장 버튼 클릭 시 즉시 변환!)
+                        </h4>
                         <div className="flex flex-wrap gap-1.5">
                           {currentTheme.sentences.map((s, idx) => (
                             <button
@@ -5870,235 +6054,127 @@ export default function App() {
                                 setSelectedTokenIdx(0);
                                 speakText(s.rawEn);
                               }}
-                              className={`px-3 py-1.5 rounded-full text-xs font-extrabold transition ${
+                              className={`px-3 py-1 rounded-full text-xs font-extrabold ${
                                 !customDissectSentence && activeDiagramSentenceIdx === idx
-                                  ? 'bg-blue-600 text-white shadow'
-                                  : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-slate-200 dark:bg-slate-800'
                               }`}
                             >
-                              {s.id === 0
-                                ? `🔥 실검 ${selectedLiveKeyword?.rank}위 문장`
-                                : `문장 ${idx + 1} (${s.levelTag === 'beginner' ? '초급' : s.levelTag === 'intermediate' ? '중급' : '고급'})`}
+                              {s.id === 0 ? '🔥 실검문장' : `문장 ${idx + 1}`}
                             </button>
                           ))}
                         </div>
                       </div>
 
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-                        {currentDiagramEx.tokens.map((tk, idx) => {
-                          const isCardSel = selectedTokenIdx === idx;
-                          return (
-                            <button
-                              key={idx}
-                              onClick={() => {
-                                setSelectedTokenIdx(idx);
-                                setSelectedComp(tk.comp === '독립어' ? 'M' : tk.comp);
-                                setSelectedPos(tk.pos);
-                                speakText(tk.word);
-                              }}
-                              className={`p-3.5 rounded-2xl bg-white dark:bg-slate-900 border-2 text-center flex flex-col items-center justify-between gap-2 transition shadow-sm ${
-                                isCardSel
-                                  ? 'border-blue-600 ring-2 ring-blue-500/20'
-                                  : `${tk.colorClass} dark:border-slate-800`
-                              }`}
-                            >
-                              <span className="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200">
-                                {tk.compLabel}
-                              </span>
-                              <span className="text-base font-black text-slate-900 dark:text-white my-0.5">
-                                {tk.word}
-                              </span>
-                              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400">
-                                {tk.posLabel}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      <div className="text-xs pt-2 border-t border-slate-200 dark:border-slate-800 space-y-1">
-                        <div>
-                          <strong>현재 해부 중인 문장:</strong> "{activeSentenceForDiagram.rawEn}"
-                        </div>
-                        <div>
-                          <strong>해석:</strong> {currentDiagramEx.translation} (
-                          <strong>핵심 뼈대:</strong> {currentDiagramEx.skeleton})
-                        </div>
+                        {currentDiagramEx.tokens.map((tk, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => {
+                              setSelectedTokenIdx(idx);
+                              setSelectedComp(tk.comp === '독립어' ? 'M' : tk.comp);
+                              setSelectedPos(tk.pos);
+                              speakText(tk.word);
+                            }}
+                            className={`p-3 rounded-2xl bg-white dark:bg-slate-900 border-2 text-center flex flex-col items-center gap-1.5 ${
+                              selectedTokenIdx === idx
+                                ? 'border-blue-600'
+                                : `${tk.colorClass} dark:border-slate-800`
+                            }`}
+                          >
+                            <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800">
+                              {tk.compLabel}
+                            </span>
+                            <span className="text-base font-black">{tk.word}</span>
+                            <span className="text-[10px] font-bold text-slate-500">
+                              {tk.posLabel}
+                            </span>
+                          </button>
+                        ))}
                       </div>
                     </div>
                   </section>
 
-                  {/* STEP 4. 전 레벨 3단 직독직해 & 펜슬장 */}
+                  {/* STEP 4. 3단 직독직해 */}
                   <section
-                    className={`border rounded-3xl p-6 shadow-sm space-y-6 ${
+                    className={`border rounded-3xl p-6 shadow-sm space-y-5 ${
                       darkMode
                         ? 'bg-slate-900 border-slate-800'
                         : 'bg-white border-slate-200'
                     }`}
                   >
                     <h3 className="text-lg font-extrabold">
-                      🗣️ STEP 4. 전 레벨(초급·중급·고급) 3단 직독직해 & 바꿔 말하기 트레이닝
+                      🗣️ STEP 4. 전 레벨 3단 직독직해 & 바꿔 말하기 트레이닝
                     </h3>
-
-                    <div className="space-y-5">
-                      {currentTheme.sentences.map((sent, sIdx) => {
-                        const sentPronKey = `sent-${currentTheme.id}-${sent.id}`;
-                        const isCurrentlyDissected =
-                          !customDissectSentence && activeDiagramSentenceIdx === sIdx;
-
-                        return (
-                          <div
-                            key={sent.id}
-                            className={`p-5 rounded-2xl border space-y-3 transition ${
-                              sent.id === 0
-                                ? 'bg-rose-500/10 border-rose-500 ring-2 ring-rose-500/30'
-                                : darkMode
-                                ? 'bg-slate-950 border-slate-800'
-                                : 'bg-slate-50 border-slate-200'
-                            }`}
-                          >
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <span
-                                className={`text-xs font-extrabold px-3 py-1 rounded-full text-white ${
-                                  sent.id === 0 ? 'bg-rose-600' : themeAccentBg
-                                }`}
-                              >
-                                {sent.tag}
-                              </span>
-
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                <button
-                                  onClick={() => {
-                                    setCustomDissectSentence(null);
-                                    setActiveDiagramSentenceIdx(sIdx);
-                                    setSelectedTokenIdx(0);
-                                    speakText(sent.rawEn);
-                                  }}
-                                  className={`px-3 py-1 rounded-lg text-xs font-extrabold border transition ${
-                                    isCurrentlyDissected
-                                      ? 'bg-emerald-600 text-white border-emerald-600'
-                                      : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-blue-600 dark:text-blue-300'
-                                  }`}
-                                >
-                                  {isCurrentlyDissected
-                                    ? '✅ STEP 3 해부 카드에 표시중'
-                                    : '🔍 이 문장 16매핑 카드로 해부하기'}
-                                </button>
-                                <button
-                                  onClick={() => speakText(sent.rawEn)}
-                                  className={`px-3 py-1 rounded-lg text-white text-xs font-extrabold ${themeAccentBg}`}
-                                >
-                                  🔊 {speechRate}x 듣기
-                                </button>
-                              </div>
-                            </div>
-
-                            <div
-                              className={`p-4 rounded-xl border space-y-2 text-sm leading-relaxed ${
-                                darkMode
-                                  ? 'bg-slate-900 border-slate-800'
-                                  : 'bg-white border-slate-200'
-                              }`}
+                    {currentTheme.sentences.map((sent, sIdx) => (
+                      <div
+                        key={sent.id}
+                        className={`p-5 rounded-2xl border space-y-2.5 ${
+                          darkMode
+                            ? 'bg-slate-950 border-slate-800'
+                            : 'bg-slate-50 border-slate-200'
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className={`text-xs font-extrabold px-3 py-1 rounded-full text-white ${themeAccentBg}`}>
+                            {sent.tag}
+                          </span>
+                          <div className="flex gap-1.5">
+                            <button
+                              onClick={() => {
+                                setCustomDissectSentence(null);
+                                setActiveDiagramSentenceIdx(sIdx);
+                                speakText(sent.rawEn);
+                              }}
+                              className="px-3 py-1 rounded-lg bg-blue-600 text-white text-xs font-extrabold"
                             >
-                              <div className="font-semibold">① [의미단위 뜻 도움] {sent.koLine}</div>
-                              <div className="font-bold text-base">
-                                ② [영어 어순 매칭] {renderHighlightedSentence(sent.enLine)}
-                              </div>
-                              <div
-                                onClick={() => toggleKoreanPron(sentPronKey)}
-                                className="cursor-pointer text-xs font-extrabold text-amber-700 dark:text-amber-300 bg-amber-500/15 px-3 py-1.5 rounded-lg inline-block"
-                              >
-                                ③ [원어민 리얼 발음]{' '}
-                                {isPronVisible(sentPronKey)
-                                  ? sent.pronLine
-                                  : '🔒 [터치하여 한글 발음 보기]'}
-                              </div>
-                              <div
-                                onClick={() => speakText(sent.paraphraseVersion)}
-                                className="pt-2 border-t border-slate-200 dark:border-slate-800 text-xs text-emerald-600 dark:text-emerald-400 font-extrabold cursor-pointer"
-                              >
-                                🔄 [바꿔 말하기]: "{sent.paraphraseVersion}" 🔊
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-extrabold text-slate-500 w-28">
-                                ✍️ 직접 써보기:
-                              </span>
-                              <input
-                                type="text"
-                                value={writingInputs[`copy-${sent.id}`] || ''}
-                                onChange={(e) =>
-                                  setWritingInputs({
-                                    ...writingInputs,
-                                    [`copy-${sent.id}`]: e.target.value,
-                                  })
-                                }
-                                placeholder={sent.rawEn}
-                                className="flex-1 text-xs bg-transparent border-b border-dashed border-slate-300 dark:border-slate-700 py-1 focus:outline-none"
-                              />
-                            </div>
+                              🔍 16매핑 해부
+                            </button>
+                            <button
+                              onClick={() => speakText(sent.rawEn)}
+                              className="px-3 py-1 rounded-lg bg-slate-800 text-white text-xs font-bold"
+                            >
+                              🔊 듣기
+                            </button>
                           </div>
-                        );
-                      })}
-                    </div>
-
-                    <div
-                      className={`p-4 rounded-2xl border space-y-2 ${
-                        darkMode
-                          ? 'bg-slate-950 border-slate-800'
-                          : 'bg-slate-50 border-slate-200'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-extrabold text-blue-600 dark:text-blue-400">
-                          ✏️ 아이패드 M5 애플 펜슬 손글씨 & 서술형 답안 연습장
-                        </span>
-                        <button
-                          onClick={clearCanvas}
-                          className="px-3 py-1 rounded-lg bg-rose-600 text-white text-xs font-extrabold"
-                        >
-                          지우기
-                        </button>
-                      </div>
-                      <div className="border-2 border-dashed border-blue-300 dark:border-slate-700 rounded-xl overflow-hidden bg-white dark:bg-slate-900">
-                        <canvas
-                          ref={canvasRef}
-                          width={820}
-                          height={180}
-                          onPointerDown={startDrawing}
-                          onPointerMove={draw}
-                          onPointerUp={endDrawing}
-                          onPointerLeave={endDrawing}
-                          className="w-full h-[180px] touch-none cursor-crosshair"
+                        </div>
+                        <div className="text-sm font-semibold">① {sent.koLine}</div>
+                        <div className="text-base font-bold">
+                          ② {renderHighlightedSentence(sent.enLine)}
+                        </div>
+                        <div className="text-xs text-emerald-500 font-extrabold">
+                          🔄 바꿔 말하기: "{sent.paraphraseVersion}"
+                        </div>
+                        <input
+                          type="text"
+                          value={writingInputs[`copy-${sent.id}`] || ''}
+                          onChange={(e) =>
+                            setWritingInputs({
+                              ...writingInputs,
+                              [`copy-${sent.id}`]: e.target.value,
+                            })
+                          }
+                          placeholder={sent.rawEn}
+                          className="w-full text-xs bg-transparent border-b border-dashed border-slate-300 dark:border-slate-700 py-1 focus:outline-none"
                         />
                       </div>
-                    </div>
+                    ))}
                   </section>
 
-                  {/* STEP 5. 네이버 4단계 퀴즈 */}
-                  <section className="bg-slate-900 text-white rounded-3xl p-6 shadow-lg space-y-6 border border-slate-800">
-                    <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
-                      <h3 className="text-lg font-extrabold">
-                        🎮 STEP 5. 네이버 오늘의 단어 퀴즈 (단어 · 초급 · 중급 · 고급) & 영작 미션
-                      </h3>
-                      <div className="flex flex-wrap items-center gap-1.5 bg-slate-800 p-1.5 rounded-2xl">
-                        {[
-                          { id: 'word', label: '단어' },
-                          { id: 'beginner', label: 'Q 초급' },
-                          { id: 'intermediate', label: 'Q 중급 (실검연동)' },
-                          { id: 'advanced', label: 'Q 고급' },
-                        ].map((tab) => (
+                  {/* STEP 5. 네이버 퀴즈 */}
+                  <section className="bg-slate-900 text-white rounded-3xl p-6 shadow-lg space-y-4 border border-slate-800">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h3 className="text-lg font-extrabold">🎮 STEP 5. 네이버 4단계 실전 퀴즈</h3>
+                      <div className="flex gap-1.5">
+                        {(['word', 'beginner', 'intermediate', 'advanced'] as const).map((tab) => (
                           <button
-                            key={tab.id}
-                            onClick={() => setQuizLevelTab(tab.id as typeof quizLevelTab)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition ${
-                              quizLevelTab === tab.id
-                                ? 'bg-blue-600 text-white shadow'
-                                : 'text-slate-400 hover:text-white'
+                            key={tab}
+                            onClick={() => setQuizLevelTab(tab)}
+                            className={`px-3 py-1 rounded-xl text-xs font-extrabold ${
+                              quizLevelTab === tab ? 'bg-blue-600' : 'bg-slate-800'
                             }`}
                           >
-                            {tab.label}
+                            {tab.toUpperCase()}
                           </button>
                         ))}
                       </div>
@@ -6106,54 +6182,46 @@ export default function App() {
 
                     {quizLevelTab === 'word' && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {NAVER_OFFICIAL_WORD_CHALLENGE.map((item, idx) => {
-                          const isRev = revealedChallengeIdx.includes(idx);
-                          return (
-                            <div
-                              key={idx}
-                              className="bg-slate-800 border border-slate-700 rounded-2xl p-4 space-y-2"
-                            >
-                              <div className="flex items-center justify-between">
-                                <span className="text-xl font-black tracking-widest">
-                                  {isRev ? item.word : item.masked}
-                                </span>
-                                <button
-                                  onClick={() =>
-                                    setRevealedChallengeIdx((prev) =>
-                                      prev.includes(idx)
-                                        ? prev.filter((i) => i !== idx)
-                                        : [...prev, idx]
-                                    )
-                                  }
-                                  className="px-2.5 py-1 rounded bg-slate-700 text-xs"
-                                >
-                                  👁️ 정답
-                                </button>
+                        {NAVER_OFFICIAL_WORD_CHALLENGE.map((item, idx) => (
+                          <div
+                            key={idx}
+                            className="bg-slate-800 p-3.5 rounded-2xl border border-slate-700 flex items-center justify-between"
+                          >
+                            <div>
+                              <div className="font-black text-base">
+                                {revealedChallengeIdx.includes(idx) ? item.word : item.masked}
                               </div>
-                              <div className="text-xs text-blue-300">{item.enDef}</div>
-                              {isRev && (
-                                <div className="text-xs text-emerald-400 font-bold">
-                                  ✅ {item.word} — {item.koMeaning}
-                                </div>
-                              )}
+                              <div className="text-xs text-slate-300">{item.koMeaning}</div>
                             </div>
-                          );
-                        })}
+                            <button
+                              onClick={() =>
+                                setRevealedChallengeIdx((prev) =>
+                                  prev.includes(idx)
+                                    ? prev.filter((i) => i !== idx)
+                                    : [...prev, idx]
+                                )
+                              }
+                              className="px-2.5 py-1 rounded bg-slate-700 text-xs"
+                            >
+                              정답
+                            </button>
+                          </div>
+                        ))}
                       </div>
                     )}
 
                     {quizLevelTab === 'beginner' && (
-                      <div className="max-w-xl mx-auto text-center space-y-3">
-                        <div className="text-2xl font-black">{currentTheme.quiz.beginner.word}</div>
+                      <div className="space-y-2">
+                        <div className="text-xl font-black">{currentTheme.quiz.beginner.word}</div>
                         {currentTheme.quiz.beginner.options.map((opt, idx) => (
                           <button
                             key={idx}
                             onClick={() => setSelectedBeginnerOpt(idx)}
-                            className={`w-full p-3 rounded-2xl font-bold text-sm border ${
+                            className={`w-full p-2.5 rounded-xl text-xs font-bold border ${
                               selectedBeginnerOpt === idx
                                 ? idx === currentTheme.quiz.beginner.answerIdx
-                                  ? 'bg-emerald-600 border-emerald-400'
-                                  : 'bg-rose-600 border-rose-400'
+                                  ? 'bg-emerald-600'
+                                  : 'bg-rose-600'
                                 : 'bg-slate-800 border-slate-700'
                             }`}
                           >
@@ -6164,14 +6232,9 @@ export default function App() {
                     )}
 
                     {quizLevelTab === 'intermediate' && (
-                      <div className="max-w-xl mx-auto text-center space-y-3">
-                        <div className="text-base font-extrabold">
-                          {currentTheme.quiz.intermediate.sentenceBefore}{' '}
-                          <span className="text-yellow-300 underline">
-                            {selectedInterOpt !== null
-                              ? currentTheme.quiz.intermediate.options[selectedInterOpt]
-                              : '______'}
-                          </span>{' '}
+                      <div className="space-y-2">
+                        <div className="text-sm font-bold">
+                          {currentTheme.quiz.intermediate.sentenceBefore} _______{' '}
                           {currentTheme.quiz.intermediate.sentenceAfter}
                         </div>
                         <button
@@ -6184,11 +6247,11 @@ export default function App() {
                           <button
                             key={idx}
                             onClick={() => setSelectedInterOpt(idx)}
-                            className={`w-full p-3 rounded-2xl font-bold text-sm border ${
+                            className={`w-full p-2.5 rounded-xl text-xs font-bold border ${
                               selectedInterOpt === idx
                                 ? idx === currentTheme.quiz.intermediate.answerIdx
-                                  ? 'bg-emerald-600 border-emerald-400'
-                                  : 'bg-rose-600 border-rose-400'
+                                  ? 'bg-emerald-600'
+                                  : 'bg-rose-600'
                                 : 'bg-slate-800 border-slate-700'
                             }`}
                           >
@@ -6199,13 +6262,9 @@ export default function App() {
                     )}
 
                     {quizLevelTab === 'advanced' && (
-                      <div className="max-w-xl mx-auto text-center space-y-3">
-                        <div className="text-base font-extrabold">
-                          {currentTheme.quiz.advanced.sentenceBefore}{' '}
-                          <span className="text-blue-400 underline">
-                            {currentTheme.quiz.advanced.highlightWord}
-                          </span>{' '}
-                          {currentTheme.quiz.advanced.sentenceAfter}
+                      <div className="space-y-2">
+                        <div className="text-sm font-bold">
+                          유의어 모두 선택: {currentTheme.quiz.advanced.highlightWord}
                         </div>
                         {currentTheme.quiz.advanced.options.map((opt, idx) => (
                           <button
@@ -6217,11 +6276,11 @@ export default function App() {
                                   : [...prev, idx]
                               )
                             }
-                            className={`w-full p-3 rounded-2xl font-bold text-sm border ${
+                            className={`w-full p-2.5 rounded-xl text-xs font-bold border ${
                               selectedAdvOpts.includes(idx)
                                 ? currentTheme.quiz.advanced.answerIndices.includes(idx)
-                                  ? 'bg-emerald-600 border-emerald-400'
-                                  : 'bg-rose-600 border-rose-400'
+                                  ? 'bg-emerald-600'
+                                  : 'bg-rose-600'
                                 : 'bg-slate-800 border-slate-700'
                             }`}
                           >
@@ -6231,59 +6290,41 @@ export default function App() {
                       </div>
                     )}
 
-                    <div className="pt-4 border-t border-slate-800 space-y-2">
-                      <div className="text-xs font-extrabold text-yellow-400">
-                        ✍️ [영작 미션] {currentTheme.quiz.writingMission.koPrompt}
-                      </div>
+                    <div className="pt-2 border-t border-slate-800">
                       <input
                         type="text"
                         value={userWritingMission}
                         onChange={(e) => setUserWritingMission(e.target.value)}
-                        placeholder={currentTheme.quiz.writingMission.hint}
-                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-xs text-white"
+                        placeholder={currentTheme.quiz.writingMission.koPrompt}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
                       />
                     </div>
                   </section>
                 </>
               )}
 
-              {/* ==============================================================
-                  [모드 C] 네이버 퀴즈 챌린지 & 스마트 복습 북마크 보관함
-              ============================================================== */}
+              {/* 모드 C: 복습장 */}
               {activeMode === 'naverQuiz' && (
                 <section
-                  className={`border rounded-3xl p-6 shadow-sm space-y-6 ${
+                  className={`border rounded-3xl p-6 shadow-sm space-y-4 ${
                     darkMode
                       ? 'bg-slate-900 border-slate-800'
                       : 'bg-white border-slate-200'
                   }`}
                 >
-                  <h2 className="text-2xl font-extrabold">
-                    ⭐ 전 레벨 & 수능·내신 통합 복습 단어장 ({bookmarkedWords.length}개)
+                  <h2 className="text-xl font-extrabold">
+                    ⭐ 나의 통합 복습 단어장 ({bookmarkedWords.length}개)
                   </h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {bookmarkedWords.map((bw, idx) => (
                       <div
                         key={idx}
-                        className={`p-4 rounded-2xl border flex items-center justify-between ${
-                          darkMode
-                            ? 'bg-slate-950 border-slate-800'
-                            : 'bg-slate-50 border-slate-200'
-                        }`}
+                        className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-between"
                       >
                         <div>
-                          <div className="flex items-center gap-2">
-                            <strong className="text-base font-black">{bw.word}</strong>
-                            <span className="font-mono text-xs text-blue-500">{bw.ipa}</span>
-                            <button
-                              onClick={() => speakText(bw.word)}
-                              className="text-xs px-2 py-0.5 rounded bg-blue-600 text-white"
-                            >
-                              🔊
-                            </button>
-                          </div>
-                          <div className="text-xs font-bold mt-1">{bw.meaning}</div>
-                          <div className="text-[11px] text-slate-500">짝꿍: {bw.collocation}</div>
+                          <strong className="text-base font-black">{bw.word}</strong>{' '}
+                          <span className="text-xs text-blue-500">{bw.ipa}</span>
+                          <div className="text-xs font-bold mt-0.5">{bw.meaning}</div>
                         </div>
                         <button
                           onClick={() => toggleBookmark(bw)}
@@ -6297,60 +6338,20 @@ export default function App() {
                 </section>
               )}
 
-              {/* ==============================================================
-                  [모드 D] AI 음성 회화 · 서술형 첨삭 · 영어 성장 리포트
-              ============================================================== */}
+              {/* 모드 D: AI 음성 회화 & 첨삭 */}
               {activeMode === 'aiCoach' && (
                 <div className="space-y-6">
-                  <section
-                    className={`border rounded-3xl p-6 shadow-sm space-y-4 ${
-                      darkMode
-                        ? 'bg-slate-900 border-slate-800'
-                        : 'bg-white border-slate-200'
-                    }`}
-                  >
-                    <h2 className="text-xl font-extrabold">
-                      📈 전 레벨 & 수능·내신 통합 성장 리포트
-                    </h2>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
-                      <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/30">
-                        <div className="text-2xl font-black text-blue-500">
-                          {studyStats.masteredWords}개
-                        </div>
-                        <div className="text-xs font-bold text-slate-500 mt-1">마스터 어휘</div>
-                      </div>
-                      <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30">
-                        <div className="text-2xl font-black text-emerald-500">
-                          {studyStats.completedSentences}문장
-                        </div>
-                        <div className="text-xs font-bold text-slate-500 mt-1">구문·서술형 완주</div>
-                      </div>
-                      <div className="p-4 rounded-2xl bg-purple-500/10 border border-purple-500/30">
-                        <div className="text-2xl font-black text-purple-500">
-                          {studyStats.quizAccuracy}%
-                        </div>
-                        <div className="text-xs font-bold text-slate-500 mt-1">어법·퀴즈 정답률</div>
-                      </div>
-                      <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30">
-                        <div className="text-2xl font-black text-amber-500">
-                          {studyStats.speakingMinutes + Math.floor(speakingSeconds / 60)}분
-                        </div>
-                        <div className="text-xs font-bold text-slate-500 mt-1">누적 훈련 시간</div>
-                      </div>
-                    </div>
-                  </section>
-
-                  <section className="bg-slate-900 text-white rounded-3xl p-6 shadow-lg space-y-4 border border-slate-800">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
+                  <section className="bg-slate-900 text-white rounded-3xl p-6 space-y-4">
+                    <div className="flex items-center justify-between">
                       <h3 className="text-lg font-extrabold">
-                        🎙️ AI 원어민 음성 코치 & 구문·서술형 질의응답 ({targetSpeakingMins}분 코스)
+                        🎙️ AI 원어민 코치 ({targetSpeakingMins}분 코스 · 누적 {studyStats.speakingMinutes}분)
                       </h3>
                       <div className="flex gap-1.5">
                         {[5, 10, 15, 30].map((m) => (
                           <button
                             key={m}
                             onClick={() => setTargetSpeakingMins(m)}
-                            className={`px-3 py-1 rounded-xl text-xs font-extrabold ${
+                            className={`px-2.5 py-1 rounded text-xs font-bold ${
                               targetSpeakingMins === m ? 'bg-blue-600' : 'bg-slate-800'
                             }`}
                           >
@@ -6359,42 +6360,35 @@ export default function App() {
                         ))}
                         <button
                           onClick={() => setIsVoiceActive(!isVoiceActive)}
-                          className="px-3 py-1 rounded-xl bg-emerald-600 text-xs font-extrabold"
+                          className="px-3 py-1 rounded bg-emerald-600 text-xs font-extrabold"
                         >
-                          {isVoiceActive ? '⏸️ 일시정지' : '▶️ 타이머 시작'}
+                          {isVoiceActive ? '⏸️ 일시정지' : '▶️ 시작'}
                         </button>
                       </div>
                     </div>
-
-                    <div className="space-y-2.5 max-h-72 overflow-y-auto p-3 bg-slate-950 rounded-2xl border border-slate-800">
+                    <div className="space-y-2 max-h-60 overflow-y-auto p-3 bg-slate-950 rounded-2xl">
                       {chatHistory.map((turn, i) => (
                         <div
                           key={i}
-                          className={`p-3 rounded-2xl text-xs ${
-                            turn.role === 'coach'
-                              ? 'bg-slate-800 text-slate-100 mr-8'
-                              : 'bg-blue-600 text-white ml-8'
+                          className={`p-3 rounded-xl text-xs ${
+                            turn.role === 'coach' ? 'bg-slate-800 mr-8' : 'bg-blue-600 ml-8'
                           }`}
                         >
-                          <p className="font-bold">{turn.text}</p>
-                          {turn.correction && (
-                            <p className="text-emerald-300 mt-1">{turn.correction}</p>
-                          )}
+                          {turn.text}
                         </div>
                       ))}
                     </div>
-
                     <form onSubmit={handleSendChat} className="flex gap-2">
                       <input
                         type="text"
                         value={chatInput}
                         onChange={(e) => setChatInput(e.target.value)}
                         placeholder="영어로 문장을 입력해 보세요..."
-                        className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white"
+                        className="flex-1 bg-slate-800 rounded-xl px-3 py-2 text-xs text-white"
                       />
                       <button
                         type="submit"
-                        className="px-4 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-extrabold"
+                        className="px-4 py-2 rounded-xl bg-blue-600 text-xs font-extrabold"
                       >
                         전송
                       </button>
@@ -6402,22 +6396,20 @@ export default function App() {
                   </section>
 
                   <section
-                    className={`border rounded-3xl p-6 shadow-sm space-y-4 ${
+                    className={`border rounded-3xl p-6 space-y-3 ${
                       darkMode
                         ? 'bg-slate-900 border-slate-800'
                         : 'bg-white border-slate-200'
                     }`}
                   >
-                    <h3 className="text-lg font-extrabold">
-                      ✍️ 1:1 내신 서술형 영작 & 바꿔 말하기 첨삭 클리닉
-                    </h3>
+                    <h3 className="text-base font-extrabold">✍️ 1:1 실시간 서술형·회화 영작 첨삭</h3>
                     <form onSubmit={handleRunCorrection} className="flex gap-2">
                       <input
                         type="text"
                         value={correctionInput}
                         onChange={(e) => setCorrectionInput(e.target.value)}
-                        placeholder="첨삭받고 싶은 서술형 영작 문장을 입력하세요..."
-                        className="flex-1 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2 text-xs"
+                        placeholder="첨삭받을 영어 문장을 입력하세요..."
+                        className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-xl px-3 py-2 text-xs"
                       />
                       <button
                         type="submit"
@@ -6427,46 +6419,34 @@ export default function App() {
                       </button>
                     </form>
                     {correctionResult && (
-                      <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs space-y-1">
+                      <div className="text-xs space-y-1 pt-2">
                         <div className="font-bold text-blue-500">{correctionResult.naturalEn}</div>
                         <div>{correctionResult.wordOrderFix}</div>
-                        <div className="text-slate-500">{correctionResult.grammarExplanation}</div>
                       </div>
                     )}
                   </section>
                 </div>
               )}
 
-              {/* ==============================================================
-                  [모드 E] 주간·월간 마스터 총람
-              ============================================================== */}
+              {/* 모드 E: 주간·월간 총람 */}
               {activeMode === 'weekly' && (
                 <section
-                  className={`border rounded-3xl p-6 shadow-sm space-y-6 ${
+                  className={`border rounded-3xl p-6 space-y-4 ${
                     darkMode
                       ? 'bg-slate-900 border-slate-800'
                       : 'bg-white border-slate-200'
                   }`}
                 >
-                  <h2 className="text-2xl font-extrabold">
-                    🗓️ 5대 실전 회화 테마 & 3대 수능·내신 1등급 마스터 총람
-                  </h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <h2 className="text-xl font-extrabold">🗓️ 전 테마 & 수능·내신 핵심 총람</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {THEMES.map((t) => (
                       <div
                         key={t.id}
-                        className={`p-5 rounded-2xl border space-y-2 ${
-                          darkMode
-                            ? 'bg-slate-950 border-slate-800'
-                            : 'bg-slate-50 border-slate-200'
-                        }`}
+                        className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800"
                       >
-                        <strong className="text-sm font-extrabold">{t.title}</strong>
-                        <div className="text-xs text-blue-500 font-bold">
+                        <strong className="text-sm font-black">{t.title}</strong>
+                        <div className="text-xs text-blue-500 mt-1">
                           {t.levelTracks[learningLevel].patternEn}
-                        </div>
-                        <div className="text-xs text-slate-500">
-                          {t.levelTracks[learningLevel].patternMeaningKo}
                         </div>
                       </div>
                     ))}
@@ -6474,6 +6454,145 @@ export default function App() {
                 </section>
               )}
             </div>
+          </div>
+
+          {/* ==================================================================
+              ✏️ [핵심 탑재] 화면을 따라다니는(Floating) 0.0mm 초정밀 칼보정 애플 펜슬 메모장
+              - 🔒 락(Lock: 필기 고정 모드) / 🔓 락 해제(스크롤 모드)
+              - ✏️ 펜슬 전용(손바닥 무시) / 파랑·초록·빨강·형광펜·지우개 / 높이 조절
+          ================================================================== */}
+          <div
+            className={`no-print transition-all z-40 ${
+              isFloatingPad
+                ? 'fixed bottom-3 right-4 left-4 md:left-[21rem] shadow-2xl rounded-3xl border-2 border-blue-500/80'
+                : ' mx-6 mb-6 rounded-3xl border-2 border-slate-300 dark:border-slate-700'
+            } ${
+              darkMode
+                ? 'bg-slate-900/95 text-white'
+                : 'bg-white/95 text-slate-900'
+            } backdrop-blur-md`}
+          >
+            {/* 메모장 상단 컨트롤 바 */}
+            <div className="px-4 py-2.5 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-black text-blue-600 dark:text-blue-400">
+                  ✏️ 아이패드 M5 0.0mm 초정밀 펜슬 메모장
+                </span>
+
+                {/* 🔒 락 / 🔓 락 해제 버튼 */}
+                <button
+                  onClick={() => setIsPadLocked(!isPadLocked)}
+                  className={`px-3 py-1 rounded-xl text-xs font-black transition ${
+                    isPadLocked
+                      ? 'bg-rose-600 text-white shadow-sm'
+                      : 'bg-emerald-600 text-white'
+                  }`}
+                >
+                  {isPadLocked
+                    ? '🔒 락 걸림 (흔들림 없는 초고속 필기중)'
+                    : '🔓 락 해제됨 (터치 스크롤 가능)'}
+                </button>
+
+                {/* ✏️ 애플 펜슬 전용(손바닥 무시) 스위치 */}
+                <button
+                  onClick={() => setPenOnlyMode(!penOnlyMode)}
+                  className={`px-2.5 py-1 rounded-xl text-[11px] font-extrabold border ${
+                    penOnlyMode
+                      ? 'bg-indigo-600 text-white border-indigo-500'
+                      : 'border-slate-300 dark:border-slate-700'
+                  }`}
+                >
+                  {penOnlyMode ? '✋ 펜슬전용(손바닥무시 ON)' : '👆 펜슬+손가락 겸용'}
+                </button>
+              </div>
+
+              {/* 펜 색상 · 형광펜 · 지우개 · 크기 · 접기 툴바 */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                {[
+                  { c: '#2563eb' as const, label: '파란펜' },
+                  { c: '#10b981' as const, label: '초록펜' },
+                  { c: '#e11d48' as const, label: '빨간펜' },
+                  { c: '#facc15' as const, label: '형광펜' },
+                  { c: 'eraser' as const, label: '지우개' },
+                ].map((tool) => (
+                  <button
+                    key={tool.c}
+                    onClick={() => setPenColor(tool.c)}
+                    className={`px-2 py-1 rounded-lg text-[10px] font-extrabold border ${
+                      penColor === tool.c
+                        ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 border-transparent'
+                        : 'border-slate-300 dark:border-slate-700'
+                    }`}
+                  >
+                    {tool.label}
+                  </button>
+                ))}
+
+                <button
+                  onClick={() => setPenWidth((w) => (w < 4 ? w + 1 : 1.8))}
+                  className="px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-[10px] font-bold"
+                >
+                  굵기({penWidth.toFixed(1)})
+                </button>
+
+                <button
+                  onClick={() => setPadHeight((h) => (h === 185 ? 280 : 185))}
+                  className="px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-[10px] font-bold"
+                >
+                  {padHeight === 185 ? '⬆️ 창크게' : '⬇️ 창기본'}
+                </button>
+
+                <button
+                  onClick={clearCanvas}
+                  className="px-2.5 py-1 rounded-lg bg-rose-600 text-white text-[10px] font-extrabold"
+                >
+                  전체지우기
+                </button>
+
+                <button
+                  onClick={() => setIsPadMinimized(!isPadMinimized)}
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 text-white text-[10px] font-extrabold"
+                >
+                  {isPadMinimized ? '🔼 메모장 펼치기' : '🔽 접기'}
+                </button>
+              </div>
+            </div>
+
+            {/* 0.0mm 정밀 보정 캔버스 영역 */}
+            {!isPadMinimized && (
+              <div className="p-2.5">
+                <div
+                  className={`relative rounded-2xl overflow-hidden border-2 ${
+                    isPadLocked
+                      ? 'border-blue-500 bg-white dark:bg-slate-950'
+                      : 'border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-950/50'
+                  }`}
+                  style={{ height: `${padHeight}px` }}
+                >
+                  {/* 노트 줄무늬 가이드라인 배경 */}
+                  <div
+                    className="absolute inset-0 pointer-events-none opacity-25"
+                    style={{
+                      backgroundImage:
+                        'repeating-linear-gradient(transparent, transparent 35px, #94a3b8 36px)',
+                    }}
+                  />
+                  <canvas
+                    ref={canvasRef}
+                    onPointerDown={startDrawing}
+                    onPointerMove={draw}
+                    onPointerUp={endDrawing}
+                    onPointerCancel={endDrawing}
+                    style={{
+                      touchAction: isPadLocked ? 'none' : 'pan-y',
+                    }}
+                    className={`relative z-10 w-full h-full block ${
+                      isPadLocked ? 'cursor-crosshair' : 'cursor-grab'
+                    }`}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </main>
       </div>
