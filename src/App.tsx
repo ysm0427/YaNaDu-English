@@ -3522,6 +3522,14 @@ export function buildDynamicDiagramSentence(
 // [마무리 3-B 파트] studyData.ts 대량 엔진 직결 + 0.0mm 펜슬 칼보정 + 1~5교시 전체 작동
 // (export default function App() 부터 시작합니다!)
 // ============================================================================
+import {
+  getExpandedWordbookByDay,
+  generateCombinatorialSentences,
+  EBS_MAJOR_TOPICS,
+  GRAMMAR_406_QUIZ_BANK,
+  analyzeCustomSchoolPassage,
+} from './studyData';
+
 export default function App() {
   const todayObj = new Date();
   const todayKey = `${todayObj.getFullYear()}-${String(todayObj.getMonth() + 1).padStart(2, '0')}-${String(todayObj.getDate()).padStart(2, '0')}`;
@@ -3972,7 +3980,7 @@ export default function App() {
   const [userWritingMission, setUserWritingMission] = useState<string>('');
 
   const [targetSpeakingMins, setTargetSpeakingMins] = useState<number>(5);
-  const [speakingSeconds, setSpeakingSeconds] = useState<number>(0);
+  const [, setSpeakingSeconds] = useState<number>(0);
   const [isVoiceActive, setIsVoiceActive] = useState<boolean>(false);
   const [chatInput, setChatInput] = useState<string>('');
   const [chatHistory, setChatHistory] = useState<ChatTurn[]>([
