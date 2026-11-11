@@ -2286,7 +2286,7 @@ export const THEMES_PART1: ThemeData[] = [
   },
 ];
 // ============================================================================
-// [3/4 파트] 테마 4~5 (패션 5대 매거진 포함) + 다크모드/24h자동갱신/실시간새로고침 + 초·중·고급 UI
+// [3/4 파트] 테마 4~5 + 실시간 트렌드 동적 변환 엔진 + 자동 문장 해부기 + 메인 UI
 // ============================================================================
 
 export const THEMES_PART2: ThemeData[] = [
@@ -2659,7 +2659,7 @@ export const THEMES_PART2: ThemeData[] = [
         levelTag: 'advanced',
         tag: '🌳 [고급] 세련된 뉘앙스 & 미디어 비평 ①',
         targetWord: 'captivating & resonate & informative',
-        wordOrderFormula: '[주어(This channel)] + [동사+보어(is captivating and informative)] + [분사구문/관계절(resonating with viewers)]',
+        wordOrderFormula: '[주어(This channel)] + [동사+보어(is captivating and informative)] + [결과절(so it resonates with viewers)]',
         structure: '주어(S) + 동사(V) + 주격보어(SC) + 접속사 + 동사2(V) + 수식어(M)',
         soundBlockEn: 'This content / is both captivating and informative / so it deeply resonates / with viewers.',
         soundMethodGuide: 'captivating, informative, resonates 세 핵심 어휘의 강세를 리듬감 있게 짚어주세요.',
@@ -2678,7 +2678,7 @@ export const THEMES_PART2: ThemeData[] = [
         levelTag: 'advanced',
         tag: '🌳 [고급] 세련된 뉘앙스 & 긴 대화 토론 ②',
         targetWord: 'hit the nail on the head & effortlessly',
-        wordOrderFormula: '[주어(Your analysis)] + [동사구(hit the nail on the head)] + [연결(and)] + [주어2+동사2(persuaded everyone effortlessly)]',
+        wordOrderFormula: '[주어(Your analysis)] + [동사구(hit the nail on the head)] + [연결(and)] + [동사2(persuaded everyone effortlessly)]',
         structure: '주어(S) + 동사구(V+O+M) + 접속사 + 동사2(V) + 목적어(DO) + 수식어(M)',
         soundBlockEn: 'Your analysis / hit the nail on the head / and persuaded everyone / effortlessly.',
         soundMethodGuide: 'nail on을 [네이-론]으로 연음하고 effortlessly를 부드럽게 흘려줍니다.',
@@ -2729,7 +2729,7 @@ export const THEMES_PART2: ThemeData[] = [
   },
 
   // --------------------------------------------------------------------------
-  // THEME 5 (신규 탑재!): 글로벌 패션·스타일 & 업계 트렌드 (Vogue · WWD · ELLE · Bazaar · GQ)
+  // THEME 5: 글로벌 패션·스타일 & 업계 트렌드 (Vogue · WWD · ELLE · Bazaar · GQ)
   // --------------------------------------------------------------------------
   {
     id: 'fashion-runway',
@@ -2738,11 +2738,11 @@ export const THEMES_PART2: ThemeData[] = [
     dateLabel: '오늘의 스타일 & 트렌드 코스 · Vogue / WWD / ELLE / Bazaar / GQ',
     opicLevel: '초급(일상코디·쇼핑) ➔ 중급(스타일링·바꿔말하기) ➔ 고급(런웨이·업계동향 토론)',
     coachPoint:
-      '요청하신 5대 패션 매체(Vogue Runway, WWD, ELLE, Harper’s Bazaar, GQ Style)를 완벽 통합했습니다! 초급은 일상 착장과 쇼핑 기본 표현, 중급은 ELLE·GQ 스타일의 세련된 칭찬과 바꿔 말하기, 고급은 Vogue 런웨이 미학과 WWD 럭셔리 시장 동향 토론으로 이어집니다.',
+      '5대 패션 매체(Vogue Runway, WWD, ELLE, Harper’s Bazaar, GQ Style)를 완벽 통합했습니다! 초급은 일상 착장과 쇼핑 기본 표현, 중급은 ELLE·GQ 스타일의 세련된 칭찬과 바꿔 말하기, 고급은 Vogue 런웨이 미학과 WWD 럭셔리 시장 동향 토론으로 이어집니다.',
     wordOrderPrinciple:
       '📌 핵심 어순 공식: [스타일·아이템 주어(S)] + [매칭·소화 동사(go well with / pull off / elevate)] + [대상·효과 목적어(DO)]',
     grammarSummary:
-      '초급은 자동사+전치사(go well with ~: ~와 잘 어울리다), 중급은 타동사구(pull off a look: 룩을 멋지게 소화하다), 고급은 5형식/타동사(blend A with B, spearhead the market)를 구사합니다.',
+      '초급은 자동사+전치사(go well with ~: ~와 잘 어울리다), 중급은 타동사구(pull off a look: 룩을 멋지게 소화하다), 고급은 타동사(blend A with B, spearhead the market)를 구사합니다.',
     situationGuide:
       '오늘 입은 옷(OOTD) 칭찬하기, 해외 편집샵 쇼핑, 남성 수트 핏(GQ)과 액세서리 스타일링(Bazaar) 대화부터 패션 업계 트렌드(WWD·Vogue) 분석까지 모두 아우릅니다.',
     levelTracks: {
@@ -2952,7 +2952,7 @@ export const THEMES_PART2: ThemeData[] = [
         soundMethod: 'th는 혀끝을 윗니 사이에 살짝 끼우는 무성음 /θ/로 발음하고 -the-에 강세를 줍니다.',
         soundBlock: 'minimalist / aesthetic',
         meaning: '미학, 독창적인 미적 감성·스타일 철학',
-        enDef: '1. noun/adj a set of principles underlying and guiding the work of a particular artist or brand',
+        enDef: '1. noun/adj a set of principles underlying the work of a particular artist or brand',
         exampleBlank: 'The brand’s signature ______ combines luxury with comfort.',
         pos: 'N',
         posLabel: '명사/형용사 (N)',
@@ -3167,14 +3167,145 @@ export const THEMES_PART2: ThemeData[] = [
   },
 ];
 
-// 5대 정규 테마 통합 배열
 export const THEMES: ThemeData[] = [...THEMES_PART1, ...THEMES_PART2];
 
 // ============================================================================
-// 6. 메인 컴포넌트 & 상태 관리 엔진 (다크모드 완벽 수리 · 24h 자동 갱신 · 실시간 새로고침)
+// [신규 핵심 엔진] 어떤 영어 문장이나 실시간 검색어를 눌러도 즉시 16개(7성분×9품사)
+// 이중 레이어 해부 카드로 쪼개어 변환해 주는 '실시간 스마트 어절 해부기'
+// ============================================================================
+export function buildDynamicDiagramSentence(
+  rawSentence: string,
+  koTranslation: string,
+  labelTitle: string
+): DiagramSentence {
+  const cleanWords = rawSentence
+    .replace(/\[|\]/g, '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  const detSet = new Set(['the', 'a', 'an', 'this', 'that', 'our', 'my', 'your', 'its', 'their', 'every', 'all']);
+  const pronSet = new Set(['i', 'you', 'we', 'they', 'he', 'she', 'it', 'us', 'me', 'them', 'everyone', 'what']);
+  const prepSet = new Set(['in', 'on', 'at', 'to', 'for', 'with', 'about', 'before', 'until', 'during', 'from', 'by', 'of', 'into', 'over']);
+  const conjSet = new Set(['and', 'or', 'but', 'so', 'because', 'if', 'whenever', 'whether']);
+  const auxVerbSet = new Set(['can', 'could', 'will', 'would', 'is', 'are', 'was', 'were', 'let', 'lets', 'try', 'tried', 'want', 'wanted', 'need', 'makes', 'make', 'made', 'goes', 'went', 'pulled', 'pull', 'lived', 'live', 'streamline', 'wrap', 'check', 'checked', 'drop', 'freshen', 'unwind', 'accommodate', 'spearhead', 'complements', 'complement', 'binge-watched', 'resonates', 'hit']);
+
+  let verbFound = false;
+
+  const tokens: WordToken[] = cleanWords.map((w, idx) => {
+    const lower = w.toLowerCase().replace(/[^a-z-]/g, '');
+
+    if (conjSet.has(lower)) {
+      return {
+        word: w,
+        comp: 'M',
+        compLabel: '연결/수식 (M)',
+        pos: 'Conj',
+        posLabel: '접속사(Conj)',
+        colorClass: 'border-slate-400 text-slate-700',
+      };
+    }
+    if (prepSet.has(lower)) {
+      return {
+        word: w,
+        comp: 'M',
+        compLabel: '수식어 (M)',
+        pos: 'Prep',
+        posLabel: '전치사(Prep)',
+        colorClass: 'border-amber-400 text-amber-700',
+      };
+    }
+    if (detSet.has(lower)) {
+      return {
+        word: w,
+        comp: 'M',
+        compLabel: '수식어 (M)',
+        pos: 'Det',
+        posLabel: '한정사(Det)',
+        colorClass: 'border-amber-300 text-amber-700',
+      };
+    }
+    if (lower.endsWith('ly') && lower !== 'family') {
+      return {
+        word: w,
+        comp: 'M',
+        compLabel: '수식어 (M)',
+        pos: 'Adv',
+        posLabel: '부사(Adv)',
+        colorClass: 'border-amber-400 text-amber-700',
+      };
+    }
+    if (pronSet.has(lower)) {
+      const isSubj = !verbFound || idx === 0;
+      return {
+        word: w,
+        comp: isSubj ? 'S' : 'IO',
+        compLabel: isSubj ? '주어 (S)' : '목적어 (O)',
+        pos: 'Pron',
+        posLabel: '대명사(Pron)',
+        colorClass: isSubj ? 'border-blue-500 text-blue-700' : 'border-emerald-500 text-emerald-700',
+      };
+    }
+    if (auxVerbSet.has(lower) || (!verbFound && idx === 1)) {
+      verbFound = true;
+      return {
+        word: w,
+        comp: 'V',
+        compLabel: '동사 (V)',
+        pos: 'V',
+        posLabel: '동사(V)',
+        colorClass: 'border-rose-500 text-rose-700',
+      };
+    }
+    if (
+      lower.endsWith('ble') ||
+      lower.endsWith('ive') ||
+      lower.endsWith('al') ||
+      lower.endsWith('ic') ||
+      lower.endsWith('ed') ||
+      ['new', 'quick', 'short', 'bold', 'sharp', 'vacant', 'chic', 'timeless', 'modern'].includes(lower)
+    ) {
+      return {
+        word: w,
+        comp: verbFound ? 'SC' : 'M',
+        compLabel: verbFound ? '보어/수식(C·M)' : '수식어 (M)',
+        pos: 'Adj',
+        posLabel: '형용사(Adj)',
+        colorClass: 'border-purple-400 text-purple-700',
+      };
+    }
+
+    // 기본 명사 (동사 앞이면 주어 S, 동사 뒤면 직접목적어 DO)
+    const isSubjNoun = !verbFound && idx <= 2;
+    return {
+      word: w,
+      comp: isSubjNoun ? 'S' : 'DO',
+      compLabel: isSubjNoun ? '주어 (S)' : '직접목적어 (DO)',
+      pos: 'N',
+      posLabel: '명사(N)',
+      colorClass: isSubjNoun ? 'border-blue-500 text-blue-700' : 'border-teal-500 text-teal-700',
+    };
+  });
+
+  const subjToken = tokens.find((t) => t.comp === 'S')?.word || cleanWords[0] || 'S';
+  const verbToken = tokens.find((t) => t.comp === 'V')?.word || cleanWords[1] || 'V';
+  const objToken = tokens.find((t) => t.comp === 'DO' || t.comp === 'SC')?.word || cleanWords[cleanWords.length - 1] || 'O';
+
+  return {
+    id: 'dynamic-live',
+    label: labelTitle,
+    tokens,
+    translation: `“${koTranslation}”`,
+    skeleton: `${subjToken}[S] + ${verbToken}[V] + ${objToken}[O/C]`,
+    patternType: '실시간 선택 문장 16개(7성분×9품사) 자동 해부 모드',
+    wordOrderTip: '어절 카드를 터치하면 위 16개 다이어그램 전광판의 문장 성분(직책)과 9품사(신분)가 실시간으로 움직입니다!',
+  };
+}
+
+// ============================================================================
+// 6. 메인 컴포넌트 & 상태 관리 엔진
 // ============================================================================
 export default function App() {
-  // 오늘 날짜 키 생성 (24시간 자정 기준 자동 업데이트 검증용)
   const todayObj = new Date();
   const todayKey = `${todayObj.getFullYear()}-${String(todayObj.getMonth() + 1).padStart(2, '0')}-${String(todayObj.getDate()).padStart(2, '0')}`;
   const todayDateStr = `${todayObj.getFullYear()}년 ${todayObj.getMonth() + 1}월 ${todayObj.getDate()}일`;
@@ -3182,10 +3313,9 @@ export default function App() {
     (todayObj.getTime() - new Date(todayObj.getFullYear(), 0, 0).getTime()) / 86400000
   );
 
-  // [전 레벨 학습 스위치] 첫 화면은 항상 '초급(beginner)'을 기본값으로 시작!
+  // [전 레벨 학습 스위치] 첫 화면은 항상 '초급(beginner)'을 기본값으로 시작
   const [learningLevel, setLearningLevel] = useState<LearningLevel>('beginner');
 
-  // 테마 & 모드 상태
   const [selectedThemeId, setSelectedThemeId] = useState<string>(
     THEMES[dayOfYear % THEMES.length].id
   );
@@ -3195,14 +3325,24 @@ export default function App() {
   const [activeMediaPlatform, setActiveMediaPlatform] =
     useState<MediaPlatformId>('FASHION_MAGS');
 
-  // 9대 매체 실시간 검색어 상태 & 새로고침 타임스탬프
+  // [핵심 신규 상태] 왼쪽 실시간 검색어(1~10위)를 클릭했을 때 오른쪽 전체 화면을 변환시키는 활성 트렌드 상태!
+  const [selectedLiveKeyword, setSelectedLiveKeyword] = useState<{
+    platformName: string;
+    rank: number;
+    koTitle: string;
+    enExpression: string;
+    extUrl: string;
+  } | null>(null);
+
+  // [핵심 신규 상태] STEP 3 '실전 예문 이중 레이어 해부 카드'가 현재 테마/클릭한 문장에 맞춰 즉시 바뀌는 상태!
+  const [activeDiagramSentenceIdx, setActiveDiagramSentenceIdx] = useState<number>(0);
+
   const [mediaPlatforms, setMediaPlatforms] = useState<MediaTrendPlatform[]>(
     INITIAL_MEDIA_PLATFORMS
   );
   const [lastTrendSyncTime, setLastTrendSyncTime] = useState<string>('방금 전 실시간 동기화됨');
   const [isRefreshingTrends, setIsRefreshingTrends] = useState<boolean>(false);
 
-  // 다크/라이트 모드 상태 (로컬 스토리지 기억 + HTML 루트 태그 강제 주입)
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('yanadu_dark_mode') === 'true';
@@ -3213,7 +3353,7 @@ export default function App() {
   const [fontStyle, setFontStyle] = useState<'sans' | 'serif' | 'mono'>('sans');
   const [layoutMode, setLayoutMode] = useState<'split' | 'wide'>('split');
 
-  // [수리 1] 다크/라이트 모드 변경 시 HTML/Body 루트에 즉시 반영
+  // 다크/라이트 모드 변경 시 HTML/Body 루트에 즉시 반영
   useEffect(() => {
     if (typeof document === 'undefined') return;
     const rootHtml = document.documentElement;
@@ -3234,7 +3374,6 @@ export default function App() {
     localStorage.setItem('yanadu_dark_mode', String(darkMode));
   }, [darkMode]);
 
-  // 오디오(글로벌 4개국 발음) & 세분화된 5단계 리딩 속도 (초급 기본값: 0.75x)
   const [accent, setAccent] = useState<'en-US' | 'en-GB' | 'en-AU' | 'en-IN'>('en-US');
   const [speechRate, setSpeechRate] = useState<number>(0.75);
   const [dictQuery, setDictQuery] = useState<string>('');
@@ -3246,7 +3385,6 @@ export default function App() {
   } | null>(null);
   const [isLoadingDict, setIsLoadingDict] = useState<boolean>(false);
 
-  // 한글 발음 & 뜻 도움 상태 (초급일 때는 기본으로 보여주고, 중·고급은 가림!)
   const [showAllKoreanPron, setShowAllKoreanPron] = useState<boolean>(true);
   const [revealedPronKeys, setRevealedPronKeys] = useState<string[]>([]);
   const [hideWordMode, setHideWordMode] = useState<boolean>(false);
@@ -3254,24 +3392,25 @@ export default function App() {
   const [revealedWordIds, setRevealedWordIds] = useState<number[]>([]);
   const [revealedChallengeIdx, setRevealedChallengeIdx] = useState<number[]>([]);
 
-  // 레벨 변경 시 배속과 한글 발음 도움말 자동 최적화 (단어장·학습기록은 절대 초기화 안 됨!)
   const handleSelectLevel = (lvl: LearningLevel) => {
     setLearningLevel(lvl);
     if (lvl === 'beginner') {
       setSpeechRate(0.75);
       setShowAllKoreanPron(true);
       setHideMeaningMode(false);
+      setActiveDiagramSentenceIdx(0);
     } else if (lvl === 'intermediate') {
       setSpeechRate(0.9);
       setShowAllKoreanPron(false);
       setHideMeaningMode(false);
+      setActiveDiagramSentenceIdx(1);
     } else {
       setSpeechRate(1.0);
       setShowAllKoreanPron(false);
+      setActiveDiagramSentenceIdx(2);
     }
   };
 
-  // 전자책 단어장 & 북마크 (로컬 스토리지 영구 보존으로 레벨 변경 시에도 유지!)
   const [wordbookLevel, setWordbookLevel] = useState<
     '중등 필수' | '고등·수능 핵심' | '비즈니스·실무' | '오픽(OPIc)·구동사'
   >('중등 필수');
@@ -3332,21 +3471,30 @@ export default function App() {
     }
   }, [completedDays]);
 
-  // [수리 2] 24시간 자정 기준 자동 업데이트 검증 엔진
+  // 24시간 자정 기준 자동 업데이트 & 오늘의 실시간 추천 키워드 자동 장착!
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const savedDate = localStorage.getItem('yanadu_last_study_date');
     if (savedDate !== todayKey) {
-      // 날짜가 바뀌었으면 오늘의 테마와 단어장 Day를 새로운 날짜 세트로 자동 회전!
       const nextTheme = THEMES[dayOfYear % THEMES.length].id;
       const nextWbDay = (dayOfYear % 3) + 1;
+      const todayPlat = INITIAL_MEDIA_PLATFORMS[dayOfYear % INITIAL_MEDIA_PLATFORMS.length];
+      const todayKw = todayPlat.keywords[dayOfYear % todayPlat.keywords.length];
+
       setSelectedThemeId(nextTheme);
       setWordbookDay(nextWbDay);
+      setSelectedLiveKeyword({
+        platformName: todayPlat.name,
+        rank: todayKw.rank,
+        koTitle: todayKw.koTitle,
+        enExpression: todayKw.enExpression,
+        extUrl: todayKw.extUrl,
+      });
       localStorage.setItem('yanadu_last_study_date', todayKey);
     }
   }, [todayKey, dayOfYear]);
 
-  // [수리 3] 좌측 9대 매체 실시간 검색어 TOP 10 '새로고침' 라이브 엔진
+  // 좌측 9대 매체 실시간 검색어 TOP 10 '새로고침' 라이브 엔진
   const handleRefreshLiveTrends = async () => {
     setIsRefreshingTrends(true);
     const now = new Date();
@@ -3355,7 +3503,6 @@ export default function App() {
     ).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')} 실시간 반영됨`;
 
     try {
-      // 공개 뉴스/트렌드 피드(CORS 허용 엔드포인트)에서 최신 헤드라인을 비동기 호출하여 실시간 반영
       const res = await fetch(
         'https://api.rss2json.com/v1/api.json?rss_url=https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko'
       );
@@ -3371,7 +3518,6 @@ export default function App() {
 
       setMediaPlatforms((prev) =>
         prev.map((plat) => {
-          // 기존 10개 키워드를 현재 시각 시드로 역동적으로 재배열하고 라이브 헤드라인 결합
           const rotated = [...plat.keywords]
             .sort(() => Math.random() - 0.5)
             .map((k, idx) => {
@@ -3396,7 +3542,6 @@ export default function App() {
       );
       setLastTrendSyncTime(timeLabel);
     } catch {
-      // 오프라인/방화벽 환경에서도 즉시 순위와 트렌드 풀 회전
       setMediaPlatforms((prev) =>
         prev.map((plat) => ({
           ...plat,
@@ -3411,14 +3556,11 @@ export default function App() {
     }
   };
 
-  // STEP 3: 16개 문장 성분(7) × 9품사(9) 인터랙티브 다이어그램 상태
   const [diagramTab, setDiagramTab] = useState<'all' | 'comp' | 'pos'>('all');
   const [selectedComp, setSelectedComp] = useState<CompId | null>('DO');
   const [selectedPos, setSelectedPos] = useState<PosId | null>('N');
-  const [selectedDiagramExId, setSelectedDiagramExId] = useState<string>('ex3');
-  const [selectedTokenIdx, setSelectedTokenIdx] = useState<number | null>(8);
+  const [selectedTokenIdx, setSelectedTokenIdx] = useState<number | null>(0);
 
-  // STEP 4 & STEP 5 & AI 회화 상태
   const [writingInputs, setWritingInputs] = useState<Record<string, string>>({});
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
@@ -3439,8 +3581,8 @@ export default function App() {
   const [chatHistory, setChatHistory] = useState<ChatTurn[]>([
     {
       role: 'coach',
-      text: 'Welcome! Start with Beginner mode (0.75x slow speed) or switch to Intermediate (Paraphrasing) and Advanced (Long Discussion) anytime!',
-      nuanceTip: '레벨을 올려도 저장한 단어장과 학습 기록은 그대로 이어집니다.',
+      text: 'Welcome! Click any live trend keyword on the left (1st~10th) and watch the entire lesson, vocabulary, and 16-node diagram transform in real time!',
+      nuanceTip: '왼쪽 실시간 검색어를 누르면 오른쪽 단어·문장·16개 해부 카드가 즉시 그 키워드로 바뀝니다!',
     },
   ]);
   const [correctionInput, setCorrectionInput] = useState<string>('');
@@ -3459,10 +3601,131 @@ export default function App() {
     streakDays: 8,
   });
 
-  const currentTheme = THEMES.find((t) => t.id === selectedThemeId) || THEMES[0];
+  // ==========================================================================
+  // [핵심 동적 변환 엔진] 왼쪽 실시간 검색어(selectedLiveKeyword)나 날짜에 따라
+  // 오른쪽 테마의 제목·패턴·1순위 단어·직독직해 문장·퀴즈가 실시간으로 변신합니다!
+  // ==========================================================================
+  const baseTheme = THEMES.find((t) => t.id === selectedThemeId) || THEMES[0];
+
+  const currentTheme: ThemeData = (() => {
+    if (!selectedLiveKeyword) return baseTheme;
+
+    const kwEn = selectedLiveKeyword.enExpression;
+    const kwKo = selectedLiveKeyword.koTitle;
+    const kwFirstWord = kwEn.split(' ')[0] || 'trend';
+
+    // 실시간 클릭한 키워드로 즉석 생성되는 1순위 단어
+    const liveVocabItem: VocabItem = {
+      id: 0,
+      type: '일상 회화',
+      recommendLevel: learningLevel,
+      word: kwEn,
+      masked: `${kwFirstWord.slice(0, 2)} ⬛ ⬛ ⬛`,
+      ipa: '/실시간 트렌드 핵심 표현/',
+      pron: `[실시간 키워드 발음 듣기 🔊]`,
+      soundMethod: `앞 단어 끝소리와 뒤 단어 첫 모음을 한 호흡의 소리블럭(${kwEn})으로 부드럽게 이어 발음합니다.`,
+      soundBlock: `${kwFirstWord} / ${kwEn.split(' ').slice(1).join(' ') || 'now'}`,
+      meaning: `[실검 ${selectedLiveKeyword.rank}위] ${kwKo}`,
+      enDef: `Live Trend Expression from ${selectedLiveKeyword.platformName}`,
+      exampleBlank: `Let us practice how to ______ in our daily conversation.`,
+      pos: 'V',
+      posLabel: '핵심 표현 블록 (V/N)',
+      comp: 'DO',
+      compLabel: '핵심 성분 (V·DO)',
+      roleDesc: '방금 왼쪽 실시간 트렌드에서 선택한 최우선 집중 학습 표현',
+      collocation: kwEn,
+      collocationKo: kwKo,
+      paraphraseTip: `[실시간 연동 완료] 클릭하신 "${kwKo}" 이슈를 아래 직독직해와 16개 해부 카드로 즉시 학습합니다!`,
+    };
+
+    // 실시간 클릭한 키워드로 즉석 조립되는 초·중·고급 문장
+    const liveSentence: TrainingSentence = {
+      id: 0,
+      levelTag: learningLevel,
+      tag: `🔥 [실시간 ${selectedLiveKeyword.rank}위 집중 문장] ${selectedLiveKeyword.platformName}`,
+      targetWord: kwEn,
+      wordOrderFormula: `[도입 패턴] + [실시간 핵심 표현 (${kwEn})] + [실전 상황 수식어(M)]`,
+      structure: '주어(S) + 동사(V) + 실시간 타겟 표현(DO/SC) + 수식어(M)',
+      soundBlockEn:
+        learningLevel === 'beginner'
+          ? `We really need / to focus on / ${kwEn} / today.`
+          : learningLevel === 'intermediate'
+          ? `Everyone is talking about / how to ${kwEn} / effectively.`
+          : `I was wondering if we could / ${kwEn} / from a broader perspective.`,
+      soundMethodGuide: `방금 선택하신 실시간 검색어 "${kwEn}"에 가장 강한 강세를 실어 또렷하게 발음하세요!`,
+      ipaLine: `/Live Trend Sentence — ${kwEn}/`,
+      koLine: `오늘의 핫이슈(S) / [${kwKo}] 표현을(DO) / 실전 문장으로 완벽히 소화합니다(V+M).`,
+      enLine:
+        learningLevel === 'beginner'
+          ? `We really need(S+V) / to focus on [${kwEn}](DO) / today(M).`
+          : learningLevel === 'intermediate'
+          ? `Everyone is talking about(S+V) / how to [${kwEn}](O) / right now(M).`
+          : `I was wondering(S+V) / if we could [${kwEn}](O) / effortlessly(M).`,
+      rawEn:
+        learningLevel === 'beginner'
+          ? `We really need to focus on ${kwEn} today.`
+          : learningLevel === 'intermediate'
+          ? `Everyone is talking about how to ${kwEn} right now.`
+          : `I was wondering if we could ${kwEn} effortlessly.`,
+      pronLine: `[실시간 문장 발음: 위 🔊 듣기 버튼을 눌러 원어민 연음을 확인하세요]`,
+      naturalKo: `[실시간 ${selectedLiveKeyword.rank}위 응용] 우리는 오늘 "${kwKo} (${kwEn})" 주제를 실전 영어로 자연스럽게 구사할 수 있습니다.`,
+      paraphraseVersion: `What I love most is that we can apply "${kwEn}" right away in real life.`,
+      grammarPoint: `왼쪽에서 클릭하신 실시간 키워드(${kwEn})가 문장의 핵심 목적어/동사구 블록으로 자동 결합되었습니다.`,
+      contextNuance: `${selectedLiveKeyword.platformName} 실시간 ${selectedLiveKeyword.rank}위 화젯거리를 원어민 스몰톡으로 즉시 연결한 문장입니다.`,
+    };
+
+    return {
+      ...baseTheme,
+      title: `🔥 [${selectedLiveKeyword.platformName} ${selectedLiveKeyword.rank}위] ${kwKo}`,
+      badge: `실시간 트렌드 연동 · ${baseTheme.badge}`,
+      levelTracks: {
+        beginner: {
+          ...baseTheme.levelTracks.beginner,
+          patternEn: `Let us practice / "${kwEn}" / step by step!`,
+          patternSoundBlock: `Let us practice / ${kwEn} / step by step!`,
+          patternMeaningKo: `[실시간 초급] "${kwKo}" 표현을 단계별로 쉽게 연습해 봅시다!`,
+        },
+        intermediate: {
+          ...baseTheme.levelTracks.intermediate,
+          patternEn: `Everyone is talking about / ${kwEn} / these days.`,
+          patternSoundBlock: `Everyone is talking about / ${kwEn} / these days.`,
+          patternMeaningKo: `[실시간 중급] 요즘 모두가 "${kwKo}"에 대해 이야기하고 있습니다.`,
+        },
+        advanced: {
+          ...baseTheme.levelTracks.advanced,
+          patternEn: `I was wondering if we could apply / "${kwEn}" / effectively.`,
+          patternSoundBlock: `I was wondering / if we could apply / ${kwEn} / effectively.`,
+          patternMeaningKo: `[실시간 고급] "${kwKo}" 트렌드를 실무와 일상에 효과적으로 적용해 볼 수 있을지 논의해 보고 싶습니다.`,
+        },
+      },
+      vocab: [liveVocabItem, ...baseTheme.vocab.slice(0, 9)],
+      sentences: [liveSentence, ...baseTheme.sentences],
+      quiz: {
+        ...baseTheme.quiz,
+        intermediate: {
+          sentenceBefore: 'Everyone is talking about how to',
+          sentenceAfter: 'in today’s trending issue.',
+          hint: `방금 왼쪽에서 클릭하신 [${selectedLiveKeyword.platformName} ${selectedLiveKeyword.rank}위: ${kwKo}] 영어 표현입니다!`,
+          options: [kwEn, 'take a rain check', 'miss the boat', 'call it a day'],
+          answerIdx: 0,
+          explanation: `방금 선택하신 실시간 트렌드 ${selectedLiveKeyword.rank}위 표현인 "${kwEn}"(${kwKo})이 정답입니다!`,
+        },
+      },
+    };
+  })();
+
   const currentLevelTrack = currentTheme.levelTracks[learningLevel];
-  const currentDiagramEx =
-    DIAGRAM_EXAMPLES.find((e) => e.id === selectedDiagramExId) || DIAGRAM_EXAMPLES[0];
+
+  // [핵심 수리] STEP 3 '실전 예문 이중 레이어 해부 카드'가 고정 샘플이 아니라
+  // 현재 테마의 문장들(실시간 검색어 문장 포함!)과 100% 실시간으로 연동됩니다!
+  const activeSentenceForDiagram =
+    currentTheme.sentences[activeDiagramSentenceIdx] || currentTheme.sentences[0];
+  const currentDiagramEx: DiagramSentence = buildDynamicDiagramSentence(
+    activeSentenceForDiagram.rawEn,
+    activeSentenceForDiagram.naturalKo,
+    activeSentenceForDiagram.tag
+  );
+
   const currentMediaObj =
     mediaPlatforms.find((m) => m.id === activeMediaPlatform) || mediaPlatforms[0];
 
@@ -3472,7 +3735,9 @@ export default function App() {
     setShowInterHint(false);
     setSelectedAdvOpts([]);
     setRevealedWordIds([]);
-  }, [selectedThemeId]);
+    setActiveDiagramSentenceIdx(0);
+    setSelectedTokenIdx(0);
+  }, [selectedThemeId, selectedLiveKeyword]);
 
   useEffect(() => {
     if (!isVoiceActive) return;
@@ -3560,7 +3825,7 @@ export default function App() {
   ) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
-    const cleanText = text.replace(/\[|\]/g, '');
+    const cleanText = text.replace(/\[|\]|"/g, '');
     const utterance = new SpeechSynthesisUtterance(cleanText);
     const targetLang = customAccent || accent;
     utterance.lang = targetLang;
@@ -3645,7 +3910,7 @@ export default function App() {
     const userTurn: ChatTurn = { role: 'user', text: msg };
     const coachReply: ChatTurn = {
       role: 'coach',
-      text: `[${learningLevel.toUpperCase()} COACH] Awesome! Your expression "${msg}" works really well. Let us also try paraphrasing it with "${currentTheme.vocab[2].collocation}"!`,
+      text: `[${learningLevel.toUpperCase()} COACH] Awesome! Your expression "${msg}" works really well. Let us also try paraphrasing it with "${currentTheme.vocab[0].collocation}"!`,
       correction: `💡 레벨업 추천 표현: "${currentLevelTrack.patternEn}"`,
       nuanceTip: `현재 배속(${speechRate}x)에 맞춰 소리블럭 단위로 끊어 읽어보세요!`,
     };
@@ -3714,7 +3979,7 @@ export default function App() {
 
       <div className="flex h-screen overflow-hidden">
         {/* ====================================================================
-            좌측 사이드바: 9대 매체(패션 5대 매거진 포함) 실시간 새로고침 허브 + 5단계 배속
+            좌측 사이드바: 9대 매체(패션 5대 매거진 포함) 실시간 새로고침 & 클릭 시 오른쪽 즉시 변환!
         ==================================================================== */}
         <aside
           className={`no-print w-80 flex-shrink-0 border-r flex flex-col h-full select-none transition-colors ${
@@ -3723,7 +3988,6 @@ export default function App() {
               : 'bg-white border-slate-200 text-slate-900'
           }`}
         >
-          {/* 상단 브랜드 & 다크/라이트 즉시 전환 스위치 */}
           <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
             <div>
               <div className="flex items-center gap-1.5">
@@ -3733,7 +3997,7 @@ export default function App() {
                 <h1 className="text-base font-extrabold tracking-tight">나만의 야나두 PRO</h1>
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                📅 {todayDateStr} · 24h 자동 갱신 ON
+                📅 {todayDateStr} · 실시간 연동 ON
               </p>
             </div>
             <button
@@ -3743,13 +4007,11 @@ export default function App() {
                   ? 'bg-yellow-400 text-slate-950 border-yellow-400'
                   : 'bg-slate-900 text-white border-slate-900'
               }`}
-              title="다크 모드 / 라이트 모드 즉시 전환"
             >
               {darkMode ? '☀️ 라이트 켜기' : '🌙 다크 켜기'}
             </button>
           </div>
 
-          {/* 네이버 사전 · 영영 API 실시간 검색창 */}
           <div className="p-3 bg-slate-900 text-white border-b border-slate-800 space-y-2">
             <div className="flex items-center justify-between text-[11px] font-bold text-slate-300">
               <span>💚 실시간 영영·네이버 사전 허브</span>
@@ -3827,7 +4089,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* 좌측 스크롤: 9대 매체 실시간 검색어 (새로고침 시 실시간 갱신!) */}
           <div className="flex-1 overflow-y-auto p-3 space-y-4">
             <div
               className={`p-3 rounded-2xl border ${
@@ -3857,7 +4118,6 @@ export default function App() {
                 </a>
               </div>
 
-              {/* 9대 플랫폼 선택 그리드 (패션 5대 매거진 포함) */}
               <div className="grid grid-cols-3 gap-1 mb-2.5">
                 {mediaPlatforms.map((mp) => (
                   <button
@@ -3876,73 +4136,109 @@ export default function App() {
                 ))}
               </div>
 
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 mb-2 font-semibold">
-                {currentMediaObj.name}: {currentMediaObj.desc}
+              <p className="text-[10px] text-blue-600 dark:text-blue-400 mb-2 font-extrabold">
+                👇 순위를 클릭하면 오른쪽 단어·문장·16매핑이 즉시 바뀝니다!
               </p>
 
-              {/* 선택된 매체의 1~10위 검색어 리스트 */}
+              {/* 순위 클릭 시 오른쪽 수업 전체를 해당 키워드로 즉시 변신! */}
               <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
-                {currentMediaObj.keywords.map((kw) => (
-                  <div
-                    key={kw.rank}
-                    onClick={() => {
-                      setSelectedThemeId(kw.targetThemeId);
-                      setActiveMode('daily');
-                      speakText(kw.enExpression);
-                    }}
-                    className={`group flex items-center justify-between p-2 rounded-xl border cursor-pointer transition ${
-                      darkMode
-                        ? 'bg-slate-900 hover:bg-slate-800 border-slate-800'
-                        : 'bg-white hover:bg-blue-50 border-slate-200/70'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span
-                        className={`w-5 h-5 rounded-md text-[10px] font-extrabold flex items-center justify-center flex-shrink-0 ${
-                          kw.rank <= 3
-                            ? `${themeAccentBg} text-white`
-                            : darkMode
-                            ? 'bg-slate-800 text-slate-300'
-                            : 'bg-slate-200 text-slate-700'
-                        }`}
-                      >
-                        {kw.rank}
-                      </span>
-                      <div className="truncate">
-                        <div className="text-[11px] font-bold truncate group-hover:text-blue-500">
-                          {kw.koTitle}
-                        </div>
-                        <div className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold truncate">
-                          🗣️ {kw.enExpression}
+                {currentMediaObj.keywords.map((kw) => {
+                  const isKwActive =
+                    selectedLiveKeyword?.koTitle === kw.koTitle &&
+                    selectedLiveKeyword?.rank === kw.rank;
+                  return (
+                    <div
+                      key={kw.rank}
+                      onClick={() => {
+                        setSelectedThemeId(kw.targetThemeId);
+                        setSelectedLiveKeyword({
+                          platformName: currentMediaObj.shortName,
+                          rank: kw.rank,
+                          koTitle: kw.koTitle,
+                          enExpression: kw.enExpression,
+                          extUrl: kw.extUrl,
+                        });
+                        setActiveMode('daily');
+                        setActiveDiagramSentenceIdx(0);
+                        speakText(kw.enExpression);
+                        fetchLiveDictionary(kw.enExpression);
+                      }}
+                      className={`group flex items-center justify-between p-2 rounded-xl border cursor-pointer transition ${
+                        isKwActive
+                          ? 'bg-blue-600 text-white border-blue-500 shadow'
+                          : darkMode
+                          ? 'bg-slate-900 hover:bg-slate-800 border-slate-800'
+                          : 'bg-white hover:bg-blue-50 border-slate-200/70'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span
+                          className={`w-5 h-5 rounded-md text-[10px] font-extrabold flex items-center justify-center flex-shrink-0 ${
+                            isKwActive
+                              ? 'bg-white text-blue-700'
+                              : kw.rank <= 3
+                              ? `${themeAccentBg} text-white`
+                              : darkMode
+                              ? 'bg-slate-800 text-slate-300'
+                              : 'bg-slate-200 text-slate-700'
+                          }`}
+                        >
+                          {kw.rank}
+                        </span>
+                        <div className="truncate">
+                          <div className="text-[11px] font-bold truncate">
+                            {kw.koTitle}
+                          </div>
+                          <div
+                            className={`text-[10px] font-semibold truncate ${
+                              isKwActive ? 'text-yellow-300' : 'text-blue-600 dark:text-blue-400'
+                            }`}
+                          >
+                            🗣️ {kw.enExpression}
+                          </div>
                         </div>
                       </div>
+                      <a
+                        href={kw.extUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-blue-600 flex-shrink-0"
+                      >
+                        ↗
+                      </a>
                     </div>
-                    <a
-                      href={kw.extUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-blue-600 flex-shrink-0"
-                    >
-                      ↗
-                    </a>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
-            {/* 정규 5대 핵심 테마 선택 (패션·런웨이 테마 정식 포함!) */}
+            {/* 정규 5대 핵심 테마 선택 (누르면 기본 정규 테마로 전환) */}
             <div>
-              <p className="text-[11px] font-extrabold text-slate-400 uppercase px-1 mb-1.5">
-                📚 5대 핵심 커리큘럼 (초급·중급·고급 연동)
-              </p>
+              <div className="flex items-center justify-between px-1 mb-1.5">
+                <p className="text-[11px] font-extrabold text-slate-400 uppercase">
+                  📚 5대 정규 커리큘럼 (초·중·고급)
+                </p>
+                {selectedLiveKeyword && (
+                  <button
+                    onClick={() => setSelectedLiveKeyword(null)}
+                    className="text-[10px] font-extrabold text-rose-500 underline"
+                  >
+                    실검모드 해제
+                  </button>
+                )}
+              </div>
               <div className="space-y-1.5">
                 {THEMES.map((theme) => {
-                  const isSel = theme.id === selectedThemeId && activeMode === 'daily';
+                  const isSel =
+                    theme.id === selectedThemeId &&
+                    !selectedLiveKeyword &&
+                    activeMode === 'daily';
                   return (
                     <button
                       key={theme.id}
                       onClick={() => {
+                        setSelectedLiveKeyword(null);
                         setSelectedThemeId(theme.id);
                         setActiveMode('daily');
                       }}
@@ -4046,7 +4342,6 @@ export default function App() {
                 : 'bg-white border-slate-200'
             }`}
           >
-            {/* 1층: 첫 화면에 바로 드러나는 [초급(기본) · 중급 · 고급] 전 레벨 선택 바 */}
             <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200/70 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-extrabold text-slate-500 dark:text-slate-400">
@@ -4105,7 +4400,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* 2층: 5대 핵심 모드 탭 & 디자인/글씨체 설정 */}
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl">
                 {[
@@ -4151,7 +4445,11 @@ export default function App() {
                   {layoutMode === 'split' ? '📐 스플릿뷰' : '📐 와이드'}
                 </button>
                 <button
-                  onClick={() => setFontStyle(fontStyle === 'sans' ? 'serif' : fontStyle === 'serif' ? 'mono' : 'sans')}
+                  onClick={() =>
+                    setFontStyle(
+                      fontStyle === 'sans' ? 'serif' : fontStyle === 'serif' ? 'mono' : 'sans'
+                    )
+                  }
                   className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 font-bold"
                 >
                   🔤 글씨체({fontStyle})
@@ -4160,7 +4458,6 @@ export default function App() {
             </div>
           </header>
 
-          {/* 메인 스크롤 본문 */}
           <div className="print-container flex-1 overflow-y-auto p-5 md:p-7">
             <div
               className={`${
@@ -4168,7 +4465,7 @@ export default function App() {
               } mx-auto space-y-7 pb-16`}
             >
               {/* ==============================================================
-                  [모드 A] 중등·고등·실무·오픽 전자책 단어장 (레벨 변경 시에도 진도 유지!)
+                  [모드 A] 중등·고등·실무·오픽 전자책 단어장
               ============================================================== */}
               {activeMode === 'wordbook' && (
                 <section
@@ -4345,7 +4642,6 @@ export default function App() {
               ============================================================== */}
               {activeMode === 'daily' && (
                 <>
-                  {/* 상단 주제 & 현재 선택된 레벨(초급/중급/고급) 맞춤 코스 배너 */}
                   <div
                     className={`border rounded-3xl p-6 shadow-sm space-y-4 ${
                       darkMode
@@ -4361,6 +4657,11 @@ export default function App() {
                         <span className="text-xs font-extrabold px-3 py-1 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-300">
                           {currentLevelTrack.levelName}
                         </span>
+                        {selectedLiveKeyword && (
+                          <span className="text-xs font-extrabold px-3 py-1 rounded-full bg-rose-600 text-white">
+                            ⚡ 실시간 검색어 집중 수업 모드 작동중
+                          </span>
+                        )}
                       </div>
                       <span className="text-xs font-bold text-slate-400">
                         현재 리딩 속도: {speechRate}x
@@ -4372,7 +4673,6 @@ export default function App() {
                       💡 <strong>전 레벨 학습 가이드:</strong> {currentLevelTrack.levelGuide}
                     </p>
 
-                    {/* 레벨별 특화 박스: 초급(느린발음/뜻도움) vs 중급(바꿔말하기 드릴) vs 고급(긴 대화 토론 미션) */}
                     <div className="p-4 rounded-2xl bg-slate-900 text-white space-y-3 border border-slate-800">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="text-xs font-extrabold text-emerald-400">
@@ -4410,7 +4710,6 @@ export default function App() {
                         🇰🇷 뜻 도움: "{currentLevelTrack.patternMeaningKo}"
                       </div>
 
-                      {/* 중급·고급에서 더욱 강조되는 '바꿔 말하기(Paraphrasing)' 비교 표 */}
                       <div className="pt-2 border-t border-slate-800 space-y-1.5">
                         <div className="text-xs font-extrabold text-blue-300">
                           🔄 레벨업 바꿔 말하기 (Paraphrasing Drill — 쉬운 표현 ➔ 세련된 원어민 표현):
@@ -4432,7 +4731,6 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* 고급 긴 대화 / 스피킹 프롬프트 */}
                       <div className="p-3 rounded-xl bg-indigo-950/60 border border-indigo-500/30 text-xs">
                         <strong className="text-indigo-300">🗣️ 실전 말하기 미션:</strong>{' '}
                         {currentLevelTrack.longTalkPrompt}
@@ -4440,9 +4738,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* ==========================================================
-                      STEP 2. 10개 어휘 단어장 (초·중·고급 추천 배지 & 바꿔말하기 팁 포함)
-                  ========================================================== */}
+                  {/* STEP 2. 10개 어휘 단어장 */}
                   <section
                     className={`border rounded-3xl p-6 shadow-sm space-y-6 ${
                       darkMode
@@ -4453,7 +4749,7 @@ export default function App() {
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <h3 className="text-lg font-extrabold">
-                          📚 STEP 2. 전 레벨 짝꿍 단어장 (10 Words · 초급~고급 단계별 표시)
+                          📚 STEP 2. 전 레벨 짝꿍 단어장 (실시간 클릭 키워드 1순위 자동 배치!)
                         </h3>
                         <p className="text-xs text-slate-500 mt-0.5">
                           단어를 클릭하면 아래 <strong>STEP 3의 16개 문장성분×9품사 다이어그램</strong>이 즉시 연동됩니다.
@@ -4498,7 +4794,7 @@ export default function App() {
                               hideMeaningMode && !revealedWordIds.includes(v.id);
                             const pronKey = `vocab-${currentTheme.id}-${v.id}`;
                             const isSaved = bookmarkedWords.some((b) => b.word === v.word);
-                            const isCurrentLevelMatch = v.recommendLevel === learningLevel;
+                            const isLiveTop = v.id === 0;
 
                             return (
                               <tr
@@ -4509,24 +4805,26 @@ export default function App() {
                                   setDiagramTab('all');
                                 }}
                                 className={`cursor-pointer transition ${
-                                  isCurrentLevelMatch
-                                    ? darkMode
-                                      ? 'bg-blue-950/30 hover:bg-blue-950/50'
-                                      : 'bg-blue-50/60 hover:bg-blue-100/50'
+                                  isLiveTop
+                                    ? 'bg-rose-500/15 hover:bg-rose-500/25'
                                     : 'hover:bg-slate-100/50 dark:hover:bg-slate-800/40'
                                 }`}
                               >
                                 <td className="py-3 px-3 text-center">
                                   <span
                                     className={`inline-block text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
-                                      v.recommendLevel === 'beginner'
+                                      isLiveTop
+                                        ? 'bg-rose-600 text-white'
+                                        : v.recommendLevel === 'beginner'
                                         ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
                                         : v.recommendLevel === 'intermediate'
                                         ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
                                         : 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300'
                                     }`}
                                   >
-                                    {v.recommendLevel === 'beginner'
+                                    {isLiveTop
+                                      ? '🔥 실시간1순위'
+                                      : v.recommendLevel === 'beginner'
                                       ? '🌱 초급필수'
                                       : v.recommendLevel === 'intermediate'
                                       ? '🌿 중급확장'
@@ -4630,65 +4928,9 @@ export default function App() {
                         </tbody>
                       </table>
                     </div>
-
-                    {/* 옥스퍼드 유의어 강세 보기 (강함 ↕ 약함) */}
-                    <div className="bg-slate-900 text-white rounded-2xl p-5 border border-slate-800">
-                      <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-800">
-                        <div>
-                          <span className="text-[10px] font-extrabold text-emerald-400 uppercase">
-                            OXFORD & COLLINS THESAURUS INTENSITY SCALE
-                          </span>
-                          <h4 className="text-sm font-extrabold mt-0.5">
-                            📊 유의어 강세 보기 (▲ 강함 ↕ ▼ 약함 뉘앙스 비교) —{' '}
-                            {currentTheme.synonymScale.baseWord}
-                          </h4>
-                        </div>
-                        <span className="text-xs text-slate-400">
-                          {currentTheme.synonymScale.meaning}
-                        </span>
-                      </div>
-
-                      <div className="mt-3 flex gap-3 items-stretch">
-                        <div className="flex flex-col items-center justify-between py-2 px-2 bg-slate-800 rounded-xl text-[10px] font-extrabold text-blue-300">
-                          <span>▲ 고급/강함</span>
-                          <div className="w-1 flex-1 bg-gradient-to-b from-rose-500 via-blue-500 to-emerald-400 my-1.5 rounded-full" />
-                          <span>▼ 초급/완곡</span>
-                        </div>
-                        <div className="flex-1 space-y-2">
-                          {currentTheme.synonymScale.levels.map((lvl, idx) => (
-                            <div
-                              key={idx}
-                              className="bg-slate-800/90 border border-slate-700 rounded-xl p-2.5 flex flex-wrap items-center justify-between gap-2"
-                            >
-                              <span className="text-xs font-extrabold text-slate-300 w-36">
-                                {lvl.strength}
-                              </span>
-                              <div className="flex-1 flex flex-wrap gap-2">
-                                {lvl.words.map((w, wIdx) => (
-                                  <button
-                                    key={wIdx}
-                                    onClick={() => speakText(w.word)}
-                                    className="px-3 py-1 rounded-lg bg-indigo-500/30 hover:bg-indigo-500/50 border border-indigo-400/40 text-xs font-bold text-indigo-200 flex items-center gap-1.5"
-                                  >
-                                    <span>{w.word}</span>
-                                    <span className="font-mono text-[10px] text-slate-300">
-                                      {w.ipa}
-                                    </span>
-                                    <span>🔊</span>
-                                    <span className="text-[11px] font-normal text-slate-300">
-                                      — {w.nuance}
-                                    </span>
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
                   </section>
                   {/* ==========================================================
-                      [4/4 파트] STEP 3 (16개 매핑 다이어그램 & 뜻 사전) + STEP 4~5 + AI회화/첨삭/리포트
+                      [4/4 파트] STEP 3 (실시간 문장 연동 16매핑 & 어절 해부 카드) + STEP 4~5 + AI코치
                   ========================================================== */}
                   <section
                     className={`border rounded-3xl p-6 shadow-sm space-y-6 ${
@@ -4754,7 +4996,7 @@ export default function App() {
                       }`}
                     >
                       <p className="text-xs text-slate-500 dark:text-slate-400">
-                        🔍 <strong>STEP 3. 문장 성분(7직책) × 9품사(9신분) 총 16개 매핑 다이어그램:</strong> 상단 문장 성분(7개) 또는 하단 9품사 노드를 클릭하면 연결 경로와 정확한 뜻·어순 규칙이 아래에 표시됩니다.
+                        🔍 <strong>STEP 3. 문장 성분(7직책) × 9품사(9신분) 총 16개 매핑 다이어그램:</strong> 상단 문장 성분(7개), 하단 9품사 노드, 또는 아래 <strong>실전 문장 해부 카드</strong>를 터치하면 연결 경로와 정확한 뜻·어순 규칙이 실시간으로 바뀝니다!
                       </p>
 
                       <div className="w-full overflow-x-auto">
@@ -5032,7 +5274,7 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* 실전 예문 이중 레이어 해부 카드 */}
+                    {/* [완벽 연동] 실전 예문 이중 레이어 해부 카드 (선택한 주제·문장·실검에 따라 실시간 변환!) */}
                     <div
                       className={`border rounded-3xl p-5 space-y-4 ${
                         darkMode
@@ -5042,33 +5284,44 @@ export default function App() {
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
-                          <h4 className="text-base font-extrabold">
-                            실전 예문 이중 레이어 해부 (문장 성분 × 9품사 컬러 코딩)
-                          </h4>
-                          <p className="text-xs text-slate-500">
-                            어절 카드를 터치하면 위 16개 다이어그램에서 해당 문장 성분과 품사가 동시에 강조되고 발음이 재생됩니다.
+                          <div className="flex items-center gap-2">
+                            <span className="px-2.5 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-extrabold">
+                              실시간 문장 연동 ON
+                            </span>
+                            <h4 className="text-base font-extrabold">
+                              실전 예문 이중 레이어 해부 (선택한 문장의 단어들이 즉시 카드로 쪼개집니다!)
+                            </h4>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            오른쪽 버튼으로 현재 테마의 문장(초·중·고급 및 실시간 검색어 문장)을 골라보거나 아래 STEP 4에서 문장을 선택하면 카드들이 즉시 바뀝니다!
                           </p>
                         </div>
+
+                        {/* 현재 테마의 실제 문장들(실검 문장 포함)을 직접 골라서 해부하는 버튼 */}
                         <div className="flex flex-wrap gap-1.5">
-                          {DIAGRAM_EXAMPLES.map((ex) => (
+                          {currentTheme.sentences.map((s, idx) => (
                             <button
-                              key={ex.id}
+                              key={s.id}
                               onClick={() => {
-                                setSelectedDiagramExId(ex.id);
-                                setSelectedTokenIdx(null);
+                                setActiveDiagramSentenceIdx(idx);
+                                setSelectedTokenIdx(0);
+                                speakText(s.rawEn);
                               }}
-                              className={`px-3.5 py-1.5 rounded-full text-xs font-extrabold transition ${
-                                selectedDiagramExId === ex.id
-                                  ? 'bg-white dark:bg-slate-900 text-blue-600 border-2 border-blue-600 shadow-sm'
-                                  : 'bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                              className={`px-3 py-1.5 rounded-full text-xs font-extrabold transition ${
+                                activeDiagramSentenceIdx === idx
+                                  ? 'bg-blue-600 text-white shadow'
+                                  : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
                               }`}
                             >
-                              {ex.label}
+                              {s.id === 0
+                                ? `🔥 실검 ${selectedLiveKeyword?.rank}위 문장`
+                                : `문장 ${idx + 1} (${s.levelTag === 'beginner' ? '초급' : s.levelTag === 'intermediate' ? '중급' : '고급'})`}
                             </button>
                           ))}
                         </div>
                       </div>
 
+                      {/* 실시간으로 쪼개진 어절 카드 그리드 */}
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
                         {currentDiagramEx.tokens.map((tk, idx) => {
                           const isCardSel = selectedTokenIdx === idx;
@@ -5103,6 +5356,9 @@ export default function App() {
 
                       <div className="text-xs pt-2 border-t border-slate-200 dark:border-slate-800 space-y-1">
                         <div>
+                          <strong>현재 해부 중인 문장:</strong> "{activeSentenceForDiagram.rawEn}"
+                        </div>
+                        <div>
                           <strong>해석:</strong> {currentDiagramEx.translation} (
                           <strong>핵심 뼈대:</strong> {currentDiagramEx.skeleton})
                         </div>
@@ -5129,20 +5385,24 @@ export default function App() {
                           🗣️ STEP 4. 전 레벨(초급·중급·고급) 3단 직독직해 & 바꿔 말하기 트레이닝
                         </h3>
                         <p className="text-xs text-slate-500">
-                          선택한 레벨({learningLevel.toUpperCase()}) 문장이 강조되며, 모든 문장에 <strong>🔄 중급 바꿔 말하기(Paraphrasing) 버전</strong>이 함께 제공됩니다.
+                          각 문장의 <strong>[🔍 이 문장 16매핑 카드로 해부하기]</strong> 버튼을 누르면 위쪽 STEP 3 해부 카드가 즉시 이 문장으로 바뀝니다!
                         </p>
                       </div>
                     </div>
 
                     <div className="space-y-5">
-                      {currentTheme.sentences.map((sent) => {
+                      {currentTheme.sentences.map((sent, sIdx) => {
                         const sentPronKey = `sent-${currentTheme.id}-${sent.id}`;
-                        const isLevelMatched = sent.levelTag === learningLevel;
+                        const isLevelMatched = sent.levelTag === learningLevel || sent.id === 0;
+                        const isCurrentlyDissected = activeDiagramSentenceIdx === sIdx;
+
                         return (
                           <div
                             key={sent.id}
                             className={`p-5 rounded-2xl border space-y-3 transition ${
-                              isLevelMatched
+                              sent.id === 0
+                                ? 'bg-rose-500/10 border-rose-500 ring-2 ring-rose-500/30'
+                                : isLevelMatched
                                 ? darkMode
                                   ? 'bg-blue-950/30 border-blue-500 ring-1 ring-blue-500/30'
                                   : 'bg-blue-50/50 border-blue-400 ring-1 ring-blue-400/30'
@@ -5154,15 +5414,12 @@ export default function App() {
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <div className="flex flex-wrap items-center gap-2">
                                 <span
-                                  className={`text-xs font-extrabold px-3 py-1 rounded-full text-white ${themeAccentBg}`}
+                                  className={`text-xs font-extrabold px-3 py-1 rounded-full text-white ${
+                                    sent.id === 0 ? 'bg-rose-600' : themeAccentBg
+                                  }`}
                                 >
                                   {sent.tag}
                                 </span>
-                                {isLevelMatched && (
-                                  <span className="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950">
-                                    ✨ 현재 선택 레벨 집중 문장
-                                  </span>
-                                )}
                                 <span className="text-xs font-extrabold">
                                   Target:{' '}
                                   <strong className="underline decoration-2 decoration-blue-500 text-blue-600 dark:text-yellow-300">
@@ -5171,7 +5428,23 @@ export default function App() {
                                 </span>
                               </div>
 
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <button
+                                  onClick={() => {
+                                    setActiveDiagramSentenceIdx(sIdx);
+                                    setSelectedTokenIdx(0);
+                                    speakText(sent.rawEn);
+                                  }}
+                                  className={`px-3 py-1 rounded-lg text-xs font-extrabold border transition ${
+                                    isCurrentlyDissected
+                                      ? 'bg-emerald-600 text-white border-emerald-600'
+                                      : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-blue-600 dark:text-blue-300'
+                                  }`}
+                                >
+                                  {isCurrentlyDissected
+                                    ? '✅ STEP 3 해부 카드에 표시중'
+                                    : '🔍 이 문장 16매핑 카드로 해부하기'}
+                                </button>
                                 <button
                                   onClick={() => speakText(sent.rawEn, accent, 0.75)}
                                   className="px-2.5 py-1 rounded-lg bg-slate-800 text-amber-300 text-xs font-bold"
@@ -5204,7 +5477,6 @@ export default function App() {
                               </span>
                             </div>
 
-                            {/* 3단 직독직해 + 바꿔 말하기 박스 */}
                             <div
                               className={`p-4 rounded-xl border space-y-2 text-sm leading-relaxed ${
                                 darkMode
@@ -5231,7 +5503,6 @@ export default function App() {
                                   : '🔒 [여기를 터치하면 한글 발음이 표시됩니다]'}
                               </div>
 
-                              {/* 중급·고급 핵심: 바꿔 말하기(Paraphrasing) 비교 줄 */}
                               <div
                                 onClick={() => speakText(sent.paraphraseVersion)}
                                 className="pt-2 border-t border-slate-200 dark:border-slate-800 text-xs text-emerald-600 dark:text-emerald-400 font-extrabold cursor-pointer flex items-center justify-between"
@@ -5365,7 +5636,7 @@ export default function App() {
                             🎮 STEP 5. 네이버 오늘의 단어 퀴즈 (단어 · 초급 · 중급 · 고급) & 영작 미션
                           </h3>
                           <p className="text-xs text-slate-400">
-                            단계별 문제를 풀고 맨 아래 정답 및 코치의 뉘앙스 해설을 터치해 확인하세요.
+                            왼쪽에서 실시간 검색어를 클릭하면 <strong>Q중급 문제</strong>가 해당 실시간 검색어 문제로 즉시 변환됩니다!
                           </p>
                         </div>
                       </div>
@@ -5374,7 +5645,7 @@ export default function App() {
                         {[
                           { id: 'word', label: '단어 (철자 추론)' },
                           { id: 'beginner', label: 'Q 초급 (뜻 맞추기)' },
-                          { id: 'intermediate', label: 'Q 중급 (문장 빈칸)' },
+                          { id: 'intermediate', label: 'Q 중급 (실검·문장 빈칸)' },
                           { id: 'advanced', label: 'Q 고급 (유의어 복수선택)' },
                         ].map((tab) => (
                           <button
