@@ -3517,987 +3517,14 @@ export function buildDynamicDiagramSentence(
     wordOrderTip: '어절 카드를 터치하면 위 16개 다이어그램 전광판의 문장 성분(직책)과 9품사(신분)가 실시간으로 움직입니다!',
   };
 }
-// ============================================================================
-// [업그레이드 3-B 파트] 초고속 펜슬 엔진(파란블록 원천차단·4종 펜·굵기확대)
-// + 단어·문장 양방향 보관함(수정·추가·암기완료 해제) + 제작과정 백서 연결
-// ============================================================================
-import {
-  getExpandedWordbookByDay,
-  generateCombinatorialSentences,
-  EBS_MAJOR_TOPICS,
-  GRAMMAR_406_QUIZ_BANK,
-  analyzeCustomSchoolPassage,
-} from './studyData';
-
-export interface SavedSentenceItem {
-  id: string;
-  en: string;
-  ko: string;
-  note: string;
-  category: string;
-  mastered: boolean;
-}
-
-export default function App() {
-  const todayObj = new Date();
-  const todayKey = `${todayObj.getFullYear()}-${String(todayObj.getMonth() + 1).padStart(2, '0')}-${String(todayObj.getDate()).padStart(2, '0')}`;
-  const todayDateStr = `${todayObj.getFullYear()}년 ${todayObj.getMonth() + 1}월 ${todayObj.getDate()}일`;
-  const dayOfYear = Math.floor(
-    (todayObj.getTime() - new Date(todayObj.getFullYear(), 0, 0).getTime()) / 86400000
-  );
-
-  const [learningLevel, setLearningLevel] = useState<LearningLevel>('beginner');
-  const [selectedThemeId, setSelectedThemeId] = useState<string>(
-    THEMES[dayOfYear % THEMES.length].id
-  );
-  // 상단 메인 모드에 'devStory' (🛠️ 제작과정 백서) 포함!
-  const [activeMode, setActiveMode] = useState<
-    'daily' | 'examMaster' | 'wordbook' | 'naverQuiz' | 'aiCoach' | 'weekly' | 'devStory'
-  >('daily');
-  const [activeMediaPlatform, setActiveMediaPlatform] =
-    useState<MediaPlatformId>('FASHION_MAGS');
-
-  // 🎓 수능·내신 1등급 마스터 & 1~5교시 독립 작동 상태
-  const [selectedExamTrack, setSelectedExamTrack] = useState<ExamTrackId>('CSAT_MASTER');
-  const [schoolInternalStage, setSchoolInternalStage] = useState<number>(1);
-  const [syntaxSeed, setSyntaxSeed] = useState<number>(1);
-  const [vocabQuizSeed, setVocabQuizSeed] = useState<number>(1);
-  const [selectedVocabQuizAnswers, setSelectedVocabQuizAnswers] = useState<Record<number, number>>({});
-  const [selectedGrammarQuizAnswers, setSelectedGrammarQuizAnswers] = useState<Record<number, 'A' | 'B'>>({});
-  const [customSchoolText, setCustomSchoolText] = useState<string>(
-    'Not until we step out of our cognitive comfort zone can we genuinely broaden our perspective on complex phenomena. Consistent exposure to diverse viewpoints prevents confirmation bias and fosters intellectual flexibility. Streamlining the approval process makes the entire project feasible.'
-  );
-  const [examEssayInput, setExamEssayInput] = useState<string>('');
-  const [showExamModelAnswer, setShowExamModelAnswer] = useState<boolean>(false);
-  const [csatTimerMins, setCsatTimerMins] = useState<number>(180);
-
-  const [selectedLiveKeyword, setSelectedLiveKeyword] = useState<{
-    platformName: string;
-    rank: number;
-    koTitle: string;
-    enExpression: string;
-    extUrl: string;
-  } | null>(null);
-
-  const [activeDiagramSentenceIdx, setActiveDiagramSentenceIdx] = useState<number>(0);
-  const [customDissectSentence, setCustomDissectSentence] = useState<{
-    en: string;
-    ko: string;
-    title: string;
-  } | null>(null);
-
-  const [mediaPlatforms, setMediaPlatforms] = useState<MediaTrendPlatform[]>(
-    INITIAL_MEDIA_PLATFORMS
-  );
-  const [lastTrendSyncTime, setLastTrendSyncTime] = useState<string>('방금 전 실시간 동기화됨');
-  const [isRefreshingTrends, setIsRefreshingTrends] = useState<boolean>(false);
-
-  const [darkMode, setDarkMode] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('yanadu_dark_mode') === 'true';
-    }
-    return false;
-  });
-  const [colorTheme, setColorTheme] = useState<'blue' | 'emerald' | 'indigo' | 'amber'>('blue');
-  const [fontStyle, setFontStyle] = useState<'sans' | 'serif' | 'mono'>('sans');
-  const [layoutMode, setLayoutMode] = useState<'split' | 'wide'>('split');
-
-  useEffect(() => {
-    if (typeof document === 'undefined') return;
-    const rootHtml = document.documentElement;
-    const rootBody = document.body;
-    if (darkMode) {
-      rootHtml.classList.add('dark');
-      rootBody.classList.add('dark');
-      rootHtml.style.colorScheme = 'dark';
-      rootBody.style.backgroundColor = '#020617';
-      rootBody.style.color = '#f1f5f9';
-    } else {
-      rootHtml.classList.remove('dark');
-      rootBody.classList.remove('dark');
-      rootHtml.style.colorScheme = 'light';
-      rootBody.style.backgroundColor = '#f8fafc';
-      rootBody.style.color = '#0f172a';
-    }
-    localStorage.setItem('yanadu_dark_mode', String(darkMode));
-  }, [darkMode]);
-
-  const [accent, setAccent] = useState<'en-US' | 'en-GB' | 'en-AU' | 'en-IN'>('en-US');
-  const [speechRate, setSpeechRate] = useState<number>(0.75);
-  const [dictQuery, setDictQuery] = useState<string>('');
-  const [liveDictResult, setLiveDictResult] = useState<{
-    word: string;
-    phonetic: string;
-    definition: string;
-    example: string;
-  } | null>(null);
-  const [isLoadingDict, setIsLoadingDict] = useState<boolean>(false);
-
-  const [showAllKoreanPron, setShowAllKoreanPron] = useState<boolean>(true);
-  const [revealedPronKeys, setRevealedPronKeys] = useState<string[]>([]);
-  const [hideWordMode, setHideWordMode] = useState<boolean>(false);
-  const [hideMeaningMode, setHideMeaningMode] = useState<boolean>(false);
-  const [revealedWordIds, setRevealedWordIds] = useState<number[]>([]);
-  const [revealedChallengeIdx, setRevealedChallengeIdx] = useState<number[]>([]);
-
-  const handleSelectLevel = (lvl: LearningLevel) => {
-    setLearningLevel(lvl);
-    setCustomDissectSentence(null);
-    if (lvl === 'beginner') {
-      setSpeechRate(0.75);
-      setShowAllKoreanPron(true);
-      setHideMeaningMode(false);
-      setActiveDiagramSentenceIdx(0);
-    } else if (lvl === 'intermediate') {
-      setSpeechRate(0.9);
-      setShowAllKoreanPron(false);
-      setHideMeaningMode(false);
-      setActiveDiagramSentenceIdx(1);
-    } else {
-      setSpeechRate(1.0);
-      setShowAllKoreanPron(false);
-      setActiveDiagramSentenceIdx(2);
-    }
-  };
-
-  // ==========================================================================
-  // 🗂️ [업그레이드] 양방향 단어·문장 보관함 & 직접 수정 & 암기완료 토글 시스템
-  // ==========================================================================
-  const [wordbookLevel, setWordbookLevel] = useState<
-    '중등 필수' | '고등·수능 핵심' | '비즈니스·실무' | '오픽(OPIc)·구동사'
-  >('고등·수능 핵심');
-  const [wordbookDay, setWordbookDay] = useState<number>(1);
-  const [completedDays, setCompletedDays] = useState<string[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('yanadu_completed_days');
-      if (saved) return JSON.parse(saved);
-    }
-    return ['중등 필수-1', '고등·수능 핵심-1'];
-  });
-
-  // [핵심 수리] 암기 완료 버튼을 다시 누르면 언제든 완료가 해제되는 양방향 토글 함수!
-  const toggleCompletedDay = (dayKey: string) => {
-    setCompletedDays((prev) =>
-      prev.includes(dayKey) ? prev.filter((k) => k !== dayKey) : [...prev, dayKey]
-    );
-  };
-
-  const [bookmarkedWords, setBookmarkedWords] = useState<
-    {
-      word: string;
-      ipa: string;
-      meaning: string;
-      collocation: string;
-      posLabel: string;
-      compLabel: string;
-      levelBadge?: string;
-      customNote?: string;
-      mastered?: boolean;
-    }[]
-  >(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('yanadu_bookmarks');
-      if (saved) return JSON.parse(saved);
-    }
-    return [
-      {
-        word: 'perspective',
-        ipa: '/pəˈspek.tɪv/',
-        meaning: '관점, 시각 (수능·내신 1순위)',
-        collocation: 'broaden our perspective',
-        posLabel: '명사 (Noun)',
-        compLabel: '직접목적어 (DO)',
-        levelBadge: '수능1등급',
-        customNote: 'broaden / expand 와 항상 짝꿍으로 쓰임!',
-        mastered: false,
-      },
-      {
-        word: 'feasible',
-        ipa: '/ˈfiː.zə.bəl/',
-        meaning: '실현 가능한 (406개교 5형식 보어 기출)',
-        collocation: 'make the project feasible',
-        posLabel: '형용사 (Adj)',
-        compLabel: '목적격보어 (OC)',
-        levelBadge: '내신서술형',
-        customNote: '5형식 make 목적격보어 자리에 부사(feasibly) 쓰면 오답!',
-        mastered: false,
-      },
-    ];
-  });
-
-  // [신규 탑재] 내가 저장한 문장·구문 보관함 (회화·실검·수능·내신 모든 문장 저장 및 수정 가능!)
-  const [savedSentences, setSavedSentences] = useState<SavedSentenceItem[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('yanadu_saved_sentences');
-      if (saved) return JSON.parse(saved);
-    }
-    return [
-      {
-        id: 'init-sent-1',
-        en: 'Not until we step out of our comfort zone can we genuinely broaden our perspective.',
-        ko: '우리가 안전지대를 벗어나서야 비로소 시야를 진정으로 넓힐 수 있다.',
-        note: '[수능·내신 1순위] 부정어 Not until 문두 이동 ➔ can we 동사원형 도치 주의!',
-        category: '수능·내신 킬러구문',
-        mastered: false,
-      },
-      {
-        id: 'init-sent-2',
-        en: 'You really pull off that effortlessly chic tailored look!',
-        ko: '그 꾸안꾸 시크 테일러드 룩을 정말 완벽하게 소화하시네요!',
-        note: 'pull off(멋지게 소화하다) + effortlessly chic(꾸안꾸 시크)',
-        category: '실전 회화·패션',
-        mastered: false,
-      },
-    ];
-  });
-
-  // 단어 & 문장 수정용 상태
-  const [editingWordIdx, setEditingWordIdx] = useState<number | null>(null);
-  const [editWordMeaning, setEditWordMeaning] = useState<string>('');
-  const [editWordCollocation, setEditWordCollocation] = useState<string>('');
-  const [editWordNote, setEditWordNote] = useState<string>('');
-
-  const [editingSentId, setEditingSentId] = useState<string | null>(null);
-  const [editSentEn, setEditSentEn] = useState<string>('');
-  const [editSentKo, setEditSentKo] = useState<string>('');
-  const [editSentNote, setEditSentNote] = useState<string>('');
-
-  // 새 단어 / 새 문장 직접 추가용 입력 상태
-  const [newCustomWord, setNewCustomWord] = useState<string>('');
-  const [newCustomWordMeaning, setNewCustomWordMeaning] = useState<string>('');
-  const [newCustomWordNote, setNewCustomWordNote] = useState<string>('');
-  const [newCustomSentEn, setNewCustomSentEn] = useState<string>('');
-  const [newCustomSentKo, setNewCustomSentKo] = useState<string>('');
-  const [newCustomSentNote, setNewCustomSentNote] = useState<string>('');
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('yanadu_bookmarks', JSON.stringify(bookmarkedWords));
-    }
-  }, [bookmarkedWords]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('yanadu_saved_sentences', JSON.stringify(savedSentences));
-    }
-  }, [savedSentences]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('yanadu_completed_days', JSON.stringify(completedDays));
-    }
-  }, [completedDays]);
-
-  const toggleSaveSentence = (item: Omit<SavedSentenceItem, 'id' | 'mastered'>) => {
-    setSavedSentences((prev) => {
-      const exists = prev.some((s) => s.en === item.en);
-      if (exists) return prev.filter((s) => s.en !== item.en);
-      return [
-        {
-          id: `sent-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          ...item,
-          mastered: false,
-        },
-        ...prev,
-      ];
-    });
-  };
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const savedDate = localStorage.getItem('yanadu_last_study_date');
-    if (savedDate !== todayKey) {
-      const nextTheme = THEMES[dayOfYear % THEMES.length].id;
-      const nextWbDay = (dayOfYear % 100) + 1;
-      const todayPlat = INITIAL_MEDIA_PLATFORMS[dayOfYear % INITIAL_MEDIA_PLATFORMS.length];
-      const todayKw = todayPlat.keywords[dayOfYear % todayPlat.keywords.length];
-
-      setSelectedThemeId(nextTheme);
-      setWordbookDay(nextWbDay);
-      setSelectedLiveKeyword({
-        platformName: todayPlat.name,
-        rank: todayKw.rank,
-        koTitle: todayKw.koTitle,
-        enExpression: todayKw.enExpression,
-        extUrl: todayKw.extUrl,
-      });
-      localStorage.setItem('yanadu_last_study_date', todayKey);
-    }
-  }, [todayKey, dayOfYear]);
-
-  const handleRefreshLiveTrends = async () => {
-    setIsRefreshingTrends(true);
-    const now = new Date();
-    const timeLabel = `${String(now.getHours()).padStart(2, '0')}:${String(
-      now.getMinutes()
-    ).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')} 실시간 반영됨`;
-
-    try {
-      const res = await fetch(
-        'https://api.rss2json.com/v1/api.json?rss_url=https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko'
-      );
-      let liveHeadlines: string[] = [];
-      if (res.ok) {
-        const data = await res.json();
-        if (data?.items?.length) {
-          liveHeadlines = data.items
-            .slice(0, 5)
-            .map((it: { title: string }) => it.title.split(' - ')[0]);
-        }
-      }
-
-      setMediaPlatforms((prev) =>
-        prev.map((plat) => {
-          const rotated = [...plat.keywords]
-            .sort(() => Math.random() - 0.5)
-            .map((k, idx) => {
-              if (
-                plat.id === 'GOOGLE_TRENDS' &&
-                idx < liveHeadlines.length &&
-                liveHeadlines[idx]
-              ) {
-                return {
-                  ...k,
-                  rank: idx + 1,
-                  koTitle: `[실시간] ${liveHeadlines[idx]}`,
-                };
-              }
-              return {
-                ...k,
-                rank: idx + 1,
-              };
-            });
-          return { ...plat, keywords: rotated };
-        })
-      );
-      setLastTrendSyncTime(timeLabel);
-    } catch {
-      setMediaPlatforms((prev) =>
-        prev.map((plat) => ({
-          ...plat,
-          keywords: [...plat.keywords]
-            .reverse()
-            .map((k, idx) => ({ ...k, rank: idx + 1 })),
-        }))
-      );
-      setLastTrendSyncTime(timeLabel);
-    } finally {
-      setIsRefreshingTrends(false);
-    }
-  };
-
-  const [diagramTab, setDiagramTab] = useState<'all' | 'comp' | 'pos'>('all');
-  const [selectedComp, setSelectedComp] = useState<CompId | null>('DO');
-  const [selectedPos, setSelectedPos] = useState<PosId | null>('N');
-  const [selectedTokenIdx, setSelectedTokenIdx] = useState<number | null>(0);
-
-  // ==========================================================================
-  // ✏️ [완벽 수리] 아이패드 사파리 파란블록 원천차단 + 첫 획 지연 0초 + 4종 펜슬 & 굵기 대폭 확대
-  // ==========================================================================
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const padWrapperRef = useRef<HTMLDivElement | null>(null);
-  const isDrawingRef = useRef<boolean>(false);
-  const lastPointRef = useRef<{ x: number; y: number } | null>(null);
-
-  const [isFloatingPad, setIsFloatingPad] = useState<boolean>(true);
-  const [isPadLocked, setIsPadLocked] = useState<boolean>(true);
-  const [isPadMinimized, setIsPadMinimized] = useState<boolean>(false);
-  // ✋ 기본값을 아예 '펜슬 전용(손바닥 무시 ON)'으로 설정!
-  const [penOnlyMode, setPenOnlyMode] = useState<boolean>(true);
-  // 4종 펜슬 스타일: 만년필(fountain) | 굵은 수성사인펜(marker) | 볼펜(ballpoint) | 형광펜(highlighter) | 지우개(eraser)
-  const [penType, setPenType] = useState<
-    'fountain' | 'marker' | 'ballpoint' | 'highlighter' | 'eraser'
-  >('marker');
-  const [penColor, setPenColor] = useState<'#2563eb' | '#0f172a' | '#10b981' | '#e11d48'>('#2563eb');
-  // 굵기 기본값을 6px(중간 굵기)로 올리고 3px ~ 24px까지 5단계 지원!
-  const [penWidth, setPenWidth] = useState<number>(6);
-  const [padHeight, setPadHeight] = useState<number>(210);
-
-  // iOS 사파리에서 손바닥이 닿을 때 파랗게 블록 선택되는 현상을 네이티브 레벨에서 100% 차단!
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const wrapper = padWrapperRef.current;
-    if (!canvas || !wrapper) return;
-
-    const blockSafariTouchAndSelect = (e: Event) => {
-      if (isPadLocked) {
-        e.preventDefault();
-      }
-    };
-
-    canvas.addEventListener('touchstart', blockSafariTouchAndSelect, { passive: false });
-    canvas.addEventListener('touchmove', blockSafariTouchAndSelect, { passive: false });
-    canvas.addEventListener('selectstart', blockSafariTouchAndSelect);
-    canvas.addEventListener('contextmenu', blockSafariTouchAndSelect);
-    wrapper.addEventListener('selectstart', blockSafariTouchAndSelect);
-    wrapper.addEventListener('contextmenu', blockSafariTouchAndSelect);
-
-    return () => {
-      canvas.removeEventListener('touchstart', blockSafariTouchAndSelect);
-      canvas.removeEventListener('touchmove', blockSafariTouchAndSelect);
-      canvas.removeEventListener('selectstart', blockSafariTouchAndSelect);
-      canvas.removeEventListener('contextmenu', blockSafariTouchAndSelect);
-      wrapper.removeEventListener('selectstart', blockSafariTouchAndSelect);
-      wrapper.removeEventListener('contextmenu', blockSafariTouchAndSelect);
-    };
-  }, [isPadLocked, isPadMinimized]);
-
-  // 캔버스 해상도 동기화 (창 크기가 바뀔 때만 실행하고, 펜슬이 닿을 때는 절대 실행하지 않아 첫 획 렉 0초!)
-  const syncCanvasResolution = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return;
-    const dpr = window.devicePixelRatio || 1;
-    const targetW = Math.round(rect.width * dpr);
-    const targetH = Math.round(rect.height * dpr);
-
-    if (canvas.width !== targetW || canvas.height !== targetH) {
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = canvas.width;
-      tempCanvas.height = canvas.height;
-      const tempCtx = tempCanvas.getContext('2d');
-      if (tempCtx && canvas.width > 0 && canvas.height > 0) {
-        tempCtx.drawImage(canvas, 0, 0);
-      }
-
-      canvas.width = targetW;
-      canvas.height = targetH;
-      const ctx = canvas.getContext('2d', { desynchronized: true });
-      if (ctx) {
-        ctx.scale(dpr, dpr);
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        if (tempCanvas.width > 0 && tempCanvas.height > 0) {
-          ctx.drawImage(
-            tempCanvas,
-            0,
-            0,
-            tempCanvas.width,
-            tempCanvas.height,
-            0,
-            0,
-            rect.width,
-            rect.height
-          );
-        }
-      }
-    }
-  };
-
-  useEffect(() => {
-    const timer = setTimeout(() => syncCanvasResolution(), 60);
-    window.addEventListener('resize', syncCanvasResolution);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('resize', syncCanvasResolution);
-    };
-  }, [isFloatingPad, isPadMinimized, padHeight, layoutMode, activeMode]);
-
-  const getExactPointerPos = (
-    canvas: HTMLCanvasElement,
-    clientX: number,
-    clientY: number
-  ) => {
-    const rect = canvas.getBoundingClientRect();
-    return {
-      x: clientX - rect.left,
-      y: clientY - rect.top,
-    };
-  };
-
-  // [초고속 즉각 반응] 펜촉이 닿는 즉시 0.001초 만에 선을 그립니다!
-  const startDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!isPadLocked) return;
-    // 손바닥 무시(penOnlyMode)가 켜져 있을 때 손가락/손바닥(touch)은 즉시 차단하고 선택 효과도 막음
-    if (penOnlyMode && e.pointerType === 'touch') {
-      e.preventDefault();
-      e.stopPropagation();
-      return;
-    }
-
-    e.preventDefault();
-    e.stopPropagation();
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const pos = getExactPointerPos(canvas, e.clientX, e.clientY);
-    isDrawingRef.current = true;
-    lastPointRef.current = pos;
-
-    const ctx = canvas.getContext('2d', { desynchronized: true });
-    if (!ctx) return;
-
-    const actualColor =
-      penColor === '#0f172a' && darkMode ? '#f8fafc' : penColor;
-
-    if (penType === 'eraser') {
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.globalAlpha = 1.0;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.lineWidth = Math.max(28, penWidth * 3.5);
-    } else if (penType === 'highlighter') {
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.globalAlpha = 0.32;
-      ctx.strokeStyle = '#facc15';
-      ctx.lineCap = 'square';
-      ctx.lineJoin = 'bevel';
-      ctx.lineWidth = Math.max(20, penWidth * 2.8);
-    } else if (penType === 'marker') {
-      // 🖊️ 굵은 수성 사인펜: 필압과 무관하게 묵직하고 선명한 굵기 유지!
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.globalAlpha = 1.0;
-      ctx.strokeStyle = actualColor;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.lineWidth = penWidth * 1.35;
-    } else if (penType === 'fountain') {
-      // ✒️ 만년필: 애플 펜슬 필압에 따라 굵기가 다이내믹하게 변화
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.globalAlpha = 1.0;
-      ctx.strokeStyle = actualColor;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      const pressureFactor =
-        e.pointerType === 'pen' && e.pressure > 0 ? 0.6 + e.pressure * 1.5 : 1.1;
-      ctx.lineWidth = penWidth * pressureFactor;
-    } else {
-      // ✏️ 부드러운 볼펜
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.globalAlpha = 1.0;
-      ctx.strokeStyle = actualColor;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.lineWidth = penWidth;
-    }
-
-    ctx.beginPath();
-    ctx.moveTo(pos.x, pos.y);
-    ctx.lineTo(pos.x + 0.05, pos.y + 0.05);
-    ctx.stroke();
-  };
-
-  const draw = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!isDrawingRef.current || !isPadLocked) return;
-    if (penOnlyMode && e.pointerType === 'touch') {
-      e.preventDefault();
-      return;
-    }
-
-    e.preventDefault();
-    e.stopPropagation();
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d', { desynchronized: true });
-    if (!ctx) return;
-
-    if (penType === 'fountain' && e.pointerType === 'pen' && e.pressure > 0) {
-      ctx.lineWidth = penWidth * (0.6 + e.pressure * 1.5);
-    }
-
-    const nativeEvt = e.nativeEvent as PointerEvent;
-    const events =
-      typeof nativeEvt.getCoalescedEvents === 'function'
-        ? nativeEvt.getCoalescedEvents()
-        : [nativeEvt];
-
-    ctx.beginPath();
-    if (lastPointRef.current) {
-      ctx.moveTo(lastPointRef.current.x, lastPointRef.current.y);
-    }
-
-    for (const ev of events) {
-      const pt = getExactPointerPos(canvas, ev.clientX, ev.clientY);
-      ctx.lineTo(pt.x, pt.y);
-      lastPointRef.current = pt;
-    }
-    ctx.stroke();
-  };
-
-  const endDrawing = () => {
-    isDrawingRef.current = false;
-    lastPointRef.current = null;
-  };
-
-  const clearCanvas = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.restore();
-  };
-
-  const [quizLevelTab, setQuizLevelTab] = useState<
-    'word' | 'beginner' | 'intermediate' | 'advanced'
-  >('beginner');
-  const [selectedBeginnerOpt, setSelectedBeginnerOpt] = useState<number | null>(null);
-  const [selectedInterOpt, setSelectedInterOpt] = useState<number | null>(null);
-  const [showInterHint, setShowInterHint] = useState<boolean>(false);
-  const [selectedAdvOpts, setSelectedAdvOpts] = useState<number[]>([]);
-  const [userWritingMission, setUserWritingMission] = useState<string>('');
-
-  const [targetSpeakingMins, setTargetSpeakingMins] = useState<number>(5);
-  const [, setSpeakingSeconds] = useState<number>(0);
-  const [isVoiceActive, setIsVoiceActive] = useState<boolean>(false);
-  const [chatInput, setChatInput] = useState<string>('');
-  const [chatHistory, setChatHistory] = useState<ChatTurn[]>([
-    {
-      role: 'coach',
-      text: 'Welcome! Safari blue palm-selection is now 100% blocked, pen thickness is up to 24px with 4 pen styles, and you can edit/uncheck any saved word or sentence!',
-      nuanceTip: '이제 손바닥이 닿아도 파랗게 변하지 않고 즉각 써지며, 저장한 단어·문장을 자유롭게 수정하고 암기 완료도 언제든 해제할 수 있습니다!',
-    },
-  ]);
-  const [correctionInput, setCorrectionInput] = useState<string>('');
-  const [correctionResult, setCorrectionResult] = useState<{
-    original: string;
-    naturalEn: string;
-    wordOrderFix: string;
-    grammarExplanation: string;
-    opicUpgrade: string;
-  } | null>(null);
-  const [studyStats, setStudyStats] = useState({
-    masteredWords: 120,
-    completedSentences: 64,
-    quizAccuracy: 96,
-    speakingMinutes: 55,
-    streakDays: 12,
-  });
-
-  const baseTheme = THEMES.find((t) => t.id === selectedThemeId) || THEMES[0];
-
-  const currentTheme: ThemeData = (() => {
-    if (!selectedLiveKeyword) return baseTheme;
-
-    const kwEn = selectedLiveKeyword.enExpression;
-    const kwKo = selectedLiveKeyword.koTitle;
-    const kwFirstWord = kwEn.split(' ')[0] || 'trend';
-
-    const liveVocabItem: VocabItem = {
-      id: 0,
-      type: '일상 회화',
-      recommendLevel: learningLevel,
-      word: kwEn,
-      masked: `${kwFirstWord.slice(0, 2)} ⬛ ⬛ ⬛`,
-      ipa: '/실시간 트렌드 핵심 표현/',
-      pron: `[실시간 키워드 발음 듣기 🔊]`,
-      soundMethod: `앞 단어 끝소리와 뒤 단어 첫 모음을 한 호흡의 소리블럭(${kwEn})으로 부드럽게 이어 발음합니다.`,
-      soundBlock: `${kwFirstWord} / ${kwEn.split(' ').slice(1).join(' ') || 'now'}`,
-      meaning: `[실검 ${selectedLiveKeyword.rank}위] ${kwKo}`,
-      enDef: `Live Trend Expression from ${selectedLiveKeyword.platformName}`,
-      exampleBlank: `Let us practice how to ______ in our daily conversation.`,
-      pos: 'V',
-      posLabel: '핵심 표현 블록 (V/N)',
-      comp: 'DO',
-      compLabel: '핵심 성분 (V·DO)',
-      roleDesc: '방금 왼쪽 실시간 트렌드에서 선택한 최우선 집중 학습 표현',
-      collocation: kwEn,
-      collocationKo: kwKo,
-      paraphraseTip: `[실시간 연동 완료] 클릭하신 "${kwKo}" 이슈를 아래 직독직해와 16개 해부 카드로 즉시 학습합니다!`,
-    };
-
-    const liveSentence: TrainingSentence = {
-      id: 0,
-      levelTag: learningLevel,
-      tag: `🔥 [실시간 ${selectedLiveKeyword.rank}위 집중 문장] ${selectedLiveKeyword.platformName}`,
-      targetWord: kwEn,
-      wordOrderFormula: `[도입 패턴] + [실시간 핵심 표현 (${kwEn})] + [실전 상황 수식어(M)]`,
-      structure: '주어(S) + 동사(V) + 실시간 타겟 표현(DO/SC) + 수식어(M)',
-      soundBlockEn:
-        learningLevel === 'beginner'
-          ? `We really need / to focus on / ${kwEn} / today.`
-          : learningLevel === 'intermediate'
-          ? `Everyone is talking about / how to ${kwEn} / effectively.`
-          : `I was wondering if we could / ${kwEn} / from a broader perspective.`,
-      soundMethodGuide: `방금 선택하신 실시간 검색어 "${kwEn}"에 가장 강한 강세를 실어 또렷하게 발음하세요!`,
-      ipaLine: `/Live Trend Sentence — ${kwEn}/`,
-      koLine: `오늘의 핫이슈(S) / [${kwKo}] 표현을(DO) / 실전 문장으로 완벽히 소화합니다(V+M).`,
-      enLine:
-        learningLevel === 'beginner'
-          ? `We really need(S+V) / to focus on [${kwEn}](DO) / today(M).`
-          : learningLevel === 'intermediate'
-          ? `Everyone is talking about(S+V) / how to [${kwEn}](O) / right now(M).`
-          : `I was wondering(S+V) / if we could [${kwEn}](O) / effortlessly(M).`,
-      rawEn:
-        learningLevel === 'beginner'
-          ? `We really need to focus on ${kwEn} today.`
-          : learningLevel === 'intermediate'
-          ? `Everyone is talking about how to ${kwEn} right now.`
-          : `I was wondering if we could ${kwEn} effortlessly.`,
-      pronLine: `[실시간 문장 발음: 위 🔊 듣기 버튼을 눌러 원어민 연음을 확인하세요]`,
-      naturalKo: `[실시간 ${selectedLiveKeyword.rank}위 응용] 우리는 오늘 "${kwKo} (${kwEn})" 주제를 실전 영어로 자연스럽게 구사할 수 있습니다.`,
-      paraphraseVersion: `What I love most is that we can apply "${kwEn}" right away in real life.`,
-      grammarPoint: `왼쪽에서 클릭하신 실시간 키워드(${kwEn})가 문장의 핵심 목적어/동사구 블록으로 자동 결합되었습니다.`,
-      contextNuance: `${selectedLiveKeyword.platformName} 실시간 ${selectedLiveKeyword.rank}위 화젯거리를 원어민 스몰톡으로 즉시 연결한 문장입니다.`,
-    };
-
-    return {
-      ...baseTheme,
-      title: `🔥 [${selectedLiveKeyword.platformName} ${selectedLiveKeyword.rank}위] ${kwKo}`,
-      badge: `실시간 트렌드 연동 · ${baseTheme.badge}`,
-      levelTracks: {
-        beginner: {
-          ...baseTheme.levelTracks.beginner,
-          patternEn: `Let us practice / "${kwEn}" / step by step!`,
-          patternSoundBlock: `Let us practice / ${kwEn} / step by step!`,
-          patternMeaningKo: `[실시간 초급] "${kwKo}" 표현을 단계별로 쉽게 연습해 봅시다!`,
-        },
-        intermediate: {
-          ...baseTheme.levelTracks.intermediate,
-          patternEn: `Everyone is talking about / ${kwEn} / these days.`,
-          patternSoundBlock: `Everyone is talking about / ${kwEn} / these days.`,
-          patternMeaningKo: `[실시간 중급] 요즘 모두가 "${kwKo}"에 대해 이야기하고 있습니다.`,
-        },
-        advanced: {
-          ...baseTheme.levelTracks.advanced,
-          patternEn: `I was wondering if we could apply / "${kwEn}" / effectively.`,
-          patternSoundBlock: `I was wondering / if we could apply / ${kwEn} / effectively.`,
-          patternMeaningKo: `[실시간 고급] "${kwKo}" 트렌드를 실무와 일상에 효과적으로 적용해 볼 수 있을지 논의해 보고 싶습니다.`,
-        },
-      },
-      vocab: [liveVocabItem, ...baseTheme.vocab.slice(0, 9)],
-      sentences: [liveSentence, ...baseTheme.sentences],
-      quiz: {
-        ...baseTheme.quiz,
-        intermediate: {
-          sentenceBefore: 'Everyone is talking about how to',
-          sentenceAfter: 'in today’s trending issue.',
-          hint: `방금 왼쪽에서 클릭하신 [${selectedLiveKeyword.platformName} ${selectedLiveKeyword.rank}위: ${kwKo}] 영어 표현입니다!`,
-          options: [kwEn, 'take a rain check', 'miss the boat', 'call it a day'],
-          answerIdx: 0,
-          explanation: `방금 선택하신 실시간 트렌드 ${selectedLiveKeyword.rank}위 표현인 "${kwEn}"(${kwKo})이 정답입니다!`,
-        },
-      },
-    };
-  })();
-
-  const currentLevelTrack = currentTheme.levelTracks[learningLevel];
-  const currentExamCourse =
-    EXAM_MASTER_COURSES.find((c) => c.id === selectedExamTrack) || EXAM_MASTER_COURSES[0];
-
-  const activeSentenceForDiagram = customDissectSentence
-    ? {
-        rawEn: customDissectSentence.en,
-        naturalKo: customDissectSentence.ko,
-        tag: customDissectSentence.title,
-      }
-    : currentTheme.sentences[activeDiagramSentenceIdx] || currentTheme.sentences[0];
-
-  const currentDiagramEx: DiagramSentence = buildDynamicDiagramSentence(
-    activeSentenceForDiagram.rawEn,
-    activeSentenceForDiagram.naturalKo,
-    activeSentenceForDiagram.tag
-  );
-
-  const currentMediaObj =
-    mediaPlatforms.find((m) => m.id === activeMediaPlatform) || mediaPlatforms[0];
-
-  useEffect(() => {
-    setSelectedBeginnerOpt(null);
-    setSelectedInterOpt(null);
-    setShowInterHint(false);
-    setSelectedAdvOpts([]);
-    setRevealedWordIds([]);
-    setActiveDiagramSentenceIdx(0);
-    setSelectedTokenIdx(0);
-    setCustomDissectSentence(null);
-  }, [selectedThemeId, selectedLiveKeyword]);
-
-  useEffect(() => {
-    if (!isVoiceActive) return;
-    const timer = setInterval(() => {
-      setSpeakingSeconds((prev) => {
-        if (prev + 1 >= targetSpeakingMins * 60) {
-          setIsVoiceActive(false);
-          return targetSpeakingMins * 60;
-        }
-        return prev + 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [isVoiceActive, targetSpeakingMins]);
-
-  const toggleKoreanPron = (key: string) => {
-    setRevealedPronKeys((prev) =>
-      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
-    );
-  };
-
-  const isPronVisible = (key: string) => showAllKoreanPron || revealedPronKeys.includes(key);
-
-  const toggleBookmark = (item: {
-    word: string;
-    ipa: string;
-    meaning: string;
-    collocation: string;
-    posLabel: string;
-    compLabel: string;
-    levelBadge?: string;
-  }) => {
-    setBookmarkedWords((prev) => {
-      const exists = prev.some((b) => b.word === item.word);
-      if (exists) return prev.filter((b) => b.word !== item.word);
-      setStudyStats((s) => ({ ...s, masteredWords: s.masteredWords + 1 }));
-      return [{ ...item, customNote: '', mastered: false }, ...prev];
-    });
-  };
-
-  const fetchLiveDictionary = async (wordToSearch: string) => {
-    const clean = wordToSearch.trim().split(' ')[0];
-    if (!clean) return;
-    setIsLoadingDict(true);
-    try {
-      const res = await fetch(
-        `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(clean)}`
-      );
-      if (res.ok) {
-        const data = await res.json();
-        const first = data[0];
-        const meaningObj = first?.meanings?.[0]?.definitions?.[0];
-        setLiveDictResult({
-          word: first?.word || clean,
-          phonetic: first?.phonetic || first?.phonetics?.[0]?.text || '/발음기호/',
-          definition: meaningObj?.definition || '영영 사전 정의를 불러왔습니다.',
-          example:
-            meaningObj?.example ||
-            `Let us practice using "${clean}" in our ${learningLevel} track.`,
-        });
-      } else {
-        setLiveDictResult({
-          word: clean,
-          phonetic: '/실전 구어/입시 핵심 표현/',
-          definition: '원어민 실전 구동사·수능 핵심 표현입니다. 우측 네이버/구글 사전 버튼으로 상세 예문을 확인하세요.',
-          example: `You really pulled off "${clean}" effortlessly!`,
-        });
-      }
-    } catch {
-      setLiveDictResult({
-        word: clean,
-        phonetic: '/사전 안내/',
-        definition: '우측 사전 바로가기 링크를 이용해 주세요.',
-        example: `Practice "${clean}" step by step.`,
-      });
-    } finally {
-      setIsLoadingDict(false);
-    }
-  };
-
-  const speakText = (
-    text: string,
-    customAccent?: 'en-US' | 'en-GB' | 'en-AU' | 'en-IN',
-    customRate?: number
-  ) => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-    window.speechSynthesis.cancel();
-    const cleanText = text.replace(/\[|\]|"/g, '');
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    const targetLang = customAccent || accent;
-    utterance.lang = targetLang;
-    utterance.rate = customRate || speechRate;
-
-    const voices = window.speechSynthesis.getVoices();
-    const matchedVoice = voices.find((v) => v.lang.includes(targetLang));
-    if (matchedVoice) utterance.voice = matchedVoice;
-    window.speechSynthesis.speak(utterance);
-  };
-
-  const getGoogleTranslateUrl = (text: string) => {
-    const clean = text.replace(/\[|\]/g, '');
-    return `https://translate.google.com/?sl=en&tl=ko&text=${encodeURIComponent(clean)}&op=translate`;
-  };
-
-  const getNaverDictUrl = (text: string) => {
-    const clean = text.replace(/\[|\]/g, '');
-    return `https://en.dict.naver.com/#/search?query=${encodeURIComponent(clean)}`;
-  };
-
-  const handleRunCorrection = (e: React.FormEvent) => {
-    e.preventDefault();
-    const raw = correctionInput.trim();
-    if (!raw) return;
-    const capitalized = raw.charAt(0).toUpperCase() + raw.slice(1);
-    const withPeriod =
-      capitalized.endsWith('.') || capitalized.endsWith('?')
-        ? capitalized
-        : `${capitalized}.`;
-
-    setCorrectionResult({
-      original: raw,
-      naturalEn: `[수능·내신 서술형 패러프레이징] ${currentLevelTrack.patternEn.replace('~', raw)}`,
-      wordOrderFix:
-        '서술형 감점 방지 점검: [주어(S) + 동사(V) + 목적어(DO)/보어(SC·OC)] 수일치와 5형식 보어 품사(형용사)를 확인하세요.',
-      grammarExplanation: `입력하신 "${withPeriod}" 문장을 외운 답이 아닌 구조적 어순으로 변형하면 내신 서술형 만점 답안이 됩니다.`,
-      opicUpgrade: `[고급 확장] Not only does it clarify the meaning, but ${withPeriod}`,
-    });
-    setStudyStats((s) => ({ ...s, completedSentences: s.completedSentences + 1 }));
-  };
-
-  const handleSendChat = (e: React.FormEvent) => {
-    e.preventDefault();
-    const msg = chatInput.trim();
-    if (!msg) return;
-    const userTurn: ChatTurn = { role: 'user', text: msg };
-    const coachReply: ChatTurn = {
-      role: 'coach',
-      text: `[${learningLevel.toUpperCase()} COACH] Great structure! "${msg}" shows strong command of word order. Try transforming it with "${currentTheme.vocab[0].collocation}"!`,
-      correction: `💡 레벨업 & 서술형 추천 표현: "${currentLevelTrack.patternEn}"`,
-      nuanceTip: `현재 배속(${speechRate}x)에 맞춰 의미단위(소리블럭)로 끊어 읽어보세요!`,
-    };
-    setChatHistory((prev) => [...prev, userTurn, coachReply]);
-    setChatInput('');
-    speakText(coachReply.text);
-  };
-
-  const renderHighlightedSentence = (line: string) => {
-    const parts = line.split(/(\[[^\]]+\])/g);
-    return parts.map((part, idx) => {
-      if (part.startsWith('[') && part.endsWith(']')) {
-        const word = part.slice(1, -1);
-        return (
-          <strong
-            key={idx}
-            className="underline decoration-2 decoration-blue-500 underline-offset-4 font-extrabold text-blue-600 dark:text-yellow-300 px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/70"
-          >
-            {word}
-          </strong>
-        );
-      }
-      return <span key={idx}>{part}</span>;
-    });
-  };
-
-  const fontClass =
-    fontStyle === 'serif'
-      ? 'font-serif'
-      : fontStyle === 'mono'
-      ? 'font-mono'
-      : 'font-sans';
-
-  const themeAccentBg =
-    colorTheme === 'emerald'
-      ? 'bg-emerald-600'
-      : colorTheme === 'indigo'
-      ? 'bg-indigo-600'
-      : colorTheme === 'amber'
-      ? 'bg-amber-600'
-      : 'bg-blue-600';
-
-  const filteredWordbook = getExpandedWordbookByDay(wordbookLevel, wordbookDay);
-  const generatedSyntaxList = generateCombinatorialSentences(syntaxSeed, 12);
-  const customPassageAnalysis = analyzeCustomSchoolPassage(customSchoolText);
-  const examVocabTestList = getExpandedWordbookByDay('고등·수능 핵심', vocabQuizSeed);
-  // ==========================================================================
-  // [마지막 4파트] 파란블록 원천차단 4종 펜슬장 + 양방향 보관함(수정·완료해제) + 제작백서 UI
+// ==========================================================================
+  // [파트 4] 누락 없는 전체 화면 UI + 양방향 보관함 + 필기 도구 5종(펜 4종+지우개)
   // ==========================================================================
   return (
     <div
       className={`${darkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'} ${fontClass} min-h-screen`}
     >
       <style>{`
-        /* 아이패드 사파리 손바닥 접촉 시 파랗게 블록 선택되는 현상 원천 차단 */
         .no-safari-select, .no-safari-select * {
           -webkit-touch-callout: none !important;
           -webkit-user-select: none !important;
@@ -4520,9 +3547,7 @@ export default function App() {
       `}</style>
 
       <div className="flex h-screen overflow-hidden">
-        {/* ====================================================================
-            좌측 사이드바: 9대 매체 실시간 새로고침 + 수능·내신 1등급 바로가기 + 5단계 배속
-        ==================================================================== */}
+        {/* 좌측 사이드바: 9대 매체 실시간 새로고침 + 수능·내신 바로가기 + 5단계 배속 & 4개국 억양 */}
         <aside
           className={`no-print w-80 flex-shrink-0 border-r flex flex-col h-full select-none transition-colors ${
             darkMode
@@ -4534,7 +3559,7 @@ export default function App() {
             <div>
               <div className="flex items-center gap-1.5">
                 <span className={`px-2 py-0.5 text-[10px] font-extrabold rounded text-white ${themeAccentBg}`}>
-                  8,000단어+무한구문
+                  코어어휘+조합구문
                 </span>
                 <h1 className="text-base font-extrabold tracking-tight">나만의 야나두 PRO</h1>
               </div>
@@ -4559,7 +3584,7 @@ export default function App() {
               <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-amber-400 text-slate-950">
                 수능·내신 1등급 마스터
               </span>
-              <span className="text-[10px] text-blue-200 font-bold">1~5교시 무제한 문제</span>
+              <span className="text-[10px] text-blue-200 font-bold">1~5교시 실전 훈련</span>
             </div>
             <div className="text-xs font-extrabold leading-snug">
               🎓 외운 답이 아닌 스스로 답을 만드는 영어!
@@ -4865,13 +3890,38 @@ export default function App() {
                   </button>
                 ))}
               </div>
+
+              {/* 4개국 발음 억양 선택기 (setAccent 연결 완료) */}
+              <div className="grid grid-cols-4 gap-1 text-[10px] font-bold pt-1">
+                {[
+                  { code: 'en-US' as const, label: '🇺🇸 미국' },
+                  { code: 'en-GB' as const, label: '🇬🇧 영국' },
+                  { code: 'en-AU' as const, label: '🇦🇺 호주' },
+                  { code: 'en-IN' as const, label: '🇮🇳 인도' },
+                ].map((item) => (
+                  <button
+                    key={item.code}
+                    onClick={() => {
+                      setAccent(item.code);
+                      speakText(currentLevelTrack.patternEn, item.code);
+                    }}
+                    className={`py-1 rounded-lg border ${
+                      accent === item.code
+                        ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 border-transparent'
+                        : darkMode
+                        ? 'bg-slate-900 border-slate-700'
+                        : 'bg-white border-slate-200'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </aside>
 
-        {/* ====================================================================
-            우측 메인 영역: 상단 헤더 + 본문 + 따라다니는 4종 펜슬 메모장
-        ==================================================================== */}
+        {/* 우측 메인 영역 */}
         <main className="flex-1 flex flex-col h-full overflow-hidden relative">
           <header
             className={`no-print border-b px-5 py-3 space-y-2.5 transition-colors ${
@@ -4946,15 +3996,21 @@ export default function App() {
                 >
                   {showAllKoreanPron ? '👁️ 한글발음' : '🙈 발음가림'}
                 </button>
+                <button
+                  onClick={() => window.print()}
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 text-white font-extrabold"
+                >
+                  🖨️ 인쇄
+                </button>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl">
                 {[
-                  { id: 'daily', label: '📝 일일 강의 & 16매핑' },
-                  { id: 'examMaster', label: '🎓 수능·내신 1등급 (1~5교시)' },
-                  { id: 'wordbook', label: '📘 8,000단어장 (Day 1~100)' },
+                  { id: 'daily', label: '📝 일일 강의 & 16요소' },
+                  { id: 'examMaster', label: '🎓 수능·내신 (1~5교시)' },
+                  { id: 'wordbook', label: '📘 코어 단어장 (Day 1~100)' },
                   { id: 'naverQuiz', label: '🗂️ 내 보관함·수정·완료관리' },
                   { id: 'aiCoach', label: '🎙️ AI 회화·첨삭' },
                   { id: 'weekly', label: '🗓️ 전체 총람' },
@@ -5020,7 +4076,7 @@ export default function App() {
               } mx-auto space-y-7 ${isFloatingPad && !isPadMinimized ? 'pb-72' : 'pb-20'}`}
             >
               {/* ==============================================================
-                  [모드 NEW] 🎓 수능·내신 1등급 마스터 전용관 (1~5교시 대량 문제은행)
+                  [모드 1] 🎓 수능·내신 1등급 마스터 전용관 (1~5교시 완전 복원!)
               ============================================================== */}
               {activeMode === 'examMaster' && (
                 <div className="space-y-6">
@@ -5029,10 +4085,10 @@ export default function App() {
                       <div className="space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="px-3 py-1 rounded-full bg-amber-400 text-slate-950 text-xs font-black">
-                            수능 & 내신 1등급 대량 문제은행 가동중
+                            수능 & 내신 실전 훈련 시스템
                           </span>
                           <span className="px-3 py-1 rounded-full bg-indigo-500/30 border border-indigo-400/40 text-indigo-200 text-xs font-extrabold">
-                            10,000+ 조합 구문 · 406개교 6개년 기출 · 내 학교 지문 자동 생성기
+                            조합형 구문 훈련 · 빈출 어법 체크 · 내 학교 지문 자동 분석기
                           </span>
                         </div>
                         <h2 className="text-2xl md:text-3xl font-black tracking-tight pt-1">
@@ -5045,7 +4101,7 @@ export default function App() {
 
                       <div className="bg-slate-900/90 border border-slate-700 rounded-2xl p-3.5 text-center min-w-[180px]">
                         <div className="text-[10px] font-extrabold text-amber-300 uppercase">
-                          ⏱️ 주 1회 3시간 집중 루틴
+                          ⏱️ 집중 학습 목표 시간
                         </div>
                         <div className="text-xl font-black font-mono text-white mt-0.5">
                           {csatTimerMins}분 코스
@@ -5115,11 +4171,11 @@ export default function App() {
                   >
                     <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-5 gap-2">
                       {[
-                        { step: 1, title: '1교시: 단어 스피드 테스트', sub: '20문항 무한 시험지' },
-                        { step: 2, title: '2교시: 10,000+ 킬러구문', sub: '도치·분사·강조 12문장씩' },
+                        { step: 1, title: '1교시: 단어 스피드 테스트', sub: '20문항 셔플 시험지' },
+                        { step: 2, title: '2교시: 핵심 구문 조합 훈련', sub: '도치·분사·강조 12문장씩' },
                         { step: 3, title: '3교시: 독해심화 & 지문변형', sub: 'Paraphrasing 비교' },
                         { step: 4, title: '4교시: 주요 학술소재 연계', sub: '철학·경제·뇌과학·환경' },
-                        { step: 5, title: '5교시: 406개교 어법·서술형', sub: '+내 학교 지문 자동생성기' },
+                        { step: 5, title: '5교시: 빈출 어법·서술형', sub: '+내 학교 지문 자동분석기' },
                       ].map((stObj) => {
                         const activeStage = schoolInternalStage === stObj.step;
                         return (
@@ -5144,7 +4200,7 @@ export default function App() {
                       })}
                     </div>
 
-                    {/* 1교시 */}
+                    {/* 1교시: 정답 위치(1·2·3번) 자동 분산 셔플 적용 완료! */}
                     {schoolInternalStage === 1 && (
                       <div className="space-y-4">
                         <div className="flex flex-wrap items-center justify-between gap-2 p-4 rounded-2xl bg-indigo-950 text-white">
@@ -5153,7 +4209,7 @@ export default function App() {
                               ⚡ [1교시 단어학습 & 테스트] 고등·수능 핵심 어휘 20문항 (Set #{vocabQuizSeed})
                             </h4>
                             <p className="text-xs text-indigo-200">
-                              우측 버튼을 누를 때마다 Day 1 ~ Day 100 압축 사전에서 새로운 20문항이 출제됩니다!
+                              정답 번호가 1·2·3번에 골고루 섞여 출제됩니다. 우측 버튼으로 새 시험지를 생성하세요!
                             </p>
                           </div>
                           <button
@@ -5174,7 +4230,13 @@ export default function App() {
                               examVocabTestList[(idx + 3) % examVocabTestList.length].meaning;
                             const wrong2 =
                               examVocabTestList[(idx + 7) % examVocabTestList.length].meaning;
-                            const options = [item.meaning, wrong1, wrong2];
+                            const correctPos = (idx + vocabQuizSeed) % 3;
+                            const options =
+                              correctPos === 0
+                                ? [item.meaning, wrong1, wrong2]
+                                : correctPos === 1
+                                ? [wrong1, item.meaning, wrong2]
+                                : [wrong1, wrong2, item.meaning];
                             const isSaved = bookmarkedWords.some((b) => b.word === item.word);
 
                             return (
@@ -5211,7 +4273,7 @@ export default function App() {
                                       {isSaved ? '⭐ 저장됨' : '☆ 단어저장'}
                                     </button>
                                     <button
-                                      onClick={() => speakText(item.word.split(' ')[0])}
+                                      onClick={() => speakText(item.word.split('(')[0])}
                                       className="w-7 h-7 rounded-full bg-blue-600 text-white text-xs"
                                     >
                                       🔊
@@ -5221,7 +4283,7 @@ export default function App() {
                                 <div className="space-y-1 pt-1">
                                   {options.map((opt, oIdx) => {
                                     const isSel = picked === oIdx;
-                                    const isAns = oIdx === 0;
+                                    const isAns = oIdx === correctPos;
                                     return (
                                       <button
                                         key={oIdx}
@@ -5253,13 +4315,13 @@ export default function App() {
                       </div>
                     )}
 
-                    {/* 2교시: 10,000+ 조합형 킬러 구문 (문장 스크랩 버튼 완비!) */}
+                    {/* 2교시: 핵심 구문 조합 훈련 */}
                     {schoolInternalStage === 2 && (
                       <div className="space-y-4">
                         <div className="flex flex-wrap items-center justify-between gap-2 p-4 rounded-2xl bg-indigo-950 text-white">
                           <div>
                             <h4 className="text-base font-black">
-                              🧩 [2교시 핵심구문 학습] 10,000+ 조합형 고3 킬러 구문 (Batch #{syntaxSeed})
+                              🧩 [2교시 핵심구문 학습] 조합형 고난도 구문 훈련 (Batch #{syntaxSeed})
                             </h4>
                             <p className="text-xs text-indigo-200">
                               마음에 드는 구문은 <strong>[📌 문장저장]</strong>을 눌러 내 보관함에서 수정·복습하세요!
@@ -5269,7 +4331,7 @@ export default function App() {
                             onClick={() => setSyntaxSeed((s) => s + 1)}
                             className="px-4 py-2 rounded-xl bg-amber-400 text-slate-950 text-xs font-black shadow"
                           >
-                            🔄 새 킬러 구문 12문장 즉시 생성 (Batch #{syntaxSeed + 1})
+                            🔄 새 구문 12문장 조합 생성 (Batch #{syntaxSeed + 1})
                           </button>
                         </div>
 
@@ -5289,7 +4351,7 @@ export default function App() {
                               >
                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                   <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-indigo-600 text-white">
-                                    킬러구문 #{idx + 1} · {item.openerRule}
+                                    구문 #{idx + 1} · {item.openerRule}
                                   </span>
                                   <div className="flex flex-wrap items-center gap-1.5">
                                     <button
@@ -5298,7 +4360,7 @@ export default function App() {
                                           en: item.sentenceEn,
                                           ko: item.sentenceKo,
                                           note: `${item.openerRule} | 변형: ${item.paraphrasedEn}`,
-                                          category: '수능·내신 2교시 킬러구문',
+                                          category: '수능·내신 2교시 핵심구문',
                                         })
                                       }
                                       className={`px-3 py-1 rounded-lg text-xs font-extrabold border ${
@@ -5314,14 +4376,14 @@ export default function App() {
                                         setCustomDissectSentence({
                                           en: item.sentenceEn,
                                           ko: item.sentenceKo,
-                                          title: `킬러구문 #${idx + 1}: ${item.openerRule}`,
+                                          title: `구문 #${idx + 1}: ${item.openerRule}`,
                                         });
                                         setActiveMode('daily');
                                         speakText(item.sentenceEn);
                                       }}
                                       className="px-3 py-1 rounded-lg bg-blue-600 text-white text-xs font-extrabold"
                                     >
-                                      🔍 16매핑 즉시 해부↗
+                                      🔍 16요소 즉시 해부↗
                                     </button>
                                     <button
                                       onClick={() => speakText(item.sentenceEn)}
@@ -5382,7 +4444,7 @@ export default function App() {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                               <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1.5">
                                 <div className="text-xs font-extrabold text-blue-500">
-                                  📘 [교과서·EBS 원문 지문]
+                                  📘 [교과서·모의고사 원문 지문]
                                 </div>
                                 <div className="text-sm font-black">"{st.originalPassageEn}"</div>
                                 <div className="text-xs text-slate-500">{st.originalPassageKo}</div>
@@ -5424,8 +4486,8 @@ export default function App() {
                                   toggleSaveSentence({
                                     en: tp.paraphraseSummary,
                                     ko: tp.passageKo,
-                                    note: `EBS 소재 요약: ${tp.title}`,
-                                    category: '4교시 EBS 학술요약',
+                                    note: `학술 소재 요약: ${tp.title}`,
+                                    category: '4교시 학술요약',
                                   })
                                 }
                                 className="px-2.5 py-1 rounded-lg bg-amber-400 text-slate-950 text-xs font-extrabold"
@@ -5439,19 +4501,19 @@ export default function App() {
                             </p>
                             <p className="text-xs text-slate-500">{tp.passageKo}</p>
                             <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs font-bold text-emerald-600 dark:text-emerald-300">
-                              📌 [수능 40번 한 줄 요약]: "{tp.paraphraseSummary}"
+                              📌 [수능 40번 유형 한 줄 요약]: "{tp.paraphraseSummary}"
                             </div>
                           </div>
                         ))}
                       </div>
                     )}
 
-                    {/* 5교시 */}
+                    {/* 5교시 (어법 양자택일 + 내 학교 지문 자동 분석기 + 서술형 영작 입력창 연결 완료!) */}
                     {schoolInternalStage === 5 && (
                       <div className="space-y-6">
                         <div className="space-y-3">
                           <h4 className="text-base font-black text-rose-500">
-                            🚨 1) 전국 406개교 6개년 최다 빈출 어법 양자택일 실전 테스트
+                            🚨 1) 고등 내신·수능 핵심 빈출 어법 양자택일 실전 테스트
                           </h4>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             {GRAMMAR_406_QUIZ_BANK.map((q) => {
@@ -5562,12 +4624,12 @@ export default function App() {
                                       }}
                                       className="px-3 py-1 rounded-lg bg-blue-600 text-white font-extrabold"
                                     >
-                                      🔍 16매핑 해부↗
+                                      🔍 16요소 해부↗
                                     </button>
                                   </div>
                                 </div>
                                 <div className="text-emerald-300 font-bold">
-                                  🧱 소리블럭: {item.soundBlockEn}
+                                  🧱 소리블록: {item.soundBlockEn}
                                 </div>
                                 <div className="text-slate-200">
                                   ✍️ [빈칸 문제]: {item.blankQuizSentence}{' '}
@@ -5579,6 +4641,40 @@ export default function App() {
                             ))}
                           </div>
                         </div>
+
+                        {/* 서술형 조건 영작 훈련 (examEssayInput & showExamModelAnswer 연결 완료) */}
+                        <div className="p-4 rounded-2xl border border-indigo-500/30 space-y-2">
+                          <div className="text-xs font-extrabold text-indigo-500">
+                            ✍️ 3) {currentExamCourse.steps[0].essayMission.typeBadge}
+                          </div>
+                          <div className="text-xs font-bold">
+                            {currentExamCourse.steps[0].essayMission.koCondition}
+                          </div>
+                          <div className="text-xs font-mono text-blue-500">
+                            보기: {currentExamCourse.steps[0].essayMission.givenWords}
+                          </div>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={examEssayInput}
+                              onChange={(e) => setExamEssayInput(e.target.value)}
+                              placeholder="서술형 영작 답안을 직접 입력해 보세요..."
+                              className="flex-1 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs"
+                            />
+                            <button
+                              onClick={() => setShowExamModelAnswer(!showExamModelAnswer)}
+                              className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-extrabold"
+                            >
+                              {showExamModelAnswer ? '모범답안 숨기기' : '모범답안 확인'}
+                            </button>
+                          </div>
+                          {showExamModelAnswer && (
+                            <div className="text-xs font-extrabold text-emerald-500 pt-1">
+                              ✅ 모범답안: {currentExamCourse.steps[0].essayMission.modelAnswerEn} (
+                              {currentExamCourse.steps[0].essayMission.scoringCriteria})
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </section>
@@ -5586,7 +4682,7 @@ export default function App() {
               )}
 
               {/* ==============================================================
-                  [모드 A] Day 1 ~ Day 100 (8,000단어) 단어장 + 암기완료 양방향 해제
+                  [모드 2] 코어 단어장 (Day 1 ~ Day 100) + 암기완료 양방향 해제 완전 복원!
               ============================================================== */}
               {activeMode === 'wordbook' && (
                 <section
@@ -5599,10 +4695,10 @@ export default function App() {
                   <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
                     <div>
                       <span className="text-xs font-extrabold text-blue-500">
-                        8,000+ MASSIVE E-WORDBOOK (완료 체크 언제든 다시 해제 가능!)
+                        CORE & CONTEXT EXPANDED WORDBOOK (완료 체크 언제든 다시 해제 가능!)
                       </span>
                       <h2 className="text-2xl font-extrabold mt-0.5">
-                        📘 초고밀도 영단어장 (Day 1 ~ Day 100)
+                        📘 영역별 코어 영단어 & 문맥 확장 훈련장 (Day 1 ~ Day 100)
                       </h2>
                     </div>
 
@@ -5633,7 +4729,6 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* 내가 암기 완료한 Day 현황판 & 원클릭 완료 해제 바 */}
                   <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-2">
                     <div className="flex items-center justify-between text-xs font-extrabold text-emerald-600 dark:text-emerald-300">
                       <span>
@@ -5710,7 +4805,6 @@ export default function App() {
                     </div>
 
                     <div className="flex items-center gap-2">
-                      {/* 양방향 토글: 다시 누르면 즉시 암기 완료 해제! */}
                       <button
                         onClick={() => toggleCompletedDay(`${wordbookLevel}-${wordbookDay}`)}
                         className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition ${
@@ -5797,7 +4891,7 @@ export default function App() {
 
                           <div className="text-sm font-extrabold">뜻: {item.meaning}</div>
                           <div className="text-xs space-y-1">
-                            <div>🧱 소리블럭: {item.soundBlock}</div>
+                            <div>🧱 소리블록: {item.soundBlock}</div>
                             <div className="text-blue-500 font-bold">
                               🔗 짝꿍: {item.collocation} ({item.collocationKo})
                             </div>
@@ -5811,7 +4905,7 @@ export default function App() {
               )}
 
               {/* ==============================================================
-                  [모드 B] 전 레벨 일일 강의 노트 (STEP 1 ~ STEP 5 + 문장저장 버튼)
+                  [모드 3] 전 레벨 일일 강의 노트 (STEP 1 ~ STEP 5 완전 복원!)
               ============================================================== */}
               {activeMode === 'daily' && (
                 <>
@@ -5878,6 +4972,27 @@ export default function App() {
                       <div className="text-sm font-bold text-white">
                         🇰🇷 뜻 도움: "{currentLevelTrack.patternMeaningKo}"
                       </div>
+
+                      <div className="pt-2 border-t border-slate-800 space-y-1.5">
+                        <div className="text-xs font-extrabold text-blue-300">
+                          🔄 레벨업 바꿔 말하기 (Paraphrasing Drill):
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {currentLevelTrack.paraphraseDrill.map((dr, idx) => (
+                            <div
+                              key={idx}
+                              onClick={() => speakText(dr.upgradedExpr)}
+                              className="p-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-800 cursor-pointer border border-slate-700 text-xs space-y-0.5"
+                            >
+                              <div className="text-slate-400 line-through">{dr.basicExpr}</div>
+                              <div className="text-emerald-300 font-extrabold">
+                                ➔ {dr.upgradedExpr} 🔊
+                              </div>
+                              <div className="text-[11px] text-slate-300">{dr.nuanceDiff}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -5919,8 +5034,8 @@ export default function App() {
                           <tr>
                             <th className="py-3 px-3 text-center">레벨</th>
                             <th className="py-3 px-3">단어 · 저장</th>
-                            <th className="py-3 px-3">뜻 & 16매핑</th>
-                            <th className="py-3 px-3">🧱 소리블럭</th>
+                            <th className="py-3 px-3">뜻 & 문법 요소(7성분+9품사)</th>
+                            <th className="py-3 px-3">🧱 소리블록</th>
                             <th className="py-3 px-3">🔗 짝꿍 표현</th>
                           </tr>
                         </thead>
@@ -5994,7 +5109,7 @@ export default function App() {
                     </div>
                   </section>
 
-                  {/* STEP 3 16매핑 & 어절 해부 카드 */}
+                  {/* STEP 3: 문장 성분 7개 + 품사 9개 (총 16개 문법 요소) 다이어그램 */}
                   <section
                     className={`border rounded-3xl p-6 shadow-sm space-y-6 ${
                       darkMode
@@ -6003,24 +5118,29 @@ export default function App() {
                     }`}
                   >
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="inline-flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-full">
-                        {[
-                          { id: 'all', label: '16개 전체 매핑 다이어그램' },
-                          { id: 'comp', label: '문장 성분(7직책) 사전' },
-                          { id: 'pos', label: '9품사(9신분) 사전' },
-                        ].map((t) => (
-                          <button
-                            key={t.id}
-                            onClick={() => setDiagramTab(t.id as 'all' | 'comp' | 'pos')}
-                            className={`px-4 py-1.5 rounded-full text-xs font-extrabold ${
-                              diagramTab === t.id
-                                ? 'bg-white dark:bg-slate-900 text-blue-600 border-2 border-blue-600'
-                                : 'text-slate-600 dark:text-slate-400'
-                            }`}
-                          >
-                            {t.label}
-                          </button>
-                        ))}
+                      <div>
+                        <span className="text-[11px] font-extrabold text-blue-500">
+                          문장 성분 7개 + 이 프로그램에서 사용하는 9품사 분류 (총 16개 문법 요소)
+                        </span>
+                        <div className="mt-1 inline-flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-full">
+                          {[
+                            { id: 'all', label: '16개 문법 요소 대표 연결도' },
+                            { id: 'comp', label: '문장 성분(7직책) 사전' },
+                            { id: 'pos', label: '9품사(한정사 포함) 사전' },
+                          ].map((t) => (
+                            <button
+                              key={t.id}
+                              onClick={() => setDiagramTab(t.id as 'all' | 'comp' | 'pos')}
+                              className={`px-4 py-1.5 rounded-full text-xs font-extrabold ${
+                                diagramTab === t.id
+                                  ? 'bg-white dark:bg-slate-900 text-blue-600 border-2 border-blue-600'
+                                  : 'text-slate-600 dark:text-slate-400'
+                              }`}
+                            >
+                              {t.label}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                       <button
                         onClick={() => {
@@ -6215,7 +5335,7 @@ export default function App() {
                     </div>
                   </section>
 
-                  {/* STEP 4. 3단 직독직해 + 문장 저장 */}
+                  {/* STEP 4. 3단 직독직해 + 문장 저장 + 따라 쓰기(writingInputs 연결 완료!) */}
                   <section
                     className={`border rounded-3xl p-6 shadow-sm space-y-5 ${
                       darkMode
@@ -6267,7 +5387,7 @@ export default function App() {
                                 }}
                                 className="px-3 py-1 rounded-lg bg-blue-600 text-white text-xs font-extrabold"
                               >
-                                🔍 16매핑 해부
+                                🔍 16요소 해부
                               </button>
                               <button
                                 onClick={() => speakText(sent.rawEn)}
@@ -6284,15 +5404,27 @@ export default function App() {
                           <div className="text-xs text-emerald-500 font-extrabold">
                             🔄 바꿔 말하기: "{sent.paraphraseVersion}"
                           </div>
+                          <input
+                            type="text"
+                            value={writingInputs[`copy-${sent.id}`] || ''}
+                            onChange={(e) =>
+                              setWritingInputs({
+                                ...writingInputs,
+                                [`copy-${sent.id}`]: e.target.value,
+                              })
+                            }
+                            placeholder={`✍️ 따라 쓰기: ${sent.rawEn}`}
+                            className="w-full text-xs bg-transparent border-b border-dashed border-slate-300 dark:border-slate-700 py-1 focus:outline-none"
+                          />
                         </div>
                       );
                     })}
                   </section>
 
-                  {/* STEP 5. 네이버 퀴즈 */}
+                  {/* STEP 5. 4단계 실전 퀴즈 */}
                   <section className="bg-slate-900 text-white rounded-3xl p-6 shadow-lg space-y-4 border border-slate-800">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <h3 className="text-lg font-extrabold">🎮 STEP 5. 네이버 4단계 실전 퀴즈</h3>
+                      <h3 className="text-lg font-extrabold">🎮 STEP 5. 오늘의 4단계 실전 퀴즈</h3>
                       <div className="flex gap-1.5">
                         {(['word', 'beginner', 'intermediate', 'advanced'] as const).map((tab) => (
                           <button
@@ -6432,11 +5564,10 @@ export default function App() {
               )}
 
               {/* ==============================================================
-                  [모드 C 업그레이드] 🗂️ 내 단어·문장 보관함 & 직접 수정 & 암기완료 해제 관리소
+                  [모드 4] 🗂️ 내 단어·문장 보관함 & 직접 수정 & 암기완료 해제 관리소 완전 복원!
               ============================================================== */}
               {activeMode === 'naverQuiz' && (
                 <div className="space-y-6">
-                  {/* 1. 저장한 단어 목록 + 뜻/메모 직접 수정 + 암기완료 양방향 토글 + 새 단어 추가 */}
                   <section
                     className={`border rounded-3xl p-6 shadow-sm space-y-5 ${
                       darkMode
@@ -6455,7 +5586,6 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* 새 단어 직접 추가 폼 */}
                     <div className="p-4 rounded-2xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2">
                       <div className="text-xs font-extrabold text-blue-600 dark:text-blue-400">
                         ➕ 나만의 새 단어 직접 추가하기
@@ -6537,7 +5667,6 @@ export default function App() {
                               </div>
 
                               <div className="flex items-center gap-1">
-                                {/* 암기 완료 ⇄ 암기중 양방향 스위치 */}
                                 <button
                                   onClick={() =>
                                     setBookmarkedWords((prev) =>
@@ -6643,7 +5772,6 @@ export default function App() {
                     </div>
                   </section>
 
-                  {/* 2. 내가 저장한 문장·구문 보관함 (직접 수정 & 16매핑 즉시 해부 & 암기완료 해제) */}
                   <section
                     className={`border rounded-3xl p-6 shadow-sm space-y-5 ${
                       darkMode
@@ -6652,10 +5780,9 @@ export default function App() {
                     }`}
                   >
                     <h2 className="text-2xl font-extrabold">
-                      📌 2) 내가 스크랩한 문장·구문 보관함 ({savedSentences.length}문장 · 직접 수정 & 16매핑 연동)
+                      📌 2) 내가 스크랩한 문장·구문 보관함 ({savedSentences.length}문장 · 직접 수정 & 16요소 해부 연동)
                     </h2>
 
-                    {/* 새 문장 직접 추가 폼 */}
                     <div className="p-4 rounded-2xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2">
                       <div className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400">
                         ➕ 나만의 중요 영어 문장 / 내신 서술형 문장 직접 등록하기
@@ -6753,7 +5880,7 @@ export default function App() {
                                   }}
                                   className="px-2.5 py-1 rounded-lg bg-blue-600 text-white text-xs font-extrabold"
                                 >
-                                  🔍 16매핑 해부↗
+                                  🔍 16요소 해부↗
                                 </button>
                                 <button
                                   onClick={() => speakText(sItem.en)}
@@ -6851,14 +5978,21 @@ export default function App() {
                 </div>
               )}
 
-              {/* 모드 D: AI 음성 회화 & 첨삭 */}
+              {/* ==============================================================
+                  [모드 5] AI 음성 회화 & 첨삭 (studyStats & speakingSeconds 표시 연결 완료!)
+              ============================================================== */}
               {activeMode === 'aiCoach' && (
                 <div className="space-y-6">
                   <section className="bg-slate-900 text-white rounded-3xl p-6 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-extrabold">
-                        🎙️ AI 원어민 코치 ({targetSpeakingMins}분 코스)
-                      </h3>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <h3 className="text-lg font-extrabold">
+                          🎙️ AI 원어민 코치 ({targetSpeakingMins}분 코스 · 현재 {Math.floor(speakingSeconds / 60)}분 {speakingSeconds % 60}초 진행)
+                        </h3>
+                        <p className="text-xs text-slate-400">
+                          📊 누적 학습 현황: 마스터 어휘 {studyStats.masteredWords}개 · 완료 문장 {studyStats.completedSentences}개 · 누적 스피킹 {studyStats.speakingMinutes}분
+                        </p>
+                      </div>
                       <div className="flex gap-1.5">
                         {[5, 10, 15, 30].map((m) => (
                           <button
@@ -6941,14 +6075,16 @@ export default function App() {
                 </div>
               )}
 
-              {/* 모드 E: 주간·월간 총람 */}
+              {/* ==============================================================
+                  [모드 6] 주간·월간 총람
+              ============================================================== */}
               {activeMode === 'weekly' && (
                 <section
                   className={`border rounded-3xl p-6 space-y-4 ${
                     darkMode
                       ? 'bg-slate-900 border-slate-800'
                       : 'bg-white border-slate-200'
-                  }`}
+                    }`}
                 >
                   <h2 className="text-xl font-extrabold">🗓️ 전 테마 & 수능·내신 핵심 총람</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -6968,7 +6104,7 @@ export default function App() {
               )}
 
               {/* ==============================================================
-                  [모드 F 신규 탑재] 🛠️ 나만의 야나두 PRO 전체 제작 과정 & 아키텍처 마스터 백서
+                  [모드 7] 🛠️ 나만의 야나두 PRO 전체 제작 과정 & 아키텍처 마스터 백서
               ============================================================== */}
               {activeMode === 'devStory' && (
                 <section
@@ -6983,48 +6119,48 @@ export default function App() {
                       SYSTEM ARCHITECTURE & DEVELOPMENT BLUEPRINT
                     </span>
                     <h2 className="text-2xl font-black mt-0.5">
-                      🛠️ [나만의 야나두 PRO] 파트 1~4 및 studyData.ts 전체 제작 과정 마스터 백서
+                      🛠️ [나만의 야나두 PRO] 파트 1~4 및 studyData.ts 전체 제작 과정 백서
                     </h2>
                     <p className="text-xs text-slate-500 mt-1">
-                      단일 파일의 한계를 넘어 8,000단어 압축 사전, 10,000+ 조합 구문, 406개교 내신 어법·서술형, 아이패드 M5 펜슬 엔진을 완성한 전체 개발 기록입니다.
+                      코어 어휘 문맥 확장 사전, 조합형 구문 훈련기, 문장 성분 7개 + 9품사(총 16개 문법 요소) 시각화, 필기 도구 5종(펜 4종+지우개)을 통합한 개발 기록입니다.
                     </p>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                     <div className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 space-y-2">
                       <h3 className="text-sm font-black text-indigo-500">
-                        📦 1. src/studyData.ts (초대형 데이터 & 무한 문제 생성 엔진)
+                        📦 1. src/studyData.ts (코어 어휘 & 조합형 구문 생성 엔진)
                       </h3>
-                      <p>• <strong>8,000+ 초고밀도 파이프(|) 압축 단어장</strong>: 중등·고등/수능·비즈니스·오픽 4대 영역 × Day 1~100 (하루 20단어씩 파생·문맥 자동 확장)</p>
-                      <p>• <strong>10,000+ 조합형 킬러 구문 생성기</strong>: [도치/강조/분사절] × [핵심 동사구] × [수식어구] 블록을 교차 조합하여 무한 구문 생성</p>
-                      <p>• <strong>EBS 4대 학술 소재 & 406개교 6개년 어법 은행</strong>: 철학·경제·뇌과학·환경 지문 및 최빈출 어법 함정 문제 탑재</p>
-                      <p>• <strong>내 학교 지문 자동 분석기</strong>: 교과서/모의고사 지문 입력 시 소리블럭·빈칸 추론·서술형 어순 배열 문제 즉석 생성</p>
+                      <p>• <strong>코어 어휘 & 문맥 확장 단어장</strong>: 중등·고등/수능·비즈니스·오픽 4대 영역 × Day 1~100 학습 엔트리 구성</p>
+                      <p>• <strong>조합형 구문 생성기</strong>: 시제와 어법이 검증된 [도치/강조/분사절] + [핵심 동사구] + [수식어구] 조합</p>
+                      <p>• <strong>학술 소재 & 빈출 어법 은행</strong>: 철학·경제·뇌과학·환경 지문 및 내신·수능 핵심 어법 양자택일 문제</p>
+                      <p>• <strong>내 학교 지문 자동 분석기</strong>: 교과서/모의고사 지문 입력 시 소리블록·빈칸 추론·어순 배열 문제 자동 생성</p>
                     </div>
 
                     <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/30 space-y-2">
                       <h3 className="text-sm font-black text-blue-500">
-                        🧱 2. src/App.tsx [1/4 파트] & [2/4 파트] (기반 사전 & 정규 테마 1~3)
+                        🧱 2. src/App.tsx [1/4 파트] & [2/4 파트] (16개 문법 요소 & 정규 테마 1~3)
                       </h3>
-                      <p>• <strong>[1/4 파트]</strong>: TypeScript 규격 정의 + 16개(7문장성분 × 9품사) 뜻·어순 매핑 사전 + 9대 빅미디어(패션 5대 매거진 Vogue·WWD·ELLE·Bazaar·GQ 포함) 실시간 트렌드 90선</p>
-                      <p>• <strong>[2/4 파트]</strong>: 네이버 공식 단어 챌린지 + 테마 1(비즈니스 회의) · 테마 2(오픽 일상 루틴) · 테마 3(해외여행·호텔·공항) 초·중·고급 3단계 트랙</p>
+                      <p>• <strong>[1/4 파트]</strong>: 문장 성분 7개 + 이 프로그램에서 사용하는 9품사 분류(한정사 포함, 총 16개 문법 요소) 대표 관계도 + 9대 매체 실시간 트렌드</p>
+                      <p>• <strong>[2/4 파트]</strong>: 오늘의 단어 챌린지 + 테마 1(비즈니스 회의) · 테마 2(오픽 일상 루틴) · 테마 3(해외여행·호텔·공항) 초·중·고급 트랙</p>
                     </div>
 
                     <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-2">
                       <h3 className="text-sm font-black text-emerald-500">
-                        ⚙️ 3. src/App.tsx [3/4 파트] (테마 4~5 & 입시 3대 반 & 초고속 펜슬 엔진)
+                        ⚙️ 3. src/App.tsx [3/4 파트] (테마 4~5 & 입시 3대 반 & 펜슬 엔진)
                       </h3>
-                      <p>• <strong>테마 4~5</strong>: 유튜브·숏폼 바이럴 리액션 및 5대 패션 매거진 런웨이 비평</p>
-                      <p>• <strong>수능·내신 3대 반</strong>: ① 수능 정규 완성반(주1회 3시간) ② 고등 어법·서술형 완성반(406개교 6개년) ③ 학교별 내신 대비반(5단계 변형)</p>
-                      <p>• <strong>애플 펜슬 칼보정 엔진</strong>: 레티나 해상도 1:1 매칭, 사파리 파란 블록 원천 차단, 4종 펜슬(수성펜·만년필·볼펜·형광펜) 및 3px~24px 굵기 제어</p>
+                      <p>• <strong>테마 4~5</strong>: 유튜브·숏폼 바이럴 리액션 및 패션 에디토리얼 스타일 표현</p>
+                      <p>• <strong>수능·내신 3대 반</strong>: ① 수능 완성반 ② 어법·서술형 완성반 ③ 학교별 내신 대비반</p>
+                      <p>• <strong>아이패드 필기 최적화 설계</strong>: 레티나 해상도 좌표 보정, 사파리 텍스트 선택 방지, 필기 도구 5종(펜 4종+지우개) 및 3px~24px 굵기 제어</p>
                     </div>
 
                     <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2">
                       <h3 className="text-sm font-black text-amber-500">
                         🖥️ 4. src/App.tsx [4/4 파트] (통합 UI & 양방향 보관함 & 플로팅 메모장)
                       </h3>
-                      <p>• <strong>실시간 트렌드 연동</strong>: 좌측 실검 클릭 시 우측 전체 수업·16매핑·퀴즈 즉시 변환</p>
-                      <p>• <strong>양방향 보관함 관리소</strong>: 단어·문장 스크랩, 내 뜻/메모 직접 수정, 새 단어·문장 직접 추가, 암기 완료 언제든 해제(토글)</p>
-                      <p>• <strong>따라다니는(Floating) 락/락해제 메모장</strong>: 스크롤 시 화면 하단에 고정되어 따라다니며 흔들림 없는 필기 지원</p>
+                      <p>• <strong>실시간 트렌드 연동</strong>: 좌측 실검 클릭 시 how to + 동사원형 구조로 문법 오류 없이 우측 전체 수업 변환</p>
+                      <p>• <strong>양방향 보관함 관리소</strong>: 단어·문장 스크랩, 내 뜻/메모 직접 수정, 새 단어·문장 추가, 암기 완료 언제든 해제(토글)</p>
+                      <p>• <strong>따라다니는(Floating) 락/락해제 메모장</strong>: 스크롤 시 화면 하단에 따라다니며 안정적인 필기 지원</p>
                     </div>
                   </div>
                 </section>
@@ -7033,7 +6169,7 @@ export default function App() {
           </div>
 
           {/* ==================================================================
-              ✏️ [완벽 수리] 파란 블록 선택 100% 차단 + 첫 획 지연 0초 + 4종 펜슬 & 5단계 굵기 메모장
+              ✏️ 필기 도구 5종 (펜 4종 + 지우개) & 5단계 굵기(3px~24px) & 사파리 선택 방지 메모장
           ================================================================== */}
           <div
             ref={padWrapperRef}
@@ -7047,7 +6183,6 @@ export default function App() {
                 : 'bg-white/95 text-slate-900'
             } backdrop-blur-md`}
           >
-            {/* 메모장 상단 컨트롤 툴바 */}
             <div className="px-4 py-2.5 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-1.5">
                 <button
@@ -7072,7 +6207,7 @@ export default function App() {
                   {penOnlyMode ? '✋ 손바닥무시 ON(펜슬전용)' : '👆 손가락겸용'}
                 </button>
 
-                {/* 4종 펜슬 종류 변경 스위치 */}
+                {/* 필기 도구 5종 (펜 4종 + 지우개) */}
                 {[
                   { id: 'marker' as const, label: '🖊️ 수성사인펜' },
                   { id: 'fountain' as const, label: '✒️ 만년필' },
@@ -7094,7 +6229,6 @@ export default function App() {
                 ))}
               </div>
 
-              {/* 색상 & 5단계 굵기(3px~24px) & 창 조절 */}
               <div className="flex flex-wrap items-center gap-1.5">
                 {[
                   { c: '#2563eb' as const, label: '🔵파랑' },
@@ -7120,7 +6254,6 @@ export default function App() {
                   </button>
                 ))}
 
-                {/* 굵기 5단계 직관적 선택 버튼 */}
                 <div className="inline-flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-0.5 border border-slate-300 dark:border-slate-700">
                   {[
                     { w: 3, label: '세필(3)' },
@@ -7166,7 +6299,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* 캔버스 본체 */}
             {!isPadMinimized && (
               <div className="p-2.5 no-safari-select">
                 <div
@@ -7208,4 +6340,3 @@ export default function App() {
     </div>
   );
 }
-  
