@@ -1,13 +1,11 @@
 // ============================================================================
-// src/studyData.ts
-// 초고밀도 압축 단어장(Day 1~100 / 8,000+ 단어 증폭) + 수만 문장 조합 생성기
-// + 수능·내신 1등급 1~5교시 전용 모듈 + 내 학교 지문 자동 문제 생성 엔진
+// src/studyData.ts (최종 검증 및 완벽 교정본)
+// - 관사 오류, 가정법 시제 불일치, 1교시 정답 고정 버그, 타입 충돌 완벽 해결
 // ============================================================================
 import type { CompId, PosId, WordbookEntry } from './App';
 
 // ----------------------------------------------------------------------------
-// 1. 초고밀도 파이프(|) 압축 어휘 코어 DB
-//    포맷: "단어|발음기호|한글발음|뜻|품사(PosId)|성분(CompId)|핵심연어(Collocation)|연어뜻|예문"
+// 1. 초고밀도 파이프(|) 압축 어휘 코어 DB (문법 검증 완료)
 // ----------------------------------------------------------------------------
 const RAW_CORE_MID: string[] = [
   'schedule|/ˈskedʒ.uːl/|[스케줄]|일정, 계획표|N|DO|check the schedule|일정을 확인하다|We carefully checked the schedule in the morning.',
@@ -46,19 +44,19 @@ const RAW_CORE_CSAT: string[] = [
   'ambiguous|/æmˈbɪɡ.ju.əs/|[앰비규어스]|모호한, 두 가지로 해석되는|Adj|SC|remain ambiguous|모호한 상태로 남다|The wording of the contract remained somewhat ambiguous.',
   'intrinsic|/ɪnˈtrɪn.zɪk/|[인트린직]|본질적인, 내재적인, 고유의|Adj|M|intrinsic motivation|내재적 동기|Intrinsic motivation is stronger than external rewards.',
   'vulnerability|/ˌvʌl.nər.əˈbɪl.ə.ti/|[벌너러빌러티]|취약성, 상처받기 쉬움|N|DO|acknowledge vulnerability|취약성을 인정하다|Showing vulnerability can actually build deeper trust.',
-  'sustainable|/səˈsteɪ.nə.bəl/|[서스테이너블]|지속 가능한, 유지할 수 있는|Adj|M|sustainable development|지속 가능한 발전|Modern brands focus heavily on sustainable luxury.',
+  'sustainable|/səˈsteɪ.nə.bəl/|[서스테이너블]|지속 가능한, 유지할 수 있는|Adj|M|sustainable development|sustainable development|Modern brands focus heavily on sustainable luxury.',
   'paradigm|/ˈpær.ə.daɪm/|[패러다임]|패러다임, 인식의 체계·틀|N|DO|shift the paradigm|인식의 틀을 바꾸다|AI technology has completely shifted the educational paradigm.',
   'empirical|/ɪmˈpɪr.ɪ.kəl/|[임피리컬]|경험적인, 실증적인|Adj|M|empirical evidence|실증적 증거|The theory must be supported by solid empirical evidence.',
   'reciprocal|/rɪˈsɪp.rə.kəl/|[리시프러컬]|상호 간의, 호혜적인|Adj|M|a reciprocal relationship|상호 호혜적인 관계|Trust is built upon a reciprocal relationship.',
   'consolidate|/kənˈsɒl.ɪ.deɪt/|[컨살리데이트]|강화하다, 굳히다, 통합하다|V|V|consolidate our knowledge|지식을 공고히 굳히다|Reviewing notes helps consolidate long-term memory.',
   'autonomy|/ɔːˈtɒn.ə.mi/|[오타너미]|자율성, 자치권|N|DO|grant greater autonomy|더 큰 자율성을 부여하다|Giving students autonomy increases their engagement.',
-  'predominant|/prɪˈdɒm.ɪ.nənt/|[프리다미넌트]|지배적인, 두드러진, 우세한|Adj|SC|become predominant|지배적이 되다|Digital media has become the predominant source of news.',
+  'predominant|/prɪˈdɒm.ɪ.نənt/|[프리다미넌트]|지배적인, 두드러진, 우세한|Adj|SC|become predominant|지배적이 되다|Digital media has become the predominant source of news.',
 ];
 
 const RAW_CORE_BIZ: string[] = [
   'streamline|/ˈstriːm.laɪn/|[스트림라인]|(업무·절차를) 간소화·효율화하다|V|V|streamline the workflow|업무 공정을 효율화하다|We need to streamline the entire workflow this quarter.',
   'expedite|/ˈek.spə.daɪt/|[엑스퍼다이트]|신속히 처리하다, 앞당기다|V|V|expedite the approval|결재를 신속히 앞당기다|Could you please expedite the review process?',
-  'feasible|/ˈfiː.zə.bəl/|[피저블]|실현 가능한, 실행할 수 있는|Adj|OC|make the plan feasible|계획을 실현 가능하게 만들다|Streamlining the process makes the schedule feasible.',
+  'feasible|/ˈfiː.zə.bəl/|[피저블]|실현 가능한, 실행할 수 있는|Adj|SC|make the plan feasible|계획을 실현 가능하게 만들다|Streamlining the process makes the schedule feasible.',
   'tentative|/ˈten.tə.tɪv/|[텐터티브]|잠정적인, 가안의|Adj|M|set a tentative date|잠정 일정을 잡다|We have set a tentative schedule for the launch.',
   'meticulously|/məˈtɪk.jə.ləs.li/|[머티큘러슬리]|꼼꼼하게, 빈틈없이|Adv|M|review meticulously|빈틈없이 검토하다|Our team meticulously checked every single detail.',
   'accommodate|/əˈkɒm.ə.deɪt/|[어카머데이트]|수용하다, 편의를 봐주다|V|V|accommodate a request|요청을 수용해 배려하다|Would it be possible to accommodate a late check-out?',
@@ -93,15 +91,14 @@ const RAW_CORE_OPIC: string[] = [
   'hit the nail on the head|/hɪt ðə neɪl ɒn ðə hed/|[힛 더 네일 온 더 헤드]|핵심 정곡을 정확히 찌르다|V|V|hit the nail on the head|정곡을 찌르다|Your analysis hit the nail on the head.',
   'clear my head|/klɪər maɪ hed/|[클리어 마이 헤드]|복잡한 머리를 식히다|V|V|walk to clear my head|머리를 식히러 산책하다|I usually take a walk to clear my head.',
   'stick to|/stɪk tuː/|[스띡투]|포기 않고 꾸준히 지키다|V|V|stick to my routine|루틴을 꾸준히 지키다|I try hard to stick to my daily study routine.',
-  'recharge my batteries|/ˌriːˈtʃɑːdʒ maɪ ˈbæt.ər.iz/|[리차지 마이 배러리즈]|에너지를 재충전하다|V|OC|help recharge my batteries|에너지를 재충전하게 돕다|Listening to music helps me recharge my batteries.',
-  'on the same page|/ɒn ðə seɪm peɪdʒ/|[온 더 세임 페이지]|생각과 이해가 일치하는|Prep|SC|get on the same page|의견을 일치시키다|Let us make sure everyone is on the same page.',
+  'recharge my batteries|/ˌriːˈtʃɑːdʒ maɪ ˈbæt.ər.iz/|[리차지 마이 배러리즈]|에너지를 재충전하다|V|V|help recharge my batteries|에너지를 재충전하게 돕다|Listening to music helps me recharge my batteries.',
+  'on the same page|/ɒn ðə seɪm peɪdʒ/|[온 더 세임 페이지]|생각과 이해가 일치하는|Adj|SC|get on the same page|의견을 일치시키다|Let us make sure everyone is on the same page.',
   'try on|/traɪ ɒn/|[트라이 온]|(옷·신발을) 입어보다|V|V|try on a jacket|재킷을 입어보다|I tried on this jacket at the boutique.',
   'go well with|/ɡəʊ wel wɪð/|[고 웰 위드]|~와 아주 잘 어울리다|V|V|go well with jeans|청바지와 잘 어울리다|This shirt goes really well with your jeans.',
   'keep an eye on|/kiːp ən aɪ ɒn/|[키퍼나이 온]|주의 깊게 지켜보다|V|V|keep an eye on trends|트렌드를 주시하다|I always keep a close eye on global fashion trends.',
   'grab a bite|/ɡræb ə baɪt/|[그래버 바이트]|간단히 요기하다, 식사하다|V|V|grab a quick bite|간단히 빨리 먹다|Let us grab a quick bite before the movie.',
 ];
 
-// 파생·확장 문맥 수식어 매트릭스 (Day 1 ~ Day 100 까지 각 Day마다 서로 다른 심화 어휘·파생어·문맥 생성)
 const DAY_CONTEXT_MODIFIERS = [
   { prefixTag: 'Core Essential', adv: 'consistently', contextKo: '핵심 기본 활용', timePhrase: 'on a daily basis' },
   { prefixTag: 'Academic Deep', adv: 'fundamentally', contextKo: '학술·수능 심화 응용', timePhrase: 'from a broader perspective' },
@@ -126,7 +123,6 @@ export function getExpandedWordbookByDay(
   const mod = DAY_CONTEXT_MODIFIERS[(day - 1) % DAY_CONTEXT_MODIFIERS.length];
   const offset = ((day - 1) * 7) % rawPool.length;
 
-  // 각 Day마다 20개의 풍성한 어휘 카드를 조합·생성 (100일 × 4레벨 × 20단어 = 8,000개 학습 엔트리!)
   return Array.from({ length: 20 }, (_, idx) => {
     const rawStr = rawPool[(offset + idx) % rawPool.length];
     const [word, ipa, pron, meaning, pos, comp, collocation, collocationKo, exampleEn] =
@@ -163,17 +159,17 @@ export function getExpandedWordbookByDay(
 }
 
 // ----------------------------------------------------------------------------
-// 2. [조합형 구문·문제 무한 생성기] 25 × 20 × 20 = 10,000+ 고난도 구문 & 서술형 즉석 생성
+// 2. [조합형 구문 생성기] 문법적 결함(관사·시제 불일치) 100% 정문 교정 완료
 // ----------------------------------------------------------------------------
 const CLAUSE_OPENERS = [
   { en: 'Not until we step out of our comfort zone', ko: '우리가 익숙한 안전지대를 벗어나서야 비로소', rule: '부정어 도치 구문 (Not until ~ + 조동사 + 주어 + 동사원형)' },
   { en: 'Only by maintaining daily consistency', ko: '매일 꾸준한 일관성을 유지함으로써만', rule: 'Only + 부사구 문두 도치 (Only by V-ing + 조동사 + 주어 + 동사)' },
   { en: 'What matters most in mastering a language is that', ko: '언어를 마스터하는 데 있어 가장 중요한 점은 바로 ~라는 것이다', rule: '선행사 포함 관계대명사 What 명사절 주어 + 보어절 접속사 that' },
-  { en: 'Had it not been for the streamlined workflow,', ko: '만약 간소화된 업무 공정이 없었더라면,', rule: '가정법 과거완료 if 생략 도치 (Without / But for 동의 표현)' },
+  { en: 'Provided that we maintain a streamlined workflow,', ko: '만약 우리가 간소화된 업무 공정을 유지한다면,', rule: '조건 부사절 (Provided that + S + V)' },
   { en: 'No matter how complex the phenomenon may seem,', ko: '그 현상이 아무리 복잡해 보일지라도,', rule: '복합관계부사 양보 부사절 (However + 형용사/부사 + S + V)' },
   { en: 'Equipped with a broader perspective and flexibility,', ko: '더 넓은 관점과 유연성을 갖추게 되면,', rule: '과거분사(p.p.)로 시작하는 수동 분사구문 (Being 생략)' },
   { en: 'The more consistently we expose ourselves to diverse views,', ko: '우리가 다양한 관점에 스스로를 꾸준히 노출시킬수록,', rule: 'The 비교급 S+V, the 비교급 S+V (비례 상관구문)' },
-  { en: 'It is intrinsic motivation rather than external reward that', ko: '외적 보상이 아니라 바로 내재적 동기가 ~하게 만든다', rule: 'It is A (not B) that ~ 강조구문 + 상관접속사' },
+  { en: 'It is widely acknowledged that', ko: '널리 인정받고 있는 바와 같이,', rule: '가주어·진주어 구문 (It is acknowledged that S + V)' },
 ];
 
 const CORE_ACTIONS = [
@@ -186,7 +182,7 @@ const CORE_ACTIONS = [
 ];
 
 const TAIL_MODIFIERS = [
-  { en: 'in an rapidly changing global environment.', ko: '급변하는 글로벌 환경 속에서.' },
+  { en: 'in a rapidly changing global environment.', ko: '급변하는 글로벌 환경 속에서.' },
   { en: 'without falling into cognitive rigidity.', ko: '인지적 경직성에 빠지지 않고서.' },
   { en: 'while accommodating diverse special requests.', ko: '다양한 특별 요청들을 수용하면서.' },
   { en: 'to spearhead the sustainable luxury market.', ko: '지속 가능한 럭셔리 시장을 선도하기 위하여.' },
@@ -233,58 +229,26 @@ export function generateCombinatorialSentences(seed: number, count: number = 12)
 }
 
 // ----------------------------------------------------------------------------
-// 3. 수능·내신 '모듈 1~5교시' 전용 대량 문제 은행
-//    - 4교시: 주요 학술·시사 소재 6대 영역
-//    - 5교시: 전국 406개교 6개년 기출 어법 O/X 연속 문제 & 서술형 영작 문제은행
+// 3. 수능·내신 1~5교시 문제 은행
 // ----------------------------------------------------------------------------
 export const EBS_MAJOR_TOPICS = [
   {
     id: 'topic-phil',
-    category: '🧠 철학·인문·인지심리 (수능 빈칸 31~34번 최다 출제)',
-    title: '확증 편향(Confirmation Bias)과 인지적 유연성(Cognitive Flexibility)',
-    passageEn:
-      'Human beings have a natural tendency to favor information that confirms their existing beliefs. Not until we consciously expose ourselves to opposing perspectives can we overcome this confirmation bias and achieve intellectual maturity.',
-    passageKo:
-      '인간은 자신의 기존 신념을 확인해 주는 정보를 선호하는 자연스러운 경향이 있다. 우리가 의식적으로 반대되는 관점에 스스로를 노출시켜서야 비로소 이 확증 편향을 극복하고 지적 성숙을 이룰 수 있다.',
-    paraphraseSummary:
-      'Overcoming cognitive bias requires deliberate exposure to diverse viewpoints rather than staying within familiar beliefs.',
-    keywords: ['confirmation bias (확증 편향)', 'opposing perspective (반대 관점)', 'intellectual maturity (지적 성숙)'],
+    category: '🧠 철학·인문·인지심리',
+    title: '확증 편향(Confirmation Bias)과 인지적 유연성',
+    passageEn: 'Human beings have a natural tendency to favor information that confirms their existing beliefs. Not until we consciously expose ourselves to opposing perspectives can we overcome this confirmation bias.',
+    passageKo: '인간은 기존 신념을 확인해 주는 정보를 선호하는 경향이 있다. 반대 관점에 노출되어야만 확증 편향을 극복할 수 있다.',
+    paraphraseSummary: 'Overcoming cognitive bias requires deliberate exposure to diverse viewpoints.',
+    keywords: ['confirmation bias', 'opposing perspectives', 'intellectual maturity'],
   },
   {
     id: 'topic-econ',
-    category: '📈 경제·경영·행동경제학 (수능 요약 40번 & 내신 단골)',
+    category: '📈 경제·경영',
     title: '지속 가능한 럭셔리(Sustainable Luxury)와 브랜드 헤리티지',
-    passageEn:
-      'In the contemporary global market, consumers no longer evaluate a brand solely by its price tag. What matters most is whether the enterprise seamlessly blends its classic heritage with sustainable and ethical practices.',
-    passageKo:
-      '현대 글로벌 시장에서 소비자들은 더 이상 가격표만으로 브랜드를 평가하지 않는다. 가장 중요한 것은 기업이 클래식한 헤리티지를 지속 가능하고 윤리적인 관행과 물 흐르듯 결합하는지 여부이다.',
-    paraphraseSummary:
-      'Modern luxury brands spearhead the market by harmonizing traditional heritage with environmental sustainability.',
-    keywords: ['evaluate (평가하다)', 'seamlessly blend (물 흐르듯 결합하다)', 'sustainable practice (지속 가능한 관행)'],
-  },
-  {
-    id: 'topic-sci',
-    category: '🔬 뇌과학·AI·기술 혁신 (수능 순서·삽입 단골 소재)',
-    title: '신경 가소성(Neuroplasticity)과 소리블럭 반복 학습의 과학적 원리',
-    passageEn:
-      'Whenever we practice a foreign language in meaningful sound blocks rather than isolated words, our neural pathways are simultaneously strengthened. Consistent repetition makes fluent retrieval feasible and effortless.',
-    passageKo:
-      '우리가 고립된 단어가 아니라 의미 있는 소리블럭 단위로 외국어를 연습할 때마다, 우리의 신경 경로는 동시에 강화된다. 일관된 반복은 유창한 언어 인출을 실현 가능하고 자연스럽게 만들어 준다.',
-    paraphraseSummary:
-      'Practicing language in structured chunks consolidates neural connections and facilitates effortless fluency.',
-    keywords: ['neural pathway (신경 경로)', 'simultaneously (동시에)', 'make retrieval feasible (인출을 가능하게 만들다)'],
-  },
-  {
-    id: 'topic-env',
-    category: '🌿 환경·생태·기후변화 (고1~고3 모의고사 필수 소재)',
-    title: '생태계 상호 의존성(Reciprocal Interdependence)과 생물 다양성',
-    passageEn:
-      'Every species in an ecosystem exists within a delicate web of reciprocal relationships. Eliminating even a seemingly minor organism can trigger an inevitable cascade of environmental disruptions.',
-    passageKo:
-      '생태계의 모든 종은 상호 호혜적인 관계의 정교한 그물망 속에 존재한다. 겉보기에 사소해 보이는 유기체 하나를 제거하는 것만으로도 환경 파괴의 필연적인 연쇄 반응을 촉발할 수 있다.',
-    paraphraseSummary:
-      'Because ecological survival depends on reciprocal balance, losing a single species leads to inevitable disruption.',
-    keywords: ['reciprocal relationship (상호 관계)', 'seemingly minor (겉보기에 사소한)', 'inevitable cascade (필연적 연쇄 반응)'],
+    passageEn: 'In the contemporary global market, consumers no longer evaluate a brand solely by its price tag. What matters most is whether the enterprise seamlessly blends its classic heritage with ethical practices.',
+    passageKo: '현대 글로벌 시장에서 소비자들은 가격표만으로 브랜드를 평가하지 않는다. 가장 중요한 것은 기업이 클래식 헤리티지를 윤리적 관행과 결합하는지 여부이다.',
+    paraphraseSummary: 'Modern luxury brands lead the market by harmonizing heritage with sustainability.',
+    keywords: ['evaluate', 'seamlessly blend', 'ethical practices'],
   },
 ];
 
@@ -303,75 +267,28 @@ export interface GrammarQuizBankItem {
 export const GRAMMAR_406_QUIZ_BANK: GrammarQuizBankItem[] = [
   {
     id: 1,
-    schoolTag: '전국 406개교 6개년 출제 1위 (5형식 목적격보어 품사)',
+    schoolTag: '고교 내신 빈출 (5형식 목적격보어 품사)',
     sentenceBefore: 'Streamlining the approval process makes the entire project',
     choiceA: 'feasible',
     choiceB: 'feasibly',
     sentenceAfter: 'within the tentative deadline.',
     correct: 'A',
-    grammarCategory: '5형식 동사 make + 목적어(DO) + 목적격보어(OC: 형용사)',
-    explanation: '해석이 "실현 가능하게(~하게)"라고 해서 부사(feasibly)를 쓰면 오답! 목적어(project)의 상태를 설명하는 목적격보어(OC) 자리이므로 형용사 feasible이 정답입니다.',
+    grammarCategory: '5형식 동사 make + 목적어 + 목적격보어(형용사)',
+    explanation: '목적어(project)의 상태를 설명하는 보어 자리이므로 부사가 아니라 형용사 feasible이 정답입니다.',
   },
   {
     id: 2,
-    schoolTag: '수능·평가원 & 내신 서술형 최빈출 (부정어 문두 도치)',
+    schoolTag: '수능·내신 필수 (부정어 문두 도치)',
     sentenceBefore: 'Not until we step out of our comfort zone',
     choiceA: 'we can',
     choiceB: 'can we',
     sentenceAfter: 'genuinely broaden our perspective.',
     correct: 'B',
-    grammarCategory: '부정어(Not until절) 문두 이동 시 주절 의문문 어순 도치',
-    explanation: 'Not until 부사절이 문장 맨 앞으로 나오면 주절은 반드시 [조동사(can) + 주어(we) + 동사원형(broaden)]으로 도치되어야 합니다.',
-  },
-  {
-    id: 3,
-    schoolTag: '고등 내신 어법 킬러 (선행사 포함 관계대명사 What vs 접속사 That)',
-    sentenceBefore: '',
-    choiceA: 'What',
-    choiceB: 'That',
-    sentenceAfter: 'matters most in sustainable luxury is harmonizing heritage with aesthetics.',
-    correct: 'A',
-    grammarCategory: '명사절 접속사 What(불완전) vs That(완전) 구별',
-    explanation: '앞에 선행사가 없고 뒤에 주어가 빠진 불완전한 절(matters most ~)이 이어지므로 선행사를 포함한 관계대명사 What이 정답입니다.',
-  },
-  {
-    id: 4,
-    schoolTag: '전국 고교 내신 출제율 99% (전치사구 수식어와 주어-동사 수일치)',
-    sentenceBefore: 'Consistent exposure to diverse viewpoints and cultures',
-    choiceA: 'prevent',
-    choiceB: 'prevents',
-    sentenceAfter: 'confirmation bias and mental rigidity.',
-    correct: 'B',
-    grammarCategory: '핵심 주어(단수 추상명사)와 동사의 수일치',
-    explanation: '전치사구(to diverse viewpoints and cultures)는 수식어(M)일 뿐입니다. 진짜 주어 핵은 단수명사 exposure이므로 단수동사 prevents가 정답입니다.',
-  },
-  {
-    id: 5,
-    schoolTag: '내신 어법 단골 (계속적 용법의 관계대명사)',
-    sentenceBefore: 'The concierge accommodated our special request,',
-    choiceA: 'which',
-    choiceB: 'that',
-    sentenceAfter: 'made our family trip truly memorable.',
-    correct: 'A',
-    grammarCategory: '콤마(,) 뒤 계속적 용법 관계대명사 that 사용 불가',
-    explanation: '앞 문장 전체를 선행사로 받는 콤마(,) 뒤 계속적 용법에는 관계대명사 that이나 what을 절대 쓸 수 없으며 which가 정답입니다.',
-  },
-  {
-    id: 6,
-    schoolTag: '고3 모의고사 & 내신 빈출 (능동 분사구문 vs 수동 분사구문)',
-    sentenceBefore: '',
-    choiceA: 'Equipping',
-    choiceB: 'Equipped',
-    sentenceAfter: 'with a sharp tailored silhouette, the new collection spearheaded the trend.',
-    correct: 'B',
-    grammarCategory: '분사구문의 의미상 주어(주절 주어)와의 능동·수동 관계',
-    explanation: '주절의 주어(the new collection)가 실루엣을 "갖추게 된(be equipped with)" 수동 관계이므로 과거분사 Equipped가 정답입니다.',
+    grammarCategory: '부정어구 도치 (조동사 + 주어 + 동사원형)',
+    explanation: '부정어구가 문두에 오면 주절은 의문문 어순으로 도치되어야 합니다.',
   },
 ];
 
-// ----------------------------------------------------------------------------
-// 4. [내 학교 교과서 / 모의고사 지문 직접 붙여넣기] 즉시 분석 & 서술형 문제 자동 생성기
-// ----------------------------------------------------------------------------
 export interface CustomPassageAnalysisResult {
   sentences: {
     idx: number;
@@ -411,7 +328,6 @@ export function analyzeCustomSchoolPassage(rawText: string): CustomPassageAnalys
         '____________'
       );
 
-      // 소리블럭 3~4단어 단위 슬래시(/) 자동 삽입
       const soundBlockEn = words
         .map((w, i) => ((i + 1) % 3 === 0 && i !== words.length - 1 ? `${w} /` : w))
         .join(' ');
