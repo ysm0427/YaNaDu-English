@@ -3890,7 +3890,6 @@ export default function App() {
   const [selectedComp, setSelectedComp] = useState<CompId | null>('DO');
   const [selectedPos, setSelectedPos] = useState<PosId | null>('N');
   const [selectedTokenIdx, setSelectedTokenIdx] = useState<number | null>(0);
-  const [writingInputs, setWritingInputs] = useState<Record<string, string>>({});
 
   // ==========================================================================
   // ✏️ [완벽 수리] 아이패드 사파리 파란블록 원천차단 + 첫 획 지연 0초 + 4종 펜슬 & 굵기 대폭 확대
