@@ -2286,7 +2286,7 @@ export const THEMES_PART1: ThemeData[] = [
   },
 ];
 // ============================================================================
-// [3/4 파트] 테마 4~5 + 실시간 트렌드 동적 변환 엔진 + 자동 문장 해부기 + 메인 UI
+// [3/4 파트] 테마 4~5 + 🎓수능·내신 1등급 마스터 DB(3대 반) + 실시간 동적 엔진 + 메인 UI
 // ============================================================================
 
 export const THEMES_PART2: ThemeData[] = [
@@ -3170,8 +3170,225 @@ export const THEMES_PART2: ThemeData[] = [
 export const THEMES: ThemeData[] = [...THEMES_PART1, ...THEMES_PART2];
 
 // ============================================================================
-// [신규 핵심 엔진] 어떤 영어 문장이나 실시간 검색어를 눌러도 즉시 16개(7성분×9품사)
-// 이중 레이어 해부 카드로 쪼개어 변환해 주는 '실시간 스마트 어절 해부기'
+// 🎓 [신규 탑재] 수능·내신 1등급 완벽 대비 전략적 학습 데이터베이스
+//    - 슬로건: "영어로 생각하고 표현하는 힘, 외운 답이 아닌 답을 만드는 영어"
+//    - 3대 전문 반: ① 수능 정규 완성반(고3 1등급) ② 고등 어법·서술형 완성반(406개교 6개년) ③ 학교별 내신 대비반(5단계 누적·변형)
+// ============================================================================
+export type ExamTrackId = 'CSAT_MASTER' | 'GRAMMAR_ESSAY' | 'SCHOOL_INTERNAL';
+
+export interface ExamStepModule {
+  stepNum: number;
+  stepTitle: string;
+  durationLabel: string;
+  goalDesc: string;
+  originalPassageEn: string;
+  originalPassageKo: string;
+  transformedEn: string; // 변형 / 패러프레이징 지문
+  transformedPoint: string;
+  killerGrammarTrap: {
+    questionEn: string;
+    wrongChoice: string;
+    correctChoice: string;
+    freqBadge: string;
+    ruleExplanation: string;
+  };
+  essayMission: {
+    typeBadge: string;
+    koCondition: string;
+    givenWords: string;
+    modelAnswerEn: string;
+    scoringCriteria: string;
+  };
+}
+
+export interface ExamMasterCourse {
+  id: ExamTrackId;
+  name: string;
+  shortTabName: string;
+  badge: string;
+  targetGoal: string;
+  scheduleRule: string;
+  philosophy: string;
+  curriculumPills: string[];
+  steps: ExamStepModule[];
+}
+
+export const EXAM_MASTER_COURSES: ExamMasterCourse[] = [
+  {
+    id: 'CSAT_MASTER',
+    name: '🏆 수능 정규 완성반 (고3 수능 모의고사 1등급 완성)',
+    shortTabName: '① 수능 1등급 완성반 (주1회 3시간)',
+    badge: '고3 수능 1등급 · 최상위권 실력 유지',
+    targetGoal: '학습목표: 고3 수능 1등급 달성 및 킬러 문항(빈칸·순서·삽입·요약) 완전 정복',
+    scheduleRule: '수업구성: 주 1회 3시간(180분) 집중 수업 · EBS 수능 연계교재 + 주요 소재 심화 + 고난도 기출/변형 실전 모의고사',
+    philosophy:
+      '영어로 생각하고 표현하는 힘! 지문을 단순 해석하는 것을 넘어 EBS 핵심 소재의 논리 구조와 구문 뼈대를 장악해 어떤 고난도 변형 문제에서도 스스로 정답을 도출합니다.',
+    curriculumPills: [
+      '1교시: 단어학습 & 단어테스트 (25분)',
+      '2교시: 핵심문장 구문 학습 (35분)',
+      '3교시: 독해심화 변형 문제 (40분)',
+      '4교시: 주요소재 연계학습 (30분)',
+      '5교시: 고난도 실전 테스트 (50분)',
+    ],
+    steps: [
+      {
+        stepNum: 1,
+        stepTitle: 'STEP 1~2. EBS 연계 어휘 테스트 & 고난도 핵심문장 구문 해부',
+        durationLabel: '1~2교시 (60분)',
+        goalDesc: 'EBS 수능특강·수능완성 최빈출 추상 어휘를 점검하고, 3줄 이상의 길고 복잡한 도치·분사구문을 16개(7성분×9품사) 뼈대로 직독직해합니다.',
+        originalPassageEn:
+          'Not until we step out of our cognitive comfort zone can we genuinely broaden our perspective on complex phenomena.',
+        originalPassageKo:
+          '우리가 인지적 안전지대(편안한 영역) 밖으로 걸어 나와서야 비로소 우리는 복잡한 현상에 대한 우리의 관점을 진정으로 넓힐 수 있다.',
+        transformedEn:
+          'Only by transcending familiar cognitive boundaries is it feasible for us to expand our viewpoint.',
+        transformedPoint:
+          '[수능 간접연계 변형 포인트] 부정어 도치 구문(Not until ~ can we)을 제한 부사구 도치(Only by ~ is it feasible)로 패러프레이징하여 빈칸 추론 문항으로 출제!',
+        killerGrammarTrap: {
+          questionEn: 'Not until we step out of our comfort zone [ we can / can we ] genuinely broaden our perspective.',
+          wrongChoice: 'we can (평서문 어순 오답)',
+          correctChoice: 'can we (부정어 문두 도치 정답!)',
+          freqBadge: '수능·평가원 어법 1순위 도치 구문',
+          ruleExplanation:
+            '부정어구(Not until절)가 강조를 위해 문장 맨 앞으로 이동하면, 주절의 어순은 반드시 의문문 어순인 [조동사(can) + 주어(we) + 동사원형(broaden)]으로 도치되어야 합니다!',
+        },
+        essayMission: {
+          typeBadge: '수능 40번 요약문 완성 & 고난도 구문 영작',
+          koCondition: '“익숙한 영역을 벗어날 때 비로소 우리는 시야를 넓힐 수 있다”를 부정어 도치(Not until)를 사용해 완성하시오.',
+          givenWords: '[ Not until / step out of / can / broaden / our perspective / we ]',
+          modelAnswerEn: 'Not until we step out of our comfort zone can we broaden our perspective.',
+          scoringCriteria: '1) Not until 부사절 내 현재시제(step) 사용 2) 주절 조동사 도치(can we broaden) 어순 정확성',
+        },
+      },
+      {
+        stepNum: 2,
+        stepTitle: 'STEP 3~5. 독해심화 변형 문제 · 주요소재 연계 · 고난도 실전 테스트',
+        durationLabel: '3~5교시 (120분)',
+        goalDesc: '철학·뇌과학·환경·경제 등 수능 주요 소재를 연계 학습하고, 실제 수능 31~34번 빈칸 추론 수준으로 변형된 모의고사를 시간 내에 돌파합니다.',
+        originalPassageEn:
+          'Consistent exposure to diverse viewpoints prevents confirmation bias and fosters intellectual flexibility.',
+        originalPassageKo:
+          '다양한 관점에 대한 꾸준한 노출은 확증 편향을 방지하고 지적 유연성을 길러준다.',
+        transformedEn:
+          'Maintaining consistency in encountering opposing ideas is essential to overcoming cognitive rigidity.',
+        transformedPoint:
+          '[독해심화 변형 포인트] confirmation bias(확증 편향) ➔ cognitive rigidity(인지적 경직성), intellectual flexibility(지적 유연성) ➔ overcoming rigidity로 반의어·유의어 치환!',
+        killerGrammarTrap: {
+          questionEn: 'Consistent exposure to diverse viewpoints [ prevent / prevents ] confirmation bias.',
+          wrongChoice: 'prevent (앞 복수명사 viewpoints에 현혹된 오답)',
+          correctChoice: 'prevents (단수 주어 핵 exposure에 수일치!)',
+          freqBadge: '수능·모의고사 99% 출제 주어-동사 수일치',
+          ruleExplanation:
+            '전치사구(to diverse viewpoints)는 주어(exposure)를 꾸며주는 수식어(M)일 뿐입니다. 진짜 주어 핵은 단수 추상명사 exposure이므로 단수동사 prevents(-s)를 써야 합니다.',
+        },
+        essayMission: {
+          typeBadge: '주제·요약 서술형 실전 테스트',
+          koCondition: '위 지문의 핵심 요지를 [동명사 주어(Maintaining consistency) + 5형식(makes our mind flexible)] 구조로 요약 영작하시오.',
+          givenWords: '[ Maintaining / consistency / makes / our mind / flexible / and / objective ]',
+          modelAnswerEn: 'Maintaining consistency makes our mind flexible and objective.',
+          scoringCriteria: '1) 동명사구 주어(Maintaining consistency) 단수 취급(makes) 2) 목적격보어(OC) 자리에 형용사(flexible, objective) 배치',
+        },
+      },
+    ],
+  },
+  {
+    id: 'GRAMMAR_ESSAY',
+    name: '✍️ 고등 어법·서술형 완성반 (내신 1등급 치트키 · 방학 특강)',
+    shortTabName: '② 고등 어법·서술형 완성반 (406개교 기출)',
+    badge: '전국 406개교 최신 6개년 기출 완전 분석',
+    targetGoal: '학습목표: 고등 내신 1등급을 결정짓는 어법과 서술형(조건 영작·요약) 완벽 마스터',
+    scheduleRule: '수업구성: 기출 필수 어법 개념 총정리 + 서술형 유형별 전략 + 내신 기출 실전 모의고사',
+    philosophy:
+      '외운 답이 아닌 답을 만드는 영어! 전국 406개 고등학교의 최신 6개년 기출 빅데이터를 분석하여, 내신 1등급으로 직결되는 필수 어법 함정과 감점 없는 서술형 답안 작성 공식을 체화합니다.',
+    curriculumPills: [
+      '모듈 1: 406개교 6개년 기출 필수 어법 총정리',
+      '모듈 2: 서술형 유형별 전략 (조건영작·어형변화·요약)',
+      '모듈 3: 내신 1등급 실전 기출 모의고사',
+    ],
+    steps: [
+      {
+        stepNum: 1,
+        stepTitle: '모듈 1~2. 전국 406개교 6개년 최다 빈출 어법 TOP 킬러 & 서술형 영작 전략',
+        durationLabel: '핵심 어법 + 서술형 전략',
+        goalDesc: '학교 시험 서술형에서 가장 많이 감점되는 [5형식 보어 품사 / 관계대명사 vs 관계부사 / 분사구문 태 결정]을 16개 매핑 원리로 완벽히 정복합니다.',
+        originalPassageEn:
+          'Streamlining the approval process makes the entire project feasible, which allows the team to expedite the launch.',
+        originalPassageKo:
+          '결재 절차를 간소화하는 것은 전체 프로젝트를 실현 가능하게 만들어 주며, 이는 팀이 런칭을 앞당길 수 있게 해 준다.',
+        transformedEn:
+          'The streamlined process renders the project highly feasible, thereby enabling the team to accelerate the release.',
+        transformedPoint:
+          '[내신 어법·서술형 변형] 계속적 용법의 관계대명사(, which allows ~)를 분사구문(, thereby enabling ~)으로 어형 변화시키는 서술형 단골 출제 유형!',
+        killerGrammarTrap: {
+          questionEn: 'Streamlining the process makes the entire project [ feasible / feasibly ], [ which / that ] allows the team to expedite it.',
+          wrongChoice: 'feasibly (부사 오답) / that (콤마 뒤 관계대명사 that 불가)',
+          correctChoice: 'feasible (목적격보어 형용사) / which (계속적 용법)',
+          freqBadge: '406개교 6개년 내신 출제율 1위 (보어 품사 & 관계사)',
+          ruleExplanation:
+            '① 5형식 동사 make의 목적격보어(OC) 자리에는 해석이 "~하게"라도 반드시 형용사(feasible)를 써야 합니다! ② 콤마(,) 뒤 계속적 용법에는 관계대명사 that이나 what을 절대 쓸 수 없으며 which를 씁니다.',
+        },
+        essayMission: {
+          typeBadge: '406개교 기출 서술형 1순위: [조건 영작 & 어형 변화]',
+          koCondition: '조건: 1) 가목적어 it과 진목적어 to부정사를 사용할 것 2) 보기 단어를 필요시 어형 변화할 것 (“새로운 시스템은 우리가 일정을 간소화하는 것을 가능하게 만들었다”)',
+          givenWords: '[ make / the new system / possible / streamline / the schedule / for us ]',
+          modelAnswerEn: 'The new system made it possible for us to streamline the schedule.',
+          scoringCriteria: '1) 5형식 가목적어 구문(made it possible) 2) 의미상 주어(for us) + 진목적어(to streamline) 어순 정확성',
+        },
+      },
+    ],
+  },
+  {
+    id: 'SCHOOL_INTERNAL',
+    name: '🏫 학교별 내신 대비반 (5단계 누적·심화·변형 완벽 대비)',
+    shortTabName: '③ 학교별 내신 대비반 (5단계 변형)',
+    badge: '양치기·무조건 암기 지양 · 고등 R&D센터 선별 콘텐츠',
+    targetGoal: '학습목표: 학교별 맞춤 출제 경향 완벽 장악 및 어떠한 지문 변형에도 흔들리지 않는 고등 내신 1등급',
+    scheduleRule: '5단계 공식: 전체 흐름 ▶ 세부 내용 ▶ 심화 ▶ 변형(Paraphrasing) ▶ 서술형(요약·영작)',
+    philosophy:
+      '무조건적인 본문 암기는 시험장에서 지문이 조금만 변형되어도 무너집니다! 이해 기반의 누적·심화 반복 학습으로 지문의 논리 구조와 어휘 변형을 완벽히 장악합니다.',
+    curriculumPills: [
+      '1단계: 전체 흐름 (논리 구조도)',
+      '2단계: 세부 내용 (소리블럭 직독직해)',
+      '3단계: 심화 (킬러 구문·어법 해부)',
+      '4단계: 변형 (어휘·문장 Paraphrasing)',
+      '5단계: 서술형 (요약문·조건 영작)',
+    ],
+    steps: [
+      {
+        stepNum: 1,
+        stepTitle: '학교별 내신 5단계 마스터: [전체 흐름 ▶ 세부 ▶ 심화 ▶ 변형 ▶ 서술형]',
+        durationLabel: '5단계 누적·반복 시스템',
+        goalDesc: '하나의 내신 핵심 지문을 단순 암기하지 않고 1단계(전체 흐름)부터 5단계(서술형 요약·영작)까지 입체적으로 변형·확장하며 내신 1등급 실력을 완성합니다.',
+        originalPassageEn:
+          'What matters most in sustainable luxury is that brands seamlessly blend classic heritage with modern aesthetics.',
+        originalPassageKo:
+          '지속 가능한 럭셔리에서 가장 중요한 것은 브랜드가 클래식한 헤리티지와 현대적 미학을 물 흐르듯 결합한다는 점이다.',
+        transformedEn:
+          'The core essence of sustainable luxury lies in harmonizing traditional heritage with contemporary aesthetics effortlessly.',
+        transformedPoint:
+          '[학교별 내신 4단계 변형] 원문의 "What matters most ~ is that S+V" 강조 구문을 학교 선생님이 시험지에서는 "The core essence ~ lies in V-ing"로 변형 출제!',
+        killerGrammarTrap: {
+          questionEn: '[ What / That ] matters most in luxury is [ what / that ] brands blend heritage with aesthetics.',
+          wrongChoice: 'That ~ what (선행사 유무 및 완전/불완전 혼동)',
+          correctChoice: 'What (불완전한 절 이끄는 관계대명사) ~ that (완전한 보어절 접속사)',
+          freqBadge: '내신 서술형·어법 단골: What vs That 구별',
+          ruleExplanation:
+            '앞자리는 선행사가 없고 뒤에 주어 없이 동사(matters)가 바로 오므로 불완전한 절을 이끄는 What이 정답! 뒷자리는 주어(brands)+동사(blend)+목적어(heritage)가 모두 갖춘 완전한 문장이므로 접속사 that이 정답입니다.',
+        },
+        essayMission: {
+          typeBadge: '학교별 내신 5단계 최종 관문: [본문 요약 & 변형 영작]',
+          koCondition: '본문 내용을 바탕으로 아래 요약문의 빈칸을 채워 전체 문장을 완성하시오. (“지속 가능한 럭셔리의 핵심은 전통 유산과 현대 미학의 조화에 있다.”)',
+          givenWords: '[ What / love / matters / most / is / that / blend / heritage / with / aesthetics ]',
+          modelAnswerEn: 'What matters most is that brands blend heritage with aesthetics.',
+          scoringCriteria: '1) 명사절 주어(What matters most) 단수동사(is) 수일치 2) 보어절 접속사(that) 뒤 완전한 3형식 문장 결합',
+        },
+      },
+    ],
+  },
+];
+
+// ============================================================================
+// 어떤 영어 문장이나 수능·내신 구문을 눌러도 즉시 16개(7성분×9품사) 해부 카드로 변환하는 엔진
 // ============================================================================
 export function buildDynamicDiagramSentence(
   rawSentence: string,
@@ -3188,7 +3405,7 @@ export function buildDynamicDiagramSentence(
   const pronSet = new Set(['i', 'you', 'we', 'they', 'he', 'she', 'it', 'us', 'me', 'them', 'everyone', 'what']);
   const prepSet = new Set(['in', 'on', 'at', 'to', 'for', 'with', 'about', 'before', 'until', 'during', 'from', 'by', 'of', 'into', 'over']);
   const conjSet = new Set(['and', 'or', 'but', 'so', 'because', 'if', 'whenever', 'whether']);
-  const auxVerbSet = new Set(['can', 'could', 'will', 'would', 'is', 'are', 'was', 'were', 'let', 'lets', 'try', 'tried', 'want', 'wanted', 'need', 'makes', 'make', 'made', 'goes', 'went', 'pulled', 'pull', 'lived', 'live', 'streamline', 'wrap', 'check', 'checked', 'drop', 'freshen', 'unwind', 'accommodate', 'spearhead', 'complements', 'complement', 'binge-watched', 'resonates', 'hit']);
+  const auxVerbSet = new Set(['can', 'could', 'will', 'would', 'is', 'are', 'was', 'were', 'let', 'lets', 'try', 'tried', 'want', 'wanted', 'need', 'makes', 'make', 'made', 'goes', 'went', 'pulled', 'pull', 'lived', 'live', 'streamline', 'wrap', 'check', 'checked', 'drop', 'freshen', 'unwind', 'accommodate', 'spearhead', 'complements', 'complement', 'binge-watched', 'resonates', 'hit', 'step', 'broaden', 'prevents', 'fosters', 'matters', 'blend']);
 
   let verbFound = false;
 
@@ -3263,7 +3480,7 @@ export function buildDynamicDiagramSentence(
       lower.endsWith('al') ||
       lower.endsWith('ic') ||
       lower.endsWith('ed') ||
-      ['new', 'quick', 'short', 'bold', 'sharp', 'vacant', 'chic', 'timeless', 'modern'].includes(lower)
+      ['new', 'quick', 'short', 'bold', 'sharp', 'vacant', 'chic', 'timeless', 'modern', 'complex', 'diverse'].includes(lower)
     ) {
       return {
         word: w,
@@ -3275,7 +3492,6 @@ export function buildDynamicDiagramSentence(
       };
     }
 
-    // 기본 명사 (동사 앞이면 주어 S, 동사 뒤면 직접목적어 DO)
     const isSubjNoun = !verbFound && idx <= 2;
     return {
       word: w,
@@ -3313,19 +3529,24 @@ export default function App() {
     (todayObj.getTime() - new Date(todayObj.getFullYear(), 0, 0).getTime()) / 86400000
   );
 
-  // [전 레벨 학습 스위치] 첫 화면은 항상 '초급(beginner)'을 기본값으로 시작
   const [learningLevel, setLearningLevel] = useState<LearningLevel>('beginner');
-
   const [selectedThemeId, setSelectedThemeId] = useState<string>(
     THEMES[dayOfYear % THEMES.length].id
   );
+  // [업그레이드] 상단 모드에 'examMaster' (🎓 수능·내신 1등급 마스터) 정식 추가!
   const [activeMode, setActiveMode] = useState<
-    'daily' | 'wordbook' | 'naverQuiz' | 'aiCoach' | 'weekly'
+    'daily' | 'examMaster' | 'wordbook' | 'naverQuiz' | 'aiCoach' | 'weekly'
   >('daily');
   const [activeMediaPlatform, setActiveMediaPlatform] =
     useState<MediaPlatformId>('FASHION_MAGS');
 
-  // [핵심 신규 상태] 왼쪽 실시간 검색어(1~10위)를 클릭했을 때 오른쪽 전체 화면을 변환시키는 활성 트렌드 상태!
+  // 🎓 수능·내신 1등급 마스터 전용 상태 (①수능완성반 ②어법서술형반 ③학교별내신반 & 5단계 스텝 & 서술형 답안)
+  const [selectedExamTrack, setSelectedExamTrack] = useState<ExamTrackId>('CSAT_MASTER');
+  const [schoolInternalStage, setSchoolInternalStage] = useState<number>(1);
+  const [examEssayInput, setExamEssayInput] = useState<string>('');
+  const [showExamModelAnswer, setShowExamModelAnswer] = useState<boolean>(false);
+  const [csatTimerMins, setCsatTimerMins] = useState<number>(180); // 주 1회 3시간(180분) 수업 타이머
+
   const [selectedLiveKeyword, setSelectedLiveKeyword] = useState<{
     platformName: string;
     rank: number;
@@ -3334,8 +3555,12 @@ export default function App() {
     extUrl: string;
   } | null>(null);
 
-  // [핵심 신규 상태] STEP 3 '실전 예문 이중 레이어 해부 카드'가 현재 테마/클릭한 문장에 맞춰 즉시 바뀌는 상태!
   const [activeDiagramSentenceIdx, setActiveDiagramSentenceIdx] = useState<number>(0);
+  const [customDissectSentence, setCustomDissectSentence] = useState<{
+    en: string;
+    ko: string;
+    title: string;
+  } | null>(null);
 
   const [mediaPlatforms, setMediaPlatforms] = useState<MediaTrendPlatform[]>(
     INITIAL_MEDIA_PLATFORMS
@@ -3353,7 +3578,6 @@ export default function App() {
   const [fontStyle, setFontStyle] = useState<'sans' | 'serif' | 'mono'>('sans');
   const [layoutMode, setLayoutMode] = useState<'split' | 'wide'>('split');
 
-  // 다크/라이트 모드 변경 시 HTML/Body 루트에 즉시 반영
   useEffect(() => {
     if (typeof document === 'undefined') return;
     const rootHtml = document.documentElement;
@@ -3394,6 +3618,7 @@ export default function App() {
 
   const handleSelectLevel = (lvl: LearningLevel) => {
     setLearningLevel(lvl);
+    setCustomDissectSentence(null);
     if (lvl === 'beginner') {
       setSpeechRate(0.75);
       setShowAllKoreanPron(true);
@@ -3413,14 +3638,14 @@ export default function App() {
 
   const [wordbookLevel, setWordbookLevel] = useState<
     '중등 필수' | '고등·수능 핵심' | '비즈니스·실무' | '오픽(OPIc)·구동사'
-  >('중등 필수');
+  >('고등·수능 핵심');
   const [wordbookDay, setWordbookDay] = useState<number>(1);
   const [completedDays, setCompletedDays] = useState<string[]>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('yanadu_completed_days');
       if (saved) return JSON.parse(saved);
     }
-    return ['중등 필수-1'];
+    return ['중등 필수-1', '고등·수능 핵심-1'];
   });
   const [bookmarkedWords, setBookmarkedWords] = useState<
     {
@@ -3439,22 +3664,22 @@ export default function App() {
     }
     return [
       {
-        word: 'pull off',
-        ipa: '/pʊl ɒf/',
-        meaning: '(패션·스타일을) 멋지게 소화해 내다',
-        collocation: 'pull off a tailored look',
-        posLabel: '구동사 (Verb)',
-        compLabel: '동사 (V)',
-        levelBadge: '중급',
+        word: 'perspective',
+        ipa: '/pəˈspek.tɪv/',
+        meaning: '관점, 시각 (수능·내신 1순위)',
+        collocation: 'broaden our perspective',
+        posLabel: '명사 (Noun)',
+        compLabel: '직접목적어 (DO)',
+        levelBadge: '수능1등급',
       },
       {
-        word: 'streamline',
-        ipa: '/ˈstriːm.laɪn/',
-        meaning: '(업무·절차를) 간소화·효율화하다',
-        collocation: 'streamline the entire workflow',
-        posLabel: '동사 (Verb)',
-        compLabel: '동사 (V)',
-        levelBadge: '고급',
+        word: 'feasible',
+        ipa: '/ˈfiː.zə.bəl/',
+        meaning: '실현 가능한 (406개교 5형식 보어 기출)',
+        collocation: 'make the project feasible',
+        posLabel: '형용사 (Adj)',
+        compLabel: '목적격보어 (OC)',
+        levelBadge: '내신서술형',
       },
     ];
   });
@@ -3471,7 +3696,6 @@ export default function App() {
     }
   }, [completedDays]);
 
-  // 24시간 자정 기준 자동 업데이트 & 오늘의 실시간 추천 키워드 자동 장착!
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const savedDate = localStorage.getItem('yanadu_last_study_date');
@@ -3494,7 +3718,6 @@ export default function App() {
     }
   }, [todayKey, dayOfYear]);
 
-  // 좌측 9대 매체 실시간 검색어 TOP 10 '새로고침' 라이브 엔진
   const handleRefreshLiveTrends = async () => {
     setIsRefreshingTrends(true);
     const now = new Date();
@@ -3581,8 +3804,8 @@ export default function App() {
   const [chatHistory, setChatHistory] = useState<ChatTurn[]>([
     {
       role: 'coach',
-      text: 'Welcome! Click any live trend keyword on the left (1st~10th) and watch the entire lesson, vocabulary, and 16-node diagram transform in real time!',
-      nuanceTip: '왼쪽 실시간 검색어를 누르면 오른쪽 단어·문장·16개 해부 카드가 즉시 그 키워드로 바뀝니다!',
+      text: 'Welcome! Switch between All-Level Speaking and our new [🎓 수능·내신 1등급 마스터] tab anytime to build the power to think and create answers in English!',
+      nuanceTip: '외운 답이 아닌 스스로 답을 만드는 영어! 수능 1등급과 406개교 내신 어법·서술형까지 완벽히 대비합니다.',
     },
   ]);
   const [correctionInput, setCorrectionInput] = useState<string>('');
@@ -3594,17 +3817,13 @@ export default function App() {
     opicUpgrade: string;
   } | null>(null);
   const [studyStats, setStudyStats] = useState({
-    masteredWords: 52,
-    completedSentences: 28,
-    quizAccuracy: 94,
-    speakingMinutes: 40,
-    streakDays: 8,
+    masteredWords: 58,
+    completedSentences: 34,
+    quizAccuracy: 96,
+    speakingMinutes: 45,
+    streakDays: 9,
   });
 
-  // ==========================================================================
-  // [핵심 동적 변환 엔진] 왼쪽 실시간 검색어(selectedLiveKeyword)나 날짜에 따라
-  // 오른쪽 테마의 제목·패턴·1순위 단어·직독직해 문장·퀴즈가 실시간으로 변신합니다!
-  // ==========================================================================
   const baseTheme = THEMES.find((t) => t.id === selectedThemeId) || THEMES[0];
 
   const currentTheme: ThemeData = (() => {
@@ -3614,7 +3833,6 @@ export default function App() {
     const kwKo = selectedLiveKeyword.koTitle;
     const kwFirstWord = kwEn.split(' ')[0] || 'trend';
 
-    // 실시간 클릭한 키워드로 즉석 생성되는 1순위 단어
     const liveVocabItem: VocabItem = {
       id: 0,
       type: '일상 회화',
@@ -3638,7 +3856,6 @@ export default function App() {
       paraphraseTip: `[실시간 연동 완료] 클릭하신 "${kwKo}" 이슈를 아래 직독직해와 16개 해부 카드로 즉시 학습합니다!`,
     };
 
-    // 실시간 클릭한 키워드로 즉석 조립되는 초·중·고급 문장
     const liveSentence: TrainingSentence = {
       id: 0,
       levelTag: learningLevel,
@@ -3715,11 +3932,17 @@ export default function App() {
   })();
 
   const currentLevelTrack = currentTheme.levelTracks[learningLevel];
+  const currentExamCourse =
+    EXAM_MASTER_COURSES.find((c) => c.id === selectedExamTrack) || EXAM_MASTER_COURSES[0];
 
-  // [핵심 수리] STEP 3 '실전 예문 이중 레이어 해부 카드'가 고정 샘플이 아니라
-  // 현재 테마의 문장들(실시간 검색어 문장 포함!)과 100% 실시간으로 연동됩니다!
-  const activeSentenceForDiagram =
-    currentTheme.sentences[activeDiagramSentenceIdx] || currentTheme.sentences[0];
+  const activeSentenceForDiagram = customDissectSentence
+    ? {
+        rawEn: customDissectSentence.en,
+        naturalKo: customDissectSentence.ko,
+        tag: customDissectSentence.title,
+      }
+    : currentTheme.sentences[activeDiagramSentenceIdx] || currentTheme.sentences[0];
+
   const currentDiagramEx: DiagramSentence = buildDynamicDiagramSentence(
     activeSentenceForDiagram.rawEn,
     activeSentenceForDiagram.naturalKo,
@@ -3737,6 +3960,7 @@ export default function App() {
     setRevealedWordIds([]);
     setActiveDiagramSentenceIdx(0);
     setSelectedTokenIdx(0);
+    setCustomDissectSentence(null);
   }, [selectedThemeId, selectedLiveKeyword]);
 
   useEffect(() => {
@@ -3801,8 +4025,8 @@ export default function App() {
       } else {
         setLiveDictResult({
           word: clean,
-          phonetic: '/실전 구어/패션 표현/',
-          definition: '원어민 실전 구동사·패션 표현입니다. 우측 네이버/구글 사전 버튼으로 상세 예문을 확인하세요.',
+          phonetic: '/실전 구어/입시 핵심 표현/',
+          definition: '원어민 실전 구동사·수능 핵심 표현입니다. 우측 네이버/구글 사전 버튼으로 상세 예문을 확인하세요.',
           example: `You really pulled off "${clean}" effortlessly!`,
         });
       }
@@ -3894,11 +4118,11 @@ export default function App() {
 
     setCorrectionResult({
       original: raw,
-      naturalEn: `[중급 바꿔말하기] ${currentLevelTrack.patternEn.replace('~', raw)}`,
+      naturalEn: `[수능·내신 서술형 패러프레이징] ${currentLevelTrack.patternEn.replace('~', raw)}`,
       wordOrderFix:
-        '어순 점검 완료: [주어(S) + 동사(V) + 목적어(DO)] 핵심 뼈대를 먼저 말하고, 수식어(M)는 소리블럭 단위로 문장 끝에 배치하세요.',
-      grammarExplanation: `입력하신 "${withPeriod}" 문장을 초급 뼈대에서 중급(구동사 바꿔말하기) ➔ 고급(뉘앙스 확장)으로 연결하면 완벽합니다.`,
-      opicUpgrade: `[고급 확장] Honestly, from my perspective, ${withPeriod}`,
+        '서술형 감점 방지 점검: [주어(S) + 동사(V) + 목적어(DO)/보어(SC·OC)] 수일치와 5형식 보어 품사(형용사)를 확인하세요.',
+      grammarExplanation: `입력하신 "${withPeriod}" 문장을 외운 답이 아닌 구조적 어순으로 변형하면 내신 서술형 만점 답안이 됩니다.`,
+      opicUpgrade: `[고급 확장] Not only does it clarify the meaning, but ${withPeriod}`,
     });
     setStudyStats((s) => ({ ...s, completedSentences: s.completedSentences + 1 }));
   };
@@ -3910,9 +4134,9 @@ export default function App() {
     const userTurn: ChatTurn = { role: 'user', text: msg };
     const coachReply: ChatTurn = {
       role: 'coach',
-      text: `[${learningLevel.toUpperCase()} COACH] Awesome! Your expression "${msg}" works really well. Let us also try paraphrasing it with "${currentTheme.vocab[0].collocation}"!`,
-      correction: `💡 레벨업 추천 표현: "${currentLevelTrack.patternEn}"`,
-      nuanceTip: `현재 배속(${speechRate}x)에 맞춰 소리블럭 단위로 끊어 읽어보세요!`,
+      text: `[${learningLevel.toUpperCase()} COACH] Great structure! "${msg}" shows strong command of word order. Try transforming it with "${currentTheme.vocab[0].collocation}"!`,
+      correction: `💡 레벨업 & 서술형 추천 표현: "${currentLevelTrack.patternEn}"`,
+      nuanceTip: `현재 배속(${speechRate}x)에 맞춰 의미단위(소리블럭)로 끊어 읽어보세요!`,
     };
     setChatHistory((prev) => [...prev, userTurn, coachReply]);
     setChatInput('');
@@ -3979,7 +4203,7 @@ export default function App() {
 
       <div className="flex h-screen overflow-hidden">
         {/* ====================================================================
-            좌측 사이드바: 9대 매체(패션 5대 매거진 포함) 실시간 새로고침 & 클릭 시 오른쪽 즉시 변환!
+            좌측 사이드바: 9대 매체 실시간 새로고침 + 수능·내신 1등급 바로가기 + 5단계 배속
         ==================================================================== */}
         <aside
           className={`no-print w-80 flex-shrink-0 border-r flex flex-col h-full select-none transition-colors ${
@@ -3992,7 +4216,7 @@ export default function App() {
             <div>
               <div className="flex items-center gap-1.5">
                 <span className={`px-2 py-0.5 text-[10px] font-extrabold rounded text-white ${themeAccentBg}`}>
-                  전 레벨 통합
+                  회화+수능·내신1등급
                 </span>
                 <h1 className="text-base font-extrabold tracking-tight">나만의 야나두 PRO</h1>
               </div>
@@ -4012,6 +4236,41 @@ export default function App() {
             </button>
           </div>
 
+          {/* 좌측 상단: 수능·내신 1등급 전략 학습관 원클릭 배너 */}
+          <div className="p-3 bg-gradient-to-r from-indigo-900 via-blue-900 to-slate-900 text-white border-b border-slate-800 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-amber-400 text-slate-950">
+                NEW 입시 1등급 전략
+              </span>
+              <span className="text-[10px] text-blue-200 font-bold">406개교 6개년 기출</span>
+            </div>
+            <div className="text-xs font-extrabold leading-snug">
+              🎓 영어로 생각하고 표현하는 힘, 외운 답이 아닌 답을 만드는 영어!
+            </div>
+            <div className="grid grid-cols-3 gap-1 pt-0.5">
+              {[
+                { id: 'CSAT_MASTER' as ExamTrackId, label: '수능완성반' },
+                { id: 'GRAMMAR_ESSAY' as ExamTrackId, label: '어법·서술형' },
+                { id: 'SCHOOL_INTERNAL' as ExamTrackId, label: '학교별내신' },
+              ].map((tr) => (
+                <button
+                  key={tr.id}
+                  onClick={() => {
+                    setSelectedExamTrack(tr.id);
+                    setActiveMode('examMaster');
+                  }}
+                  className={`py-1.5 px-1 rounded-lg text-[10px] font-extrabold transition ${
+                    activeMode === 'examMaster' && selectedExamTrack === tr.id
+                      ? 'bg-amber-400 text-slate-950 shadow'
+                      : 'bg-slate-800/90 hover:bg-slate-700 text-white'
+                  }`}
+                >
+                  {tr.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="p-3 bg-slate-900 text-white border-b border-slate-800 space-y-2">
             <div className="flex items-center justify-between text-[11px] font-bold text-slate-300">
               <span>💚 실시간 영영·네이버 사전 허브</span>
@@ -4023,7 +4282,7 @@ export default function App() {
                 value={dictQuery}
                 onChange={(e) => setDictQuery(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && fetchLiveDictionary(dictQuery)}
-                placeholder="단어 검색 (예: silhouette, pull off)"
+                placeholder="단어 검색 (예: feasible, perspective)"
                 className="flex-1 bg-slate-800 text-white text-xs px-2.5 py-1.5 rounded-lg border border-slate-700 focus:outline-none focus:border-emerald-400"
               />
               <button
@@ -4140,8 +4399,7 @@ export default function App() {
                 👇 순위를 클릭하면 오른쪽 단어·문장·16매핑이 즉시 바뀝니다!
               </p>
 
-              {/* 순위 클릭 시 오른쪽 수업 전체를 해당 키워드로 즉시 변신! */}
-              <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+              <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
                 {currentMediaObj.keywords.map((kw) => {
                   const isKwActive =
                     selectedLiveKeyword?.koTitle === kw.koTitle &&
@@ -4213,7 +4471,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* 정규 5대 핵심 테마 선택 (누르면 기본 정규 테마로 전환) */}
             <div>
               <div className="flex items-center justify-between px-1 mb-1.5">
                 <p className="text-[11px] font-extrabold text-slate-400 uppercase">
@@ -4260,7 +4517,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* 세분화된 5단계 리딩 발음 속도 제어 & 4개국 억양 */}
             <div
               className={`p-3 rounded-2xl border space-y-2 ${
                 darkMode
@@ -4332,7 +4588,7 @@ export default function App() {
         </aside>
 
         {/* ====================================================================
-            우측 메인 영역: 최상단 [🌱초급 · 🌿중급 · 🌳고급] 마스터 스위치 + 본문
+            우측 메인 영역: 최상단 [🌱초급 · 🌿중급 · 🌳고급] + [🎓수능·내신 1등급 마스터] 탭
         ==================================================================== */}
         <main className="flex-1 flex flex-col h-full overflow-hidden">
           <header
@@ -4404,6 +4660,7 @@ export default function App() {
               <div className="flex flex-wrap items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl">
                 {[
                   { id: 'daily', label: '📝 전 레벨 일일 강의 & 16매핑' },
+                  { id: 'examMaster', label: '🎓 수능·내신 1등급 마스터 (NEW)' },
                   { id: 'wordbook', label: '📘 중·고등·실무·오픽 단어장' },
                   { id: 'naverQuiz', label: '💚 네이버 퀴즈 & 복습장' },
                   { id: 'aiCoach', label: '🎙️ AI 음성회화(5~30분)·첨삭' },
@@ -4414,7 +4671,9 @@ export default function App() {
                     onClick={() => setActiveMode(tab.id as typeof activeMode)}
                     className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition ${
                       activeMode === tab.id
-                        ? `${themeAccentBg} text-white shadow-sm`
+                        ? tab.id === 'examMaster'
+                          ? 'bg-indigo-600 text-white shadow-sm ring-2 ring-amber-400/60'
+                          : `${themeAccentBg} text-white shadow-sm`
                         : 'text-slate-600 dark:text-slate-300'
                     }`}
                   >
@@ -4465,6 +4724,359 @@ export default function App() {
               } mx-auto space-y-7 pb-16`}
             >
               {/* ==============================================================
+                  [모드 NEW] 🎓 수능·내신 1등급 마스터 전용관
+                  - 영어로 생각하고 표현하는 힘, 외운 답이 아닌 답을 만드는 영어!
+                  - ① 수능 정규 완성반 (고3 1등급 / 주 1회 3시간 루틴)
+                  - ② 고등 어법·서술형 완성반 (전국 406개교 6개년 기출 완전 분석)
+                  - ③ 학교별 내신 대비반 (전체 흐름 ▶ 세부 ▶ 심화 ▶ 변형 ▶ 서술형)
+              ============================================================== */}
+              {activeMode === 'examMaster' && (
+                <div className="space-y-6">
+                  {/* 상단 헤더 & 슬로건 배너 */}
+                  <section className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 shadow-lg border border-indigo-500/30 space-y-5">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="px-3 py-1 rounded-full bg-amber-400 text-slate-950 text-xs font-black">
+                            수능 & 내신 1등급 전략 시스템
+                          </span>
+                          <span className="px-3 py-1 rounded-full bg-indigo-500/30 border border-indigo-400/40 text-indigo-200 text-xs font-extrabold">
+                            전국 406개교 최신 6개년 기출 + EBS 연계 심화
+                          </span>
+                        </div>
+                        <h2 className="text-2xl md:text-3xl font-black tracking-tight pt-1">
+                          🎓 영어로 생각하고 표현하는 힘,{' '}
+                          <span className="text-yellow-300 underline decoration-2 underline-offset-4">
+                            외운 답이 아닌 답을 만드는 영어
+                          </span>
+                        </h2>
+                        <p className="text-xs md:text-sm text-slate-300">
+                          무조건적인 본문 암기와 양치기 학습을 지양하고, 구문 뼈대(16매핑) 이해와 지문 변형(Paraphrasing)·서술형 영작으로 고3 수능 1등급과 학교별 내신 1등급을 완성합니다.
+                        </p>
+                      </div>
+
+                      {/* 주 1회 3시간(180분) 수능 완성반 수업 타이머 */}
+                      <div className="bg-slate-900/90 border border-slate-700 rounded-2xl p-3.5 text-center min-w-[190px]">
+                        <div className="text-[10px] font-extrabold text-amber-300 uppercase">
+                          ⏱️ 주 1회 3시간(180분) 집중 루틴
+                        </div>
+                        <div className="text-xl font-black font-mono text-white mt-0.5">
+                          {csatTimerMins}분 코스 세팅됨
+                        </div>
+                        <div className="flex justify-center gap-1 mt-1.5">
+                          {[60, 120, 180].map((m) => (
+                            <button
+                              key={m}
+                              onClick={() => setCsatTimerMins(m)}
+                              className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${
+                                csatTimerMins === m
+                                  ? 'bg-amber-400 text-slate-950'
+                                  : 'bg-slate-800 text-slate-300'
+                              }`}
+                            >
+                              {m === 180 ? '3시간(정규)' : `${m}분`}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 3대 전문 반 선택 탭 */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-2">
+                      {EXAM_MASTER_COURSES.map((course) => {
+                        const isSel = course.id === selectedExamTrack;
+                        return (
+                          <button
+                            key={course.id}
+                            onClick={() => {
+                              setSelectedExamTrack(course.id);
+                              setShowExamModelAnswer(false);
+                              setExamEssayInput('');
+                            }}
+                            className={`p-4 rounded-2xl border text-left transition ${
+                              isSel
+                                ? 'bg-white text-slate-900 border-amber-400 ring-2 ring-amber-400 shadow-md'
+                                : 'bg-slate-900/70 hover:bg-slate-800/80 text-white border-slate-700'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between text-[10px] font-extrabold">
+                              <span
+                                className={`px-2 py-0.5 rounded ${
+                                  isSel
+                                    ? 'bg-indigo-600 text-white'
+                                    : 'bg-indigo-500/30 text-indigo-200'
+                                }`}
+                              >
+                                {course.badge}
+                              </span>
+                            </div>
+                            <div className="text-sm font-black mt-1.5">{course.shortTabName}</div>
+                            <div
+                              className={`text-[11px] mt-1 font-semibold ${
+                                isSel ? 'text-slate-600' : 'text-slate-300'
+                              }`}
+                            >
+                              {course.targetGoal}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+
+                  {/* 선택된 반의 상세 수업 구성 & 5단계 프로세스 */}
+                  <section
+                    className={`border rounded-3xl p-6 shadow-sm space-y-5 ${
+                      darkMode
+                        ? 'bg-slate-900 border-slate-800'
+                        : 'bg-white border-slate-200'
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-4">
+                      <div>
+                        <span className="text-xs font-extrabold text-indigo-500">
+                          {currentExamCourse.badge}
+                        </span>
+                        <h3 className="text-xl font-black mt-0.5">{currentExamCourse.name}</h3>
+                        <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mt-1">
+                          📌 {currentExamCourse.scheduleRule}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          const firstPassage = currentExamCourse.steps[0].originalPassageEn;
+                          const firstKo = currentExamCourse.steps[0].originalPassageKo;
+                          setCustomDissectSentence({
+                            en: firstPassage,
+                            ko: firstKo,
+                            title: `🎓 [${currentExamCourse.shortTabName}] 킬러 구문 16매핑 해부`,
+                          });
+                          setActiveMode('daily');
+                          speakText(firstPassage);
+                        }}
+                        className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-extrabold shadow"
+                      >
+                        🔍 이 지문 16개(7성분×9품사) 다이어그램으로 즉시 해부하기
+                      </button>
+                    </div>
+
+                    <p className="text-xs md:text-sm leading-relaxed font-semibold text-slate-700 dark:text-slate-200 bg-indigo-500/10 border border-indigo-500/20 p-3.5 rounded-2xl">
+                      💡 <strong>핵심 교육 철학:</strong> {currentExamCourse.philosophy}
+                    </p>
+
+                    {/* 수업 구성 5단계 스텝 바 (전체 흐름 ▶ 세부 내용 ▶ 심화 ▶ 변형 ▶ 서술형) */}
+                    <div>
+                      <div className="text-xs font-extrabold text-slate-400 uppercase mb-2">
+                        📋 체계적 수업 구성 & 단계별 마스터 프로세스 (클릭하여 단계 확인)
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-5 gap-2">
+                        {currentExamCourse.curriculumPills.map((pill, idx) => {
+                          const activeStage = schoolInternalStage === idx + 1;
+                          return (
+                            <button
+                              key={idx}
+                              onClick={() => setSchoolInternalStage(idx + 1)}
+                              className={`p-3 rounded-2xl border text-left transition ${
+                                activeStage
+                                  ? 'bg-indigo-600 text-white border-indigo-500 shadow'
+                                  : darkMode
+                                  ? 'bg-slate-950 border-slate-800 text-slate-300'
+                                  : 'bg-slate-50 border-slate-200 text-slate-700'
+                              }`}
+                            >
+                              <div className="text-[10px] font-black opacity-80">
+                                STEP 0{idx + 1}
+                              </div>
+                              <div className="text-xs font-extrabold mt-0.5">{pill}</div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* 실전 지문 구문 학습 + 지문 변형(Paraphrasing) + 406개교 어법 함정 + 서술형 영작 */}
+                    <div className="space-y-6 pt-2">
+                      {currentExamCourse.steps.map((st) => (
+                        <div
+                          key={st.stepNum}
+                          className={`p-5 rounded-3xl border space-y-4 ${
+                            darkMode
+                              ? 'bg-slate-950 border-slate-800'
+                              : 'bg-slate-50 border-slate-200'
+                          }`}
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="px-3 py-1 rounded-full bg-indigo-600 text-white text-xs font-extrabold">
+                                {st.durationLabel}
+                              </span>
+                              <h4 className="text-base font-black">{st.stepTitle}</h4>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => speakText(st.originalPassageEn, accent, 0.85)}
+                                className="px-3 py-1 rounded-lg bg-slate-800 text-amber-300 text-xs font-bold"
+                              >
+                                🔊 원문 듣기
+                              </button>
+                              <button
+                                onClick={() => speakText(st.transformedEn, accent, 0.95)}
+                                className="px-3 py-1 rounded-lg bg-emerald-600 text-white text-xs font-bold"
+                              >
+                                🔊 변형문장 듣기
+                              </button>
+                            </div>
+                          </div>
+
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                            {st.goalDesc}
+                          </p>
+
+                          {/* ① 원문 핵심 문장 vs ② 내신·수능 변형(Paraphrasing) 비교 카드 */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div
+                              className={`p-4 rounded-2xl border space-y-1.5 ${
+                                darkMode
+                                  ? 'bg-slate-900 border-slate-800'
+                                  : 'bg-white border-slate-200'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-extrabold text-blue-600 dark:text-blue-400">
+                                  📘 [1~2단계: 전체 흐름 & 핵심 구문 원문]
+                                </span>
+                                <button
+                                  onClick={() => {
+                                    setCustomDissectSentence({
+                                      en: st.originalPassageEn,
+                                      ko: st.originalPassageKo,
+                                      title: st.stepTitle,
+                                    });
+                                    setActiveMode('daily');
+                                    speakText(st.originalPassageEn);
+                                  }}
+                                  className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-blue-500/15 text-blue-600 dark:text-blue-300"
+                                >
+                                  16매핑 해부↗
+                                </button>
+                              </div>
+                              <div className="text-sm font-black leading-relaxed">
+                                "{st.originalPassageEn}"
+                              </div>
+                              <div className="text-xs text-slate-500">{st.originalPassageKo}</div>
+                            </div>
+
+                            <div
+                              className={`p-4 rounded-2xl border space-y-1.5 ${
+                                darkMode
+                                  ? 'bg-emerald-950/20 border-emerald-800/60'
+                                  : 'bg-emerald-50/60 border-emerald-200'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-extrabold text-emerald-600 dark:text-emerald-400">
+                                  🔄 [3~4단계: 독해 심화 & 학교 시험 지문 변형 (Paraphrasing)]
+                                </span>
+                              </div>
+                              <div className="text-sm font-black text-emerald-700 dark:text-emerald-300 leading-relaxed">
+                                "{st.transformedEn}"
+                              </div>
+                              <div className="text-xs text-slate-600 dark:text-slate-300 font-semibold">
+                                💡 {st.transformedPoint}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* ③ 전국 406개교 6개년 기출 필수 어법 킬러 박스 */}
+                          <div className="p-4 rounded-2xl bg-slate-900 text-white border border-slate-800 space-y-2">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="text-xs font-extrabold text-rose-400">
+                                🚨 [어법 1등급 치트키] {st.killerGrammarTrap.freqBadge}
+                              </span>
+                            </div>
+                            <div className="text-sm font-extrabold text-yellow-300">
+                              Q. {st.killerGrammarTrap.questionEn}
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs pt-1">
+                              <div className="p-2.5 rounded-xl bg-rose-950/50 border border-rose-500/30 text-rose-200">
+                                ❌ <strong>오답 함정:</strong> {st.killerGrammarTrap.wrongChoice}
+                              </div>
+                              <div className="p-2.5 rounded-xl bg-emerald-950/50 border border-emerald-500/30 text-emerald-200 font-bold">
+                                ✅ <strong>1등급 정답:</strong> {st.killerGrammarTrap.correctChoice}
+                              </div>
+                            </div>
+                            <div className="text-xs text-slate-300 pt-1">
+                              📐 <strong>어법 개념 총정리:</strong>{' '}
+                              {st.killerGrammarTrap.ruleExplanation}
+                            </div>
+                          </div>
+
+                          {/* ④ 5단계: 서술형(요약·조건 영작) 실전 훈련 */}
+                          <div
+                            className={`p-4 rounded-2xl border space-y-3 ${
+                              darkMode
+                                ? 'bg-slate-900 border-indigo-500/40'
+                                : 'bg-indigo-50/40 border-indigo-200'
+                            }`}
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-indigo-600 text-white">
+                                ✍️ [5단계: 서술형 완성] {st.essayMission.typeBadge}
+                              </span>
+                              <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-300">
+                                외운 답이 아닌 어순 공식으로 스스로 답을 만들어 보세요!
+                              </span>
+                            </div>
+
+                            <div className="text-xs font-extrabold">
+                              📌 서술형 조건: {st.essayMission.koCondition}
+                            </div>
+                            <div className="text-xs font-mono text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-950 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800">
+                              보기 단어: {st.essayMission.givenWords}
+                            </div>
+
+                            <div className="flex flex-wrap gap-2">
+                              <input
+                                type="text"
+                                value={examEssayInput}
+                                onChange={(e) => setExamEssayInput(e.target.value)}
+                                placeholder="조건과 보기 단어를 활용해 서술형 답안을 직접 작성해 보세요..."
+                                className="flex-1 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs font-bold focus:outline-none focus:border-indigo-500"
+                              />
+                              <button
+                                onClick={() => setShowExamModelAnswer(!showExamModelAnswer)}
+                                className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-extrabold"
+                              >
+                                {showExamModelAnswer ? '정답 닫기' : '채점 기준 & 모범답안 확인'}
+                              </button>
+                            </div>
+
+                            {showExamModelAnswer && (
+                              <div className="p-3.5 rounded-xl bg-slate-900 text-white text-xs space-y-1.5">
+                                <div className="text-emerald-400 font-extrabold flex items-center justify-between">
+                                  <span>✅ 만점 서술형 모범답안: {st.essayMission.modelAnswerEn}</span>
+                                  <button
+                                    onClick={() => speakText(st.essayMission.modelAnswerEn)}
+                                    className="px-2 py-0.5 rounded bg-emerald-600 text-white text-[10px]"
+                                  >
+                                    🔊 발음 듣기
+                                  </button>
+                                </div>
+                                <div className="text-amber-300">
+                                  ⚖️ <strong>학교 선생님 서술형 채점 기준:</strong>{' '}
+                                  {st.essayMission.scoringCriteria}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                </div>
+              )}
+
+              {/* ==============================================================
                   [모드 A] 중등·고등·실무·오픽 전자책 단어장
               ============================================================== */}
               {activeMode === 'wordbook' && (
@@ -4481,7 +5093,7 @@ export default function App() {
                         PAGE-TURNING E-WORDBOOK (진도 자동 저장)
                       </span>
                       <h2 className="text-2xl font-extrabold mt-0.5">
-                        📘 단계별 영단어장 (중등 · 고등 · 비즈니스 · 오픽)
+                        📘 단계별 영단어장 (중등 · 고등·수능 · 비즈니스 · 오픽)
                       </h2>
                     </div>
 
@@ -4531,7 +5143,7 @@ export default function App() {
                         📖 [{wordbookLevel}] — Day {wordbookDay} 페이지
                       </div>
                       <div className="text-[11px] text-slate-500">
-                        레벨(초·중·고급)을 바꾸어도 나의 단어장 완료 기록은 그대로 이어집니다!
+                        레벨(초·중·고급)이나 모드를 바꾸어도 나의 단어장 완료 기록은 그대로 이어집니다!
                       </div>
                     </div>
 
@@ -4929,9 +5541,8 @@ export default function App() {
                       </table>
                     </div>
                   </section>
-                  {/* ==========================================================
-                      [4/4 파트] STEP 3 (실시간 문장 연동 16매핑 & 어절 해부 카드) + STEP 4~5 + AI코치
-                  ========================================================== */}
+
+                  {/* STEP 3 (실시간 문장 연동 16매핑 & 어절 해부 카드) */}
                   <section
                     className={`border rounded-3xl p-6 shadow-sm space-y-6 ${
                       darkMode
@@ -4939,7 +5550,6 @@ export default function App() {
                         : 'bg-white border-slate-200'
                     }`}
                   >
-                    {/* 상단 탭 (16개 전체 매핑 | 문장 성분(7) 뜻·어순 | 9품사 뜻·역할) */}
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="inline-flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-full border border-slate-200 dark:border-slate-700">
                         {[
@@ -4987,7 +5597,6 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* 16개 노드 인터랙티브 SVG 다이어그램 */}
                     <div
                       className={`border rounded-3xl p-5 space-y-4 ${
                         darkMode
@@ -5042,7 +5651,6 @@ export default function App() {
                             );
                           })}
 
-                          {/* 상단 7개 문장 성분 노드 */}
                           {SENTENCE_COMPONENTS.map((comp, idx) => {
                             const cx = 75 + idx * 128;
                             const cy = 74;
@@ -5091,7 +5699,6 @@ export default function App() {
                             );
                           })}
 
-                          {/* 하단 9품사 노드 */}
                           {PARTS_OF_SPEECH.map((pos, idx) => {
                             const cx = 55 + idx * 101;
                             const cy = 248;
@@ -5146,7 +5753,6 @@ export default function App() {
                         </svg>
                       </div>
 
-                      {/* 선택된 문장 성분(7) & 9품사 뜻/어순 실시간 해설 박스 */}
                       <div
                         className={`p-4 rounded-2xl border space-y-3 ${
                           darkMode
@@ -5231,50 +5837,10 @@ export default function App() {
                             </div>
                           )}
                         </div>
-
-                        {diagramTab === 'comp' && (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-2">
-                            {SENTENCE_COMPONENTS.map((c) => (
-                              <div
-                                key={c.id}
-                                className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs"
-                              >
-                                <span
-                                  className={`px-2 py-0.5 rounded font-extrabold text-[11px] border ${c.colorBadge}`}
-                                >
-                                  {c.name} ({c.sub})
-                                </span>
-                                <p className="mt-1.5 font-semibold">{c.meaning}</p>
-                                <p className="text-[11px] text-slate-500 mt-0.5">
-                                  🧭 어순: {c.wordOrderRule}
-                                </p>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {diagramTab === 'pos' && (
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-2">
-                            {PARTS_OF_SPEECH.map((p) => (
-                              <div
-                                key={p.id}
-                                className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs"
-                              >
-                                <div className="font-extrabold text-blue-600 dark:text-blue-400">
-                                  {p.name} ({p.sub})
-                                </div>
-                                <p className="mt-1 text-[11px]">{p.meaning}</p>
-                                <p className="mt-1 text-[10px] text-slate-500 font-bold">
-                                  ➔ 직책: {p.canBeComponents}
-                                </p>
-                              </div>
-                            ))}
-                          </div>
-                        )}
                       </div>
                     </div>
 
-                    {/* [완벽 연동] 실전 예문 이중 레이어 해부 카드 (선택한 주제·문장·실검에 따라 실시간 변환!) */}
+                    {/* 실전 예문 이중 레이어 해부 카드 */}
                     <div
                       className={`border rounded-3xl p-5 space-y-4 ${
                         darkMode
@@ -5292,23 +5858,20 @@ export default function App() {
                               실전 예문 이중 레이어 해부 (선택한 문장의 단어들이 즉시 카드로 쪼개집니다!)
                             </h4>
                           </div>
-                          <p className="text-xs text-slate-500 mt-0.5">
-                            오른쪽 버튼으로 현재 테마의 문장(초·중·고급 및 실시간 검색어 문장)을 골라보거나 아래 STEP 4에서 문장을 선택하면 카드들이 즉시 바뀝니다!
-                          </p>
                         </div>
 
-                        {/* 현재 테마의 실제 문장들(실검 문장 포함)을 직접 골라서 해부하는 버튼 */}
                         <div className="flex flex-wrap gap-1.5">
                           {currentTheme.sentences.map((s, idx) => (
                             <button
                               key={s.id}
                               onClick={() => {
+                                setCustomDissectSentence(null);
                                 setActiveDiagramSentenceIdx(idx);
                                 setSelectedTokenIdx(0);
                                 speakText(s.rawEn);
                               }}
                               className={`px-3 py-1.5 rounded-full text-xs font-extrabold transition ${
-                                activeDiagramSentenceIdx === idx
+                                !customDissectSentence && activeDiagramSentenceIdx === idx
                                   ? 'bg-blue-600 text-white shadow'
                                   : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
                               }`}
@@ -5321,7 +5884,6 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* 실시간으로 쪼개진 어절 카드 그리드 */}
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
                         {currentDiagramEx.tokens.map((tk, idx) => {
                           const isCardSel = selectedTokenIdx === idx;
@@ -5362,16 +5924,11 @@ export default function App() {
                           <strong>해석:</strong> {currentDiagramEx.translation} (
                           <strong>핵심 뼈대:</strong> {currentDiagramEx.skeleton})
                         </div>
-                        <div className="text-blue-600 dark:text-blue-400 font-bold">
-                          🧭 <strong>어순 포인트:</strong> {currentDiagramEx.wordOrderTip}
-                        </div>
                       </div>
                     </div>
                   </section>
 
-                  {/* ==========================================================
-                      STEP 4. 전 레벨(초급 뜻도움·중급 바꿔말하기·고급 긴대화) 3단 직독직해 & 펜슬장
-                  ========================================================== */}
+                  {/* STEP 4. 전 레벨 3단 직독직해 & 펜슬장 */}
                   <section
                     className={`border rounded-3xl p-6 shadow-sm space-y-6 ${
                       darkMode
@@ -5379,22 +5936,15 @@ export default function App() {
                         : 'bg-white border-slate-200'
                     }`}
                   >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <h3 className="text-lg font-extrabold">
-                          🗣️ STEP 4. 전 레벨(초급·중급·고급) 3단 직독직해 & 바꿔 말하기 트레이닝
-                        </h3>
-                        <p className="text-xs text-slate-500">
-                          각 문장의 <strong>[🔍 이 문장 16매핑 카드로 해부하기]</strong> 버튼을 누르면 위쪽 STEP 3 해부 카드가 즉시 이 문장으로 바뀝니다!
-                        </p>
-                      </div>
-                    </div>
+                    <h3 className="text-lg font-extrabold">
+                      🗣️ STEP 4. 전 레벨(초급·중급·고급) 3단 직독직해 & 바꿔 말하기 트레이닝
+                    </h3>
 
                     <div className="space-y-5">
                       {currentTheme.sentences.map((sent, sIdx) => {
                         const sentPronKey = `sent-${currentTheme.id}-${sent.id}`;
-                        const isLevelMatched = sent.levelTag === learningLevel || sent.id === 0;
-                        const isCurrentlyDissected = activeDiagramSentenceIdx === sIdx;
+                        const isCurrentlyDissected =
+                          !customDissectSentence && activeDiagramSentenceIdx === sIdx;
 
                         return (
                           <div
@@ -5402,35 +5952,24 @@ export default function App() {
                             className={`p-5 rounded-2xl border space-y-3 transition ${
                               sent.id === 0
                                 ? 'bg-rose-500/10 border-rose-500 ring-2 ring-rose-500/30'
-                                : isLevelMatched
-                                ? darkMode
-                                  ? 'bg-blue-950/30 border-blue-500 ring-1 ring-blue-500/30'
-                                  : 'bg-blue-50/50 border-blue-400 ring-1 ring-blue-400/30'
                                 : darkMode
                                 ? 'bg-slate-950 border-slate-800'
                                 : 'bg-slate-50 border-slate-200'
                             }`}
                           >
                             <div className="flex flex-wrap items-center justify-between gap-2">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span
-                                  className={`text-xs font-extrabold px-3 py-1 rounded-full text-white ${
-                                    sent.id === 0 ? 'bg-rose-600' : themeAccentBg
-                                  }`}
-                                >
-                                  {sent.tag}
-                                </span>
-                                <span className="text-xs font-extrabold">
-                                  Target:{' '}
-                                  <strong className="underline decoration-2 decoration-blue-500 text-blue-600 dark:text-yellow-300">
-                                    {sent.targetWord}
-                                  </strong>
-                                </span>
-                              </div>
+                              <span
+                                className={`text-xs font-extrabold px-3 py-1 rounded-full text-white ${
+                                  sent.id === 0 ? 'bg-rose-600' : themeAccentBg
+                                }`}
+                              >
+                                {sent.tag}
+                              </span>
 
                               <div className="flex flex-wrap items-center gap-1.5">
                                 <button
                                   onClick={() => {
+                                    setCustomDissectSentence(null);
                                     setActiveDiagramSentenceIdx(sIdx);
                                     setSelectedTokenIdx(0);
                                     speakText(sent.rawEn);
@@ -5446,35 +5985,12 @@ export default function App() {
                                     : '🔍 이 문장 16매핑 카드로 해부하기'}
                                 </button>
                                 <button
-                                  onClick={() => speakText(sent.rawEn, accent, 0.75)}
-                                  className="px-2.5 py-1 rounded-lg bg-slate-800 text-amber-300 text-xs font-bold"
-                                >
-                                  🐢 0.75x 느림
-                                </button>
-                                <button
                                   onClick={() => speakText(sent.rawEn)}
                                   className={`px-3 py-1 rounded-lg text-white text-xs font-extrabold ${themeAccentBg}`}
                                 >
                                   🔊 {speechRate}x 듣기
                                 </button>
-                                <a
-                                  href={getGoogleTranslateUrl(sent.rawEn)}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="px-2.5 py-1 rounded-lg border border-slate-300 dark:border-slate-700 text-xs font-bold"
-                                >
-                                  🔗 번역기
-                                </a>
                               </div>
-                            </div>
-
-                            <div className="flex flex-wrap gap-2 text-xs">
-                              <span className="px-2.5 py-1 rounded-lg bg-blue-500/15 text-blue-600 dark:text-blue-300 font-bold">
-                                🧭 어순 공식: {sent.wordOrderFormula}
-                              </span>
-                              <span className="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 font-bold">
-                                🧱 소리블럭: {sent.soundBlockEn}
-                              </span>
                             </div>
 
                             <div
@@ -5484,14 +6000,9 @@ export default function App() {
                                   : 'bg-white border-slate-200'
                               }`}
                             >
-                              <div className="font-semibold">
-                                ① [의미단위 뜻 도움] {sent.koLine}
-                              </div>
+                              <div className="font-semibold">① [의미단위 뜻 도움] {sent.koLine}</div>
                               <div className="font-bold text-base">
                                 ② [영어 어순 매칭] {renderHighlightedSentence(sent.enLine)}
-                              </div>
-                              <div className="font-mono text-xs text-slate-500">
-                                🔤 [발음기호 IPA] {sent.ipaLine}
                               </div>
                               <div
                                 onClick={() => toggleKoreanPron(sentPronKey)}
@@ -5500,95 +6011,38 @@ export default function App() {
                                 ③ [원어민 리얼 발음]{' '}
                                 {isPronVisible(sentPronKey)
                                   ? sent.pronLine
-                                  : '🔒 [여기를 터치하면 한글 발음이 표시됩니다]'}
+                                  : '🔒 [터치하여 한글 발음 보기]'}
                               </div>
-
                               <div
                                 onClick={() => speakText(sent.paraphraseVersion)}
-                                className="pt-2 border-t border-slate-200 dark:border-slate-800 text-xs text-emerald-600 dark:text-emerald-400 font-extrabold cursor-pointer flex items-center justify-between"
+                                className="pt-2 border-t border-slate-200 dark:border-slate-800 text-xs text-emerald-600 dark:text-emerald-400 font-extrabold cursor-pointer"
                               >
-                                <span>
-                                  🔄 [바꿔 말하기 (Paraphrasing)]: "{sent.paraphraseVersion}"
-                                </span>
-                                <span className="px-2 py-0.5 rounded bg-emerald-600 text-white text-[10px]">
-                                  🔊 바꿔말하기 듣기
-                                </span>
+                                🔄 [바꿔 말하기]: "{sent.paraphraseVersion}" 🔊
                               </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
-                              <div
-                                className={`p-2.5 rounded-xl border ${
-                                  darkMode
-                                    ? 'bg-slate-900 border-slate-800'
-                                    : 'bg-white border-slate-200'
-                                }`}
-                              >
-                                🎙️ <strong>소리방식 비법:</strong> {sent.soundMethodGuide}
-                              </div>
-                              <div
-                                className={`p-2.5 rounded-xl border ${
-                                  darkMode
-                                    ? 'bg-slate-900 border-slate-800'
-                                    : 'bg-white border-slate-200'
-                                }`}
-                              >
-                                📐 <strong>핵심 문법:</strong> {sent.grammarPoint}
-                              </div>
-                              <div
-                                className={`p-2.5 rounded-xl border ${
-                                  darkMode
-                                    ? 'bg-slate-900 border-slate-800'
-                                    : 'bg-white border-slate-200'
-                                }`}
-                              >
-                                💬 <strong>자연스러운 뜻 & 뉘앙스:</strong> "{sent.naturalKo}" (
-                                {sent.contextNuance})
-                              </div>
-                            </div>
-
-                            <div className="pt-1 space-y-1.5">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-extrabold text-slate-500 w-32">
-                                  ✍️ 1) 따라 쓰기:
-                                </span>
-                                <input
-                                  type="text"
-                                  value={writingInputs[`copy-${sent.id}`] || ''}
-                                  onChange={(e) =>
-                                    setWritingInputs({
-                                      ...writingInputs,
-                                      [`copy-${sent.id}`]: e.target.value,
-                                    })
-                                  }
-                                  placeholder={sent.rawEn}
-                                  className="flex-1 text-xs bg-transparent border-b border-dashed border-slate-300 dark:border-slate-700 py-1 focus:outline-none focus:border-blue-500"
-                                />
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-extrabold text-slate-500 w-32">
-                                  ✍️ 2) 바꿔 써보기:
-                                </span>
-                                <input
-                                  type="text"
-                                  value={writingInputs[`custom-${sent.id}`] || ''}
-                                  onChange={(e) =>
-                                    setWritingInputs({
-                                      ...writingInputs,
-                                      [`custom-${sent.id}`]: e.target.value,
-                                    })
-                                  }
-                                  placeholder={sent.paraphraseVersion}
-                                  className="flex-1 text-xs bg-transparent border-b border-dashed border-slate-300 dark:border-slate-700 py-1 focus:outline-none focus:border-blue-500"
-                                />
-                              </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-extrabold text-slate-500 w-28">
+                                ✍️ 직접 써보기:
+                              </span>
+                              <input
+                                type="text"
+                                value={writingInputs[`copy-${sent.id}`] || ''}
+                                onChange={(e) =>
+                                  setWritingInputs({
+                                    ...writingInputs,
+                                    [`copy-${sent.id}`]: e.target.value,
+                                  })
+                                }
+                                placeholder={sent.rawEn}
+                                className="flex-1 text-xs bg-transparent border-b border-dashed border-slate-300 dark:border-slate-700 py-1 focus:outline-none"
+                              />
                             </div>
                           </div>
                         );
                       })}
                     </div>
 
-                    {/* 아이패드 애플 펜슬 프리핸드 드로잉 노트 */}
                     <div
                       className={`p-4 rounded-2xl border space-y-2 ${
                         darkMode
@@ -5598,7 +6052,7 @@ export default function App() {
                     >
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-extrabold text-blue-600 dark:text-blue-400">
-                          ✏️ 아이패드 M5 애플 펜슬 손글씨 연습장 (직접 펜슬로 문장과 어순을 적어보세요)
+                          ✏️ 아이패드 M5 애플 펜슬 손글씨 & 서술형 답안 연습장
                         </span>
                         <button
                           onClick={clearCanvas}
@@ -5622,31 +6076,18 @@ export default function App() {
                     </div>
                   </section>
 
-                  {/* ==========================================================
-                      STEP 5. 네이버 4단계 퀴즈 (단어 | Q초급 | Q중급 | Q고급) & 영작 미션
-                  ========================================================== */}
+                  {/* STEP 5. 네이버 4단계 퀴즈 */}
                   <section className="bg-slate-900 text-white rounded-3xl p-6 shadow-lg space-y-6 border border-slate-800">
                     <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
-                      <div className="flex items-center gap-3">
-                        <span className="w-7 h-7 rounded bg-emerald-500 text-slate-950 font-black flex items-center justify-center text-sm">
-                          N
-                        </span>
-                        <div>
-                          <h3 className="text-lg font-extrabold">
-                            🎮 STEP 5. 네이버 오늘의 단어 퀴즈 (단어 · 초급 · 중급 · 고급) & 영작 미션
-                          </h3>
-                          <p className="text-xs text-slate-400">
-                            왼쪽에서 실시간 검색어를 클릭하면 <strong>Q중급 문제</strong>가 해당 실시간 검색어 문제로 즉시 변환됩니다!
-                          </p>
-                        </div>
-                      </div>
-
+                      <h3 className="text-lg font-extrabold">
+                        🎮 STEP 5. 네이버 오늘의 단어 퀴즈 (단어 · 초급 · 중급 · 고급) & 영작 미션
+                      </h3>
                       <div className="flex flex-wrap items-center gap-1.5 bg-slate-800 p-1.5 rounded-2xl">
                         {[
-                          { id: 'word', label: '단어 (철자 추론)' },
-                          { id: 'beginner', label: 'Q 초급 (뜻 맞추기)' },
-                          { id: 'intermediate', label: 'Q 중급 (실검·문장 빈칸)' },
-                          { id: 'advanced', label: 'Q 고급 (유의어 복수선택)' },
+                          { id: 'word', label: '단어' },
+                          { id: 'beginner', label: 'Q 초급' },
+                          { id: 'intermediate', label: 'Q 중급 (실검연동)' },
+                          { id: 'advanced', label: 'Q 고급' },
                         ].map((tab) => (
                           <button
                             key={tab.id}
@@ -5676,35 +6117,23 @@ export default function App() {
                                 <span className="text-xl font-black tracking-widest">
                                   {isRev ? item.word : item.masked}
                                 </span>
-                                <div className="flex gap-1.5">
-                                  <button
-                                    onClick={() => speakText(item.word)}
-                                    className="w-8 h-8 rounded-full bg-blue-600 text-xs"
-                                  >
-                                    🔊
-                                  </button>
-                                  <button
-                                    onClick={() =>
-                                      setRevealedChallengeIdx((prev) =>
-                                        prev.includes(idx)
-                                          ? prev.filter((i) => i !== idx)
-                                          : [...prev, idx]
-                                      )
-                                    }
-                                    className="w-8 h-8 rounded-full bg-slate-700 text-xs"
-                                  >
-                                    👁️
-                                  </button>
-                                </div>
+                                <button
+                                  onClick={() =>
+                                    setRevealedChallengeIdx((prev) =>
+                                      prev.includes(idx)
+                                        ? prev.filter((i) => i !== idx)
+                                        : [...prev, idx]
+                                    )
+                                  }
+                                  className="px-2.5 py-1 rounded bg-slate-700 text-xs"
+                                >
+                                  👁️ 정답
+                                </button>
                               </div>
                               <div className="text-xs text-blue-300">{item.enDef}</div>
-                              <div className="text-xs text-slate-300 bg-slate-900 p-2.5 rounded-xl">
-                                "{isRev ? item.exampleFull : item.example}"
-                              </div>
                               {isRev && (
                                 <div className="text-xs text-emerald-400 font-bold">
-                                  ✅ 정답: {item.word} ({item.ipa}) — {item.koMeaning} | 소리블럭:{' '}
-                                  {item.soundBlock}
+                                  ✅ {item.word} — {item.koMeaning}
                                 </div>
                               )}
                             </div>
@@ -5714,205 +6143,105 @@ export default function App() {
                     )}
 
                     {quizLevelTab === 'beginner' && (
-                      <div className="max-w-xl mx-auto text-center space-y-4 py-2">
-                        <div className="text-xs text-slate-400">아래 단어의 알맞은 뜻은?</div>
-                        <div className="flex items-center justify-center gap-3">
-                          <span className="text-3xl font-black">
-                            {currentTheme.quiz.beginner.word}
-                          </span>
-                          <span className="font-mono text-sm text-blue-400">
-                            {currentTheme.quiz.beginner.ipa}
-                          </span>
+                      <div className="max-w-xl mx-auto text-center space-y-3">
+                        <div className="text-2xl font-black">{currentTheme.quiz.beginner.word}</div>
+                        {currentTheme.quiz.beginner.options.map((opt, idx) => (
                           <button
-                            onClick={() =>
-                              speakText(currentTheme.quiz.beginner.word.split(' ')[0])
-                            }
-                            className="w-9 h-9 rounded-full bg-blue-600"
+                            key={idx}
+                            onClick={() => setSelectedBeginnerOpt(idx)}
+                            className={`w-full p-3 rounded-2xl font-bold text-sm border ${
+                              selectedBeginnerOpt === idx
+                                ? idx === currentTheme.quiz.beginner.answerIdx
+                                  ? 'bg-emerald-600 border-emerald-400'
+                                  : 'bg-rose-600 border-rose-400'
+                                : 'bg-slate-800 border-slate-700'
+                            }`}
                           >
-                            🔊
+                            {opt}
                           </button>
-                        </div>
-                        <div className="space-y-2">
-                          {currentTheme.quiz.beginner.options.map((opt, idx) => {
-                            const isPicked = selectedBeginnerOpt === idx;
-                            const isCorrect = idx === currentTheme.quiz.beginner.answerIdx;
-                            return (
-                              <button
-                                key={idx}
-                                onClick={() => setSelectedBeginnerOpt(idx)}
-                                className={`w-full p-3.5 rounded-2xl font-bold text-sm border transition ${
-                                  isPicked
-                                    ? isCorrect
-                                      ? 'bg-emerald-600 border-emerald-400'
-                                      : 'bg-rose-600 border-rose-400'
-                                    : 'bg-slate-800 hover:bg-slate-700 border-slate-700'
-                                }`}
-                              >
-                                {opt}
-                              </button>
-                            );
-                          })}
-                        </div>
+                        ))}
                       </div>
                     )}
 
                     {quizLevelTab === 'intermediate' && (
-                      <div className="max-w-xl mx-auto text-center space-y-4 py-2">
-                        <div className="text-xs text-slate-400">아래 빈칸에 들어갈 알맞은 표현은?</div>
-                        <div className="text-lg font-extrabold flex flex-wrap items-center justify-center gap-2">
-                          <span>{currentTheme.quiz.intermediate.sentenceBefore}</span>
-                          <span className="px-4 py-1 rounded-lg bg-slate-800 border-2 border-dashed border-blue-400 text-blue-300">
+                      <div className="max-w-xl mx-auto text-center space-y-3">
+                        <div className="text-base font-extrabold">
+                          {currentTheme.quiz.intermediate.sentenceBefore}{' '}
+                          <span className="text-yellow-300 underline">
                             {selectedInterOpt !== null
                               ? currentTheme.quiz.intermediate.options[selectedInterOpt]
                               : '______'}
-                          </span>
-                          <span>{currentTheme.quiz.intermediate.sentenceAfter}</span>
+                          </span>{' '}
+                          {currentTheme.quiz.intermediate.sentenceAfter}
                         </div>
                         <button
                           onClick={() => setShowInterHint(!showInterHint)}
-                          className="w-full py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs font-bold text-slate-300"
+                          className="text-xs text-blue-300 underline"
                         >
-                          👁️ Hint{' '}
-                          {showInterHint
-                            ? `— ${currentTheme.quiz.intermediate.hint}`
-                            : '(터치하여 힌트 보기)'}
+                          {showInterHint ? currentTheme.quiz.intermediate.hint : '힌트 보기'}
                         </button>
-                        <div className="space-y-2">
-                          {currentTheme.quiz.intermediate.options.map((opt, idx) => {
-                            const isPicked = selectedInterOpt === idx;
-                            const isCorrect = idx === currentTheme.quiz.intermediate.answerIdx;
-                            return (
-                              <button
-                                key={idx}
-                                onClick={() => {
-                                  setSelectedInterOpt(idx);
-                                  speakText(opt);
-                                }}
-                                className={`w-full p-3.5 rounded-2xl font-bold text-sm border transition ${
-                                  isPicked
-                                    ? isCorrect
-                                      ? 'bg-emerald-600 border-emerald-400'
-                                      : 'bg-rose-600 border-rose-400'
-                                    : 'bg-slate-800 hover:bg-slate-700 border-slate-700'
-                                }`}
-                              >
-                                {opt}
-                              </button>
-                            );
-                          })}
-                        </div>
+                        {currentTheme.quiz.intermediate.options.map((opt, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => setSelectedInterOpt(idx)}
+                            className={`w-full p-3 rounded-2xl font-bold text-sm border ${
+                              selectedInterOpt === idx
+                                ? idx === currentTheme.quiz.intermediate.answerIdx
+                                  ? 'bg-emerald-600 border-emerald-400'
+                                  : 'bg-rose-600 border-rose-400'
+                                : 'bg-slate-800 border-slate-700'
+                            }`}
+                          >
+                            {opt}
+                          </button>
+                        ))}
                       </div>
                     )}
 
                     {quizLevelTab === 'advanced' && (
-                      <div className="max-w-xl mx-auto text-center space-y-4 py-2">
-                        <div className="text-xs text-slate-400">
-                          아래 문장에서 같은 의미로 쓰일 수 있는 유의어를 <strong>모두 선택</strong>하세요.
-                        </div>
-                        <div className="text-lg font-extrabold flex flex-wrap items-center justify-center gap-2">
-                          <span>{currentTheme.quiz.advanced.sentenceBefore}</span>
+                      <div className="max-w-xl mx-auto text-center space-y-3">
+                        <div className="text-base font-extrabold">
+                          {currentTheme.quiz.advanced.sentenceBefore}{' '}
                           <span className="text-blue-400 underline">
                             {currentTheme.quiz.advanced.highlightWord}
-                          </span>
-                          <span>{currentTheme.quiz.advanced.sentenceAfter}</span>
+                          </span>{' '}
+                          {currentTheme.quiz.advanced.sentenceAfter}
                         </div>
-                        <div className="space-y-2">
-                          {currentTheme.quiz.advanced.options.map((opt, idx) => {
-                            const isSel = selectedAdvOpts.includes(idx);
-                            const isAns =
-                              currentTheme.quiz.advanced.answerIndices.includes(idx);
-                            return (
-                              <button
-                                key={idx}
-                                onClick={() => {
-                                  speakText(opt);
-                                  setSelectedAdvOpts((prev) =>
-                                    prev.includes(idx)
-                                      ? prev.filter((i) => i !== idx)
-                                      : [...prev, idx]
-                                  );
-                                }}
-                                className={`w-full p-3.5 rounded-2xl font-bold text-sm border transition ${
-                                  isSel
-                                    ? isAns
-                                      ? 'bg-emerald-600 border-emerald-400'
-                                      : 'bg-rose-600 border-rose-400'
-                                    : 'bg-slate-800 hover:bg-slate-700 border-slate-700'
-                                }`}
-                              >
-                                {opt}
-                              </button>
-                            );
-                          })}
-                        </div>
+                        {currentTheme.quiz.advanced.options.map((opt, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() =>
+                              setSelectedAdvOpts((prev) =>
+                                prev.includes(idx)
+                                  ? prev.filter((i) => i !== idx)
+                                  : [...prev, idx]
+                              )
+                            }
+                            className={`w-full p-3 rounded-2xl font-bold text-sm border ${
+                              selectedAdvOpts.includes(idx)
+                                ? currentTheme.quiz.advanced.answerIndices.includes(idx)
+                                  ? 'bg-emerald-600 border-emerald-400'
+                                  : 'bg-rose-600 border-rose-400'
+                                : 'bg-slate-800 border-slate-700'
+                            }`}
+                          >
+                            {opt}
+                          </button>
+                        ))}
                       </div>
                     )}
 
-                    {/* 실전 영작 미션 & <details> 정답 숨김 */}
-                    <div className="pt-4 border-t border-slate-800 space-y-3">
-                      <div className="text-sm font-extrabold text-yellow-400">
-                        ✍️ [나만의 영작 미션] {currentTheme.quiz.writingMission.koPrompt}
-                      </div>
-                      <div className="text-xs text-blue-300">
-                        🧭 어순 힌트: {currentTheme.quiz.writingMission.wordOrderHint}
+                    <div className="pt-4 border-t border-slate-800 space-y-2">
+                      <div className="text-xs font-extrabold text-yellow-400">
+                        ✍️ [영작 미션] {currentTheme.quiz.writingMission.koPrompt}
                       </div>
                       <input
                         type="text"
                         value={userWritingMission}
                         onChange={(e) => setUserWritingMission(e.target.value)}
-                        placeholder="여기에 영어 문장을 직접 작성해 보세요..."
-                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500"
+                        placeholder={currentTheme.quiz.writingMission.hint}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-xs text-white"
                       />
-
-                      <details className="bg-slate-800/90 border border-slate-700 rounded-2xl p-4 cursor-pointer">
-                        <summary className="text-xs font-extrabold text-blue-300">
-                          👀 정답 및 코치의 어순·뉘앙스 해설 확인하기 (터치)
-                        </summary>
-                        <div className="mt-3 space-y-1.5 text-xs text-slate-200 leading-relaxed">
-                          <div>
-                            ✅ <strong>Q초급 정답:</strong>{' '}
-                            {
-                              currentTheme.quiz.beginner.options[
-                                currentTheme.quiz.beginner.answerIdx
-                              ]
-                            }{' '}
-                            — {currentTheme.quiz.beginner.explanation}
-                          </div>
-                          <div>
-                            ✅ <strong>Q중급 정답:</strong>{' '}
-                            {
-                              currentTheme.quiz.intermediate.options[
-                                currentTheme.quiz.intermediate.answerIdx
-                              ]
-                            }{' '}
-                            — {currentTheme.quiz.intermediate.explanation}
-                          </div>
-                          <div>
-                            ✅ <strong>Q고급 복수 정답:</strong>{' '}
-                            {currentTheme.quiz.advanced.answerIndices
-                              .map((i) => currentTheme.quiz.advanced.options[i])
-                              .join(', ')}{' '}
-                            — {currentTheme.quiz.advanced.explanation}
-                          </div>
-                          <div className="pt-2 border-t border-slate-700 text-emerald-300 font-bold flex items-center gap-2">
-                            <span>
-                              ✅ 모범 영작: {currentTheme.quiz.writingMission.modelAnswer}
-                            </span>
-                            <button
-                              onClick={() =>
-                                speakText(currentTheme.quiz.writingMission.modelAnswer)
-                              }
-                              className="px-2 py-0.5 rounded bg-emerald-700 text-white"
-                            >
-                              🔊 듣기
-                            </button>
-                          </div>
-                          <div>
-                            💡 <strong>어순·문법 체크포인트:</strong>{' '}
-                            {currentTheme.quiz.writingMission.checkPoint}
-                          </div>
-                        </div>
-                      </details>
                     </div>
                   </section>
                 </>
@@ -5929,79 +6258,47 @@ export default function App() {
                       : 'bg-white border-slate-200'
                   }`}
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-4">
-                    <div>
-                      <span className="text-xs font-extrabold text-emerald-600">
-                        SMART REVIEW & NAVER WORD CHALLENGE
-                      </span>
-                      <h2 className="text-2xl font-extrabold mt-0.5">
-                        ⭐ 전 레벨 통합 복습 단어장 & 네이버 Word of the Day
-                      </h2>
-                    </div>
-                    <button
-                      onClick={() =>
-                        setRevealedChallengeIdx(
-                          revealedChallengeIdx.length === NAVER_OFFICIAL_WORD_CHALLENGE.length
-                            ? []
-                            : NAVER_OFFICIAL_WORD_CHALLENGE.map((_, i) => i)
-                        )
-                      }
-                      className={`px-4 py-2 rounded-xl text-white text-xs font-extrabold ${themeAccentBg}`}
-                    >
-                      전체 정답 토글
-                    </button>
-                  </div>
-
-                  <div className="space-y-3">
-                    <h3 className="text-base font-extrabold">
-                      ⭐ 내가 저장한 핵심 복습 단어 ({bookmarkedWords.length}개 · 레벨 변경 시에도 영구 보존)
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {bookmarkedWords.map((bw, idx) => (
-                        <div
-                          key={idx}
-                          className={`p-4 rounded-2xl border flex items-center justify-between ${
-                            darkMode
-                              ? 'bg-slate-950 border-slate-800'
-                              : 'bg-slate-50 border-slate-200'
-                          }`}
-                        >
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <strong className="text-base font-black">{bw.word}</strong>
-                              <span className="font-mono text-xs text-blue-500">{bw.ipa}</span>
-                              {bw.levelBadge && (
-                                <span className="text-[10px] px-2 py-0.5 rounded bg-blue-500/20 text-blue-500 font-bold">
-                                  {bw.levelBadge}
-                                </span>
-                              )}
-                              <button
-                                onClick={() => speakText(bw.word)}
-                                className="text-xs px-2 py-0.5 rounded bg-blue-600 text-white"
-                              >
-                                🔊
-                              </button>
-                            </div>
-                            <div className="text-xs font-bold mt-1">{bw.meaning}</div>
-                            <div className="text-[11px] text-slate-500">
-                              짝꿍: {bw.collocation} ({bw.posLabel} · {bw.compLabel})
-                            </div>
+                  <h2 className="text-2xl font-extrabold">
+                    ⭐ 전 레벨 & 수능·내신 통합 복습 단어장 ({bookmarkedWords.length}개)
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {bookmarkedWords.map((bw, idx) => (
+                      <div
+                        key={idx}
+                        className={`p-4 rounded-2xl border flex items-center justify-between ${
+                          darkMode
+                            ? 'bg-slate-950 border-slate-800'
+                            : 'bg-slate-50 border-slate-200'
+                        }`}
+                      >
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <strong className="text-base font-black">{bw.word}</strong>
+                            <span className="font-mono text-xs text-blue-500">{bw.ipa}</span>
+                            <button
+                              onClick={() => speakText(bw.word)}
+                              className="text-xs px-2 py-0.5 rounded bg-blue-600 text-white"
+                            >
+                              🔊
+                            </button>
                           </div>
-                          <button
-                            onClick={() => toggleBookmark(bw)}
-                            className="text-xs text-rose-500 font-bold"
-                          >
-                            삭제
-                          </button>
+                          <div className="text-xs font-bold mt-1">{bw.meaning}</div>
+                          <div className="text-[11px] text-slate-500">짝꿍: {bw.collocation}</div>
                         </div>
-                      ))}
-                    </div>
+                        <button
+                          onClick={() => toggleBookmark(bw)}
+                          className="text-xs text-rose-500 font-bold"
+                        >
+                          삭제
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 </section>
               )}
 
               {/* ==============================================================
-                  [모드 D] 5~30분 시간 연장형 AI 음성 회화 · 실시간 첨삭 · 영어 성장 리포트
+                  [모드 D] AI 음성 회화 · 서술형 첨삭 · 영어 성장 리포트
               ============================================================== */}
               {activeMode === 'aiCoach' && (
                 <div className="space-y-6">
@@ -6012,145 +6309,76 @@ export default function App() {
                         : 'bg-white border-slate-200'
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-xl font-extrabold">
-                        📈 전 레벨 통합 영어 성장 인포그래픽 리포트 (초급 ➔ 중급 ➔ 고급)
-                      </h2>
-                      <span className="text-xs font-extrabold text-emerald-500">
-                        현재 학습 모드: {learningLevel.toUpperCase()}
-                      </span>
-                    </div>
+                    <h2 className="text-xl font-extrabold">
+                      📈 전 레벨 & 수능·내신 통합 성장 리포트
+                    </h2>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
                       <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/30">
                         <div className="text-2xl font-black text-blue-500">
                           {studyStats.masteredWords}개
                         </div>
-                        <div className="text-xs font-bold text-slate-500 mt-1">
-                          누적 마스터 어휘
-                        </div>
+                        <div className="text-xs font-bold text-slate-500 mt-1">마스터 어휘</div>
                       </div>
                       <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30">
                         <div className="text-2xl font-black text-emerald-500">
                           {studyStats.completedSentences}문장
                         </div>
-                        <div className="text-xs font-bold text-slate-500 mt-1">
-                          직독직해 & 바꿔말하기
-                        </div>
+                        <div className="text-xs font-bold text-slate-500 mt-1">구문·서술형 완주</div>
                       </div>
                       <div className="p-4 rounded-2xl bg-purple-500/10 border border-purple-500/30">
                         <div className="text-2xl font-black text-purple-500">
                           {studyStats.quizAccuracy}%
                         </div>
-                        <div className="text-xs font-bold text-slate-500 mt-1">
-                          네이버 퀴즈 정답률
-                        </div>
+                        <div className="text-xs font-bold text-slate-500 mt-1">어법·퀴즈 정답률</div>
                       </div>
                       <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30">
                         <div className="text-2xl font-black text-amber-500">
                           {studyStats.speakingMinutes + Math.floor(speakingSeconds / 60)}분
                         </div>
-                        <div className="text-xs font-bold text-slate-500 mt-1">
-                          누적 스피킹 훈련 시간
-                        </div>
+                        <div className="text-xs font-bold text-slate-500 mt-1">누적 훈련 시간</div>
                       </div>
                     </div>
                   </section>
 
-                  <section className="bg-slate-900 text-white rounded-3xl p-6 shadow-lg space-y-5 border border-slate-800">
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
-                      <div>
-                        <span className="text-xs font-extrabold text-emerald-400">
-                          INTERACTIVE AI VOICE COACH ({learningLevel.toUpperCase()} LEVEL)
-                        </span>
-                        <h3 className="text-lg font-extrabold mt-0.5">
-                          🎙️ 실전 AI 음성 회화 & 긴 대화 토론 (5분~10분 기본 · 시간 연장 가능)
-                        </h3>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-1.5">
+                  <section className="bg-slate-900 text-white rounded-3xl p-6 shadow-lg space-y-4 border border-slate-800">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h3 className="text-lg font-extrabold">
+                        🎙️ AI 원어민 음성 코치 & 구문·서술형 질의응답 ({targetSpeakingMins}분 코스)
+                      </h3>
+                      <div className="flex gap-1.5">
                         {[5, 10, 15, 30].map((m) => (
                           <button
                             key={m}
                             onClick={() => setTargetSpeakingMins(m)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-extrabold ${
-                              targetSpeakingMins === m
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-slate-800 text-slate-300'
+                            className={`px-3 py-1 rounded-xl text-xs font-extrabold ${
+                              targetSpeakingMins === m ? 'bg-blue-600' : 'bg-slate-800'
                             }`}
                           >
-                            {m}분 코스
+                            {m}분
                           </button>
                         ))}
                         <button
-                          onClick={() => setTargetSpeakingMins((prev) => prev + 5)}
-                          className="px-3 py-1.5 rounded-xl bg-amber-500 text-slate-950 text-xs font-extrabold"
-                        >
-                          +5분 시간 연장
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="bg-slate-800 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-4">
-                      <div>
-                        <div className="text-xs text-slate-400">
-                          현재 세션 타이머 (목표: {targetSpeakingMins}분)
-                        </div>
-                        <div className="text-2xl font-black text-emerald-400 font-mono mt-0.5">
-                          {String(Math.floor(speakingSeconds / 60)).padStart(2, '0')}:
-                          {String(speakingSeconds % 60).padStart(2, '0')} /{' '}
-                          {String(targetSpeakingMins).padStart(2, '0')}:00
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
                           onClick={() => setIsVoiceActive(!isVoiceActive)}
-                          className={`px-5 py-2.5 rounded-xl text-xs font-extrabold ${
-                            isVoiceActive ? 'bg-rose-600 text-white' : 'bg-emerald-600 text-white'
-                          }`}
+                          className="px-3 py-1 rounded-xl bg-emerald-600 text-xs font-extrabold"
                         >
-                          {isVoiceActive ? '⏸️ 음성 회화 일시정지' : '🎙️ AI 음성 회화 시작'}
-                        </button>
-                        <button
-                          onClick={() => {
-                            setIsVoiceActive(false);
-                            setSpeakingSeconds(0);
-                          }}
-                          className="px-3.5 py-2.5 rounded-xl bg-slate-700 text-xs font-bold"
-                        >
-                          초기화
+                          {isVoiceActive ? '⏸️ 일시정지' : '▶️ 타이머 시작'}
                         </button>
                       </div>
                     </div>
 
-                    <div className="space-y-3 max-h-80 overflow-y-auto p-3 bg-slate-950 rounded-2xl border border-slate-800">
+                    <div className="space-y-2.5 max-h-72 overflow-y-auto p-3 bg-slate-950 rounded-2xl border border-slate-800">
                       {chatHistory.map((turn, i) => (
                         <div
                           key={i}
-                          className={`p-3.5 rounded-2xl text-xs space-y-1.5 ${
+                          className={`p-3 rounded-2xl text-xs ${
                             turn.role === 'coach'
                               ? 'bg-slate-800 text-slate-100 mr-8'
                               : 'bg-blue-600 text-white ml-8'
                           }`}
                         >
-                          <div className="font-extrabold flex items-center justify-between">
-                            <span>
-                              {turn.role === 'coach' ? '🤖 AI 원어민 코치' : '🙋‍♂️ 나의 스피킹'}
-                            </span>
-                            <button
-                              onClick={() => speakText(turn.text)}
-                              className="text-[11px] underline"
-                            >
-                              🔊 음성 듣기
-                            </button>
-                          </div>
-                          <p className="text-sm font-semibold">{turn.text}</p>
+                          <p className="font-bold">{turn.text}</p>
                           {turn.correction && (
-                            <p className="text-emerald-300 font-bold pt-1 border-t border-slate-700">
-                              {turn.correction}
-                            </p>
-                          )}
-                          {turn.nuanceTip && (
-                            <p className="text-amber-300 text-[11px]">🎙️ {turn.nuanceTip}</p>
+                            <p className="text-emerald-300 mt-1">{turn.correction}</p>
                           )}
                         </div>
                       ))}
@@ -6161,14 +6389,14 @@ export default function App() {
                         type="text"
                         value={chatInput}
                         onChange={(e) => setChatInput(e.target.value)}
-                        placeholder="영어로 답변을 입력하거나 아이패드 키보드 마이크(🎙️)를 눌러 말해 보세요..."
-                        className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500"
+                        placeholder="영어로 문장을 입력해 보세요..."
+                        className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white"
                       />
                       <button
                         type="submit"
-                        className="px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-extrabold"
+                        className="px-4 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-extrabold"
                       >
-                        전송 & 발음교정
+                        전송
                       </button>
                     </form>
                   </section>
@@ -6181,51 +6409,28 @@ export default function App() {
                     }`}
                   >
                     <h3 className="text-lg font-extrabold">
-                      ✍️ 1:1 실시간 영작 첨삭 & 초·중·고급 바꿔 말하기 클리닉
+                      ✍️ 1:1 내신 서술형 영작 & 바꿔 말하기 첨삭 클리닉
                     </h3>
                     <form onSubmit={handleRunCorrection} className="flex gap-2">
                       <input
                         type="text"
                         value={correctionInput}
                         onChange={(e) => setCorrectionInput(e.target.value)}
-                        placeholder="첨삭받고 싶은 영어 문장을 입력하세요 (예: This suit looks very good on you)"
-                        className="flex-1 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm"
+                        placeholder="첨삭받고 싶은 서술형 영작 문장을 입력하세요..."
+                        className="flex-1 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2 text-xs"
                       />
                       <button
                         type="submit"
-                        className={`px-5 py-2.5 rounded-xl text-white text-xs font-extrabold ${themeAccentBg}`}
+                        className={`px-4 py-2 rounded-xl text-white text-xs font-extrabold ${themeAccentBg}`}
                       >
-                        즉시 첨삭 실행
+                        첨삭 실행
                       </button>
                     </form>
-
                     {correctionResult && (
-                      <div
-                        className={`p-4 rounded-2xl border space-y-2 text-xs ${
-                          darkMode
-                            ? 'bg-slate-950 border-slate-800'
-                            : 'bg-slate-50 border-slate-200'
-                        }`}
-                      >
-                        <div>
-                          • <strong>내가 쓴 문장:</strong> {correctionResult.original}
-                        </div>
-                        <div className="text-blue-500 font-extrabold text-sm flex items-center gap-2">
-                          <span>• {correctionResult.naturalEn}</span>
-                          <button
-                            onClick={() => speakText(correctionResult.naturalEn)}
-                            className="px-2 py-0.5 rounded bg-blue-600 text-white text-xs"
-                          >
-                            🔊
-                          </button>
-                        </div>
-                        <div className="text-purple-500 font-bold">
-                          • 🏆 {correctionResult.opicUpgrade}
-                        </div>
-                        <div className="text-slate-500">
-                          • 🧭 어순 & 문법 진단: {correctionResult.wordOrderFix} /{' '}
-                          {correctionResult.grammarExplanation}
-                        </div>
+                      <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs space-y-1">
+                        <div className="font-bold text-blue-500">{correctionResult.naturalEn}</div>
+                        <div>{correctionResult.wordOrderFix}</div>
+                        <div className="text-slate-500">{correctionResult.grammarExplanation}</div>
                       </div>
                     )}
                   </section>
@@ -6233,7 +6438,7 @@ export default function App() {
               )}
 
               {/* ==============================================================
-                  [모드 E] 요일별(주간) · 월별 마스터 정리 노트 (5대 테마 총람)
+                  [모드 E] 주간·월간 마스터 총람
               ============================================================== */}
               {activeMode === 'weekly' && (
                 <section
@@ -6243,54 +6448,25 @@ export default function App() {
                       : 'bg-white border-slate-200'
                   }`}
                 >
-                  <div>
-                    <span className="text-xs font-extrabold text-blue-500">
-                      WEEKLY & MONTHLY ALL-LEVEL MASTER SHEET
-                    </span>
-                    <h2 className="text-2xl font-extrabold mt-0.5">
-                      🗓️ 5대 정규 테마 (비즈니스 · 오픽 · 여행 · 미디어 · 5대 패션 매거진) 전 레벨 총람
-                    </h2>
-                  </div>
-
+                  <h2 className="text-2xl font-extrabold">
+                    🗓️ 5대 실전 회화 테마 & 3대 수능·내신 1등급 마스터 총람
+                  </h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {THEMES.map((t) => (
                       <div
                         key={t.id}
-                        className={`p-5 rounded-2xl border space-y-2.5 ${
+                        className={`p-5 rounded-2xl border space-y-2 ${
                           darkMode
                             ? 'bg-slate-950 border-slate-800'
                             : 'bg-slate-50 border-slate-200'
                         }`}
                       >
-                        <div className="flex items-center justify-between">
-                          <strong className="text-sm font-extrabold">{t.title}</strong>
-                          <button
-                            onClick={() => speakText(t.levelTracks[learningLevel].patternEn)}
-                            className={`px-2.5 py-1 rounded-lg text-white text-xs font-bold ${themeAccentBg}`}
-                          >
-                            🔊 {learningLevel} 패턴
-                          </button>
-                        </div>
-                        <div className="text-xs font-mono text-blue-500 font-bold">
-                          [{learningLevel.toUpperCase()} 패턴]: {t.levelTracks[learningLevel].patternEn}
+                        <strong className="text-sm font-extrabold">{t.title}</strong>
+                        <div className="text-xs text-blue-500 font-bold">
+                          {t.levelTracks[learningLevel].patternEn}
                         </div>
                         <div className="text-xs text-slate-500">
                           {t.levelTracks[learningLevel].patternMeaningKo}
-                        </div>
-                        <div className="flex flex-wrap gap-1.5 pt-1">
-                          {t.vocab.map((v) => (
-                            <button
-                              key={v.id}
-                              onClick={() => speakText(v.word)}
-                              className={`px-2 py-1 rounded-lg border text-[11px] font-bold ${
-                                darkMode
-                                  ? 'bg-slate-900 border-slate-800'
-                                  : 'bg-white border-slate-200'
-                              }`}
-                            >
-                              {v.word} ({v.meaning})
-                            </button>
-                          ))}
                         </div>
                       </div>
                     ))}
