@@ -3517,7 +3517,965 @@ export function buildDynamicDiagramSentence(
     wordOrderTip: '어절 카드를 터치하면 위 16개 다이어그램 전광판의 문장 성분(직책)과 9품사(신분)가 실시간으로 움직입니다!',
   };
 }
-// ==========================================================================
+// ============================================================================
+// [파트 3-B] studyData.ts 연결 + 미사용 변수 에러 0건 + 사파리 선택방지 펜슬 엔진
+// (3521행 근처 buildDynamicDiagramSentence 함수 끝나는 곳 바로 아래에 붙여넣으세요)
+// ============================================================================
+import {
+  getExpandedWordbookByDay,
+  generateCombinatorialSentences,
+  EBS_MAJOR_TOPICS,
+  GRAMMAR_406_QUIZ_BANK,
+  analyzeCustomSchoolPassage,
+} from './studyData';
+
+export interface SavedSentenceItem {
+  id: string;
+  en: string;
+  ko: string;
+  note: string;
+  category: string;
+  mastered: boolean;
+}
+
+export default function App() {
+  const todayObj = new Date();
+  const todayKey = `${todayObj.getFullYear()}-${String(todayObj.getMonth() + 1).padStart(2, '0')}-${String(todayObj.getDate()).padStart(2, '0')}`;
+  const todayDateStr = `${todayObj.getFullYear()}년 ${todayObj.getMonth() + 1}월 ${todayObj.getDate()}일`;
+  const dayOfYear = Math.floor(
+    (todayObj.getTime() - new Date(todayObj.getFullYear(), 0, 0).getTime()) / 86400000
+  );
+
+  const [learningLevel, setLearningLevel] = useState<LearningLevel>('beginner');
+  const [selectedThemeId, setSelectedThemeId] = useState<string>(
+    THEMES[dayOfYear % THEMES.length].id
+  );
+  const [activeMode, setActiveMode] = useState<
+    'daily' | 'examMaster' | 'wordbook' | 'naverQuiz' | 'aiCoach' | 'weekly' | 'devStory'
+  >('daily');
+  const [activeMediaPlatform, setActiveMediaPlatform] =
+    useState<MediaPlatformId>('FASHION_MAGS');
+
+  // 수능·내신 1~5교시 독립 작동 상태 (모든 상태가 아래 UI에 100% 연결됨)
+  const [selectedExamTrack, setSelectedExamTrack] = useState<ExamTrackId>('CSAT_MASTER');
+  const [schoolInternalStage, setSchoolInternalStage] = useState<number>(1);
+  const [syntaxSeed, setSyntaxSeed] = useState<number>(1);
+  const [vocabQuizSeed, setVocabQuizSeed] = useState<number>(1);
+  const [selectedVocabQuizAnswers, setSelectedVocabQuizAnswers] = useState<Record<number, number>>({});
+  const [selectedGrammarQuizAnswers, setSelectedGrammarQuizAnswers] = useState<Record<number, 'A' | 'B'>>({});
+  const [customSchoolText, setCustomSchoolText] = useState<string>(
+    'Not until we step out of our cognitive comfort zone can we genuinely broaden our perspective on complex phenomena. Consistent exposure to diverse viewpoints prevents confirmation bias and fosters intellectual flexibility. Streamlining the approval process makes the entire project feasible.'
+  );
+  const [examEssayInput, setExamEssayInput] = useState<string>('');
+  const [showExamModelAnswer, setShowExamModelAnswer] = useState<boolean>(false);
+  const [csatTimerMins, setCsatTimerMins] = useState<number>(180);
+
+  const [selectedLiveKeyword, setSelectedLiveKeyword] = useState<{
+    platformName: string;
+    rank: number;
+    koTitle: string;
+    enExpression: string;
+    extUrl: string;
+  } | null>(null);
+
+  const [activeDiagramSentenceIdx, setActiveDiagramSentenceIdx] = useState<number>(0);
+  const [customDissectSentence, setCustomDissectSentence] = useState<{
+    en: string;
+    ko: string;
+    title: string;
+  } | null>(null);
+
+  const [mediaPlatforms, setMediaPlatforms] = useState<MediaTrendPlatform[]>(
+    INITIAL_MEDIA_PLATFORMS
+  );
+  const [lastTrendSyncTime, setLastTrendSyncTime] = useState<string>('방금 전 실시간 동기화됨');
+  const [isRefreshingTrends, setIsRefreshingTrends] = useState<boolean>(false);
+
+  const [darkMode, setDarkMode] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('yanadu_dark_mode') === 'true';
+    }
+    return false;
+  });
+  const [colorTheme, setColorTheme] = useState<'blue' | 'emerald' | 'indigo' | 'amber'>('blue');
+  const [fontStyle, setFontStyle] = useState<'sans' | 'serif' | 'mono'>('sans');
+  const [layoutMode, setLayoutMode] = useState<'split' | 'wide'>('split');
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const rootHtml = document.documentElement;
+    const rootBody = document.body;
+    if (darkMode) {
+      rootHtml.classList.add('dark');
+      rootBody.classList.add('dark');
+      rootHtml.style.colorScheme = 'dark';
+      rootBody.style.backgroundColor = '#020617';
+      rootBody.style.color = '#f1f5f9';
+    } else {
+      rootHtml.classList.remove('dark');
+      rootBody.classList.remove('dark');
+      rootHtml.style.colorScheme = 'light';
+      rootBody.style.backgroundColor = '#f8fafc';
+      rootBody.style.color = '#0f172a';
+    }
+    localStorage.setItem('yanadu_dark_mode', String(darkMode));
+  }, [darkMode]);
+
+  const [accent, setAccent] = useState<'en-US' | 'en-GB' | 'en-AU' | 'en-IN'>('en-US');
+  const [speechRate, setSpeechRate] = useState<number>(0.75);
+  const [dictQuery, setDictQuery] = useState<string>('');
+  const [liveDictResult, setLiveDictResult] = useState<{
+    word: string;
+    phonetic: string;
+    definition: string;
+    example: string;
+  } | null>(null);
+  const [isLoadingDict, setIsLoadingDict] = useState<boolean>(false);
+
+  const [showAllKoreanPron, setShowAllKoreanPron] = useState<boolean>(true);
+  const [revealedPronKeys, setRevealedPronKeys] = useState<string[]>([]);
+  const [hideWordMode, setHideWordMode] = useState<boolean>(false);
+  const [hideMeaningMode, setHideMeaningMode] = useState<boolean>(false);
+  const [revealedWordIds, setRevealedWordIds] = useState<number[]>([]);
+  const [revealedChallengeIdx, setRevealedChallengeIdx] = useState<number[]>([]);
+
+  const handleSelectLevel = (lvl: LearningLevel) => {
+    setLearningLevel(lvl);
+    setCustomDissectSentence(null);
+    if (lvl === 'beginner') {
+      setSpeechRate(0.75);
+      setShowAllKoreanPron(true);
+      setHideMeaningMode(false);
+      setActiveDiagramSentenceIdx(0);
+    } else if (lvl === 'intermediate') {
+      setSpeechRate(0.9);
+      setShowAllKoreanPron(false);
+      setHideMeaningMode(false);
+      setActiveDiagramSentenceIdx(1);
+    } else {
+      setSpeechRate(1.0);
+      setShowAllKoreanPron(false);
+      setActiveDiagramSentenceIdx(2);
+    }
+  };
+
+  // 단어·문장 양방향 보관함 & 직접 수정 & 암기완료 해제 시스템
+  const [wordbookLevel, setWordbookLevel] = useState<
+    '중등 필수' | '고등·수능 핵심' | '비즈니스·실무' | '오픽(OPIc)·구동사'
+  >('고등·수능 핵심');
+  const [wordbookDay, setWordbookDay] = useState<number>(1);
+  const [completedDays, setCompletedDays] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('yanadu_completed_days');
+      if (saved) return JSON.parse(saved);
+    }
+    return ['중등 필수-1', '고등·수능 핵심-1'];
+  });
+
+  const toggleCompletedDay = (dayKey: string) => {
+    setCompletedDays((prev) =>
+      prev.includes(dayKey) ? prev.filter((k) => k !== dayKey) : [...prev, dayKey]
+    );
+  };
+
+  const [bookmarkedWords, setBookmarkedWords] = useState<
+    {
+      word: string;
+      ipa: string;
+      meaning: string;
+      collocation: string;
+      posLabel: string;
+      compLabel: string;
+      levelBadge?: string;
+      customNote?: string;
+      mastered?: boolean;
+    }[]
+  >(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('yanadu_bookmarks');
+      if (saved) return JSON.parse(saved);
+    }
+    return [
+      {
+        word: 'perspective',
+        ipa: '/pəˈspek.tɪv/',
+        meaning: '관점, 시각 (수능·내신 핵심)',
+        collocation: 'broaden our perspective',
+        posLabel: '명사 (Noun)',
+        compLabel: '직접목적어 (DO)',
+        levelBadge: '수능핵심',
+        customNote: 'broaden / expand 와 자주 결합함',
+        mastered: false,
+      },
+      {
+        word: 'feasible',
+        ipa: '/ˈfiː.zə.bəl/',
+        meaning: '실현 가능한 (5형식 보어 빈출)',
+        collocation: 'make the project feasible',
+        posLabel: '형용사 (Adj)',
+        compLabel: '목적격보어 (OC)',
+        levelBadge: '내신서술형',
+        customNote: '5형식 make 목적격보어 자리에 부사(feasibly) 사용 주의',
+        mastered: false,
+      },
+    ];
+  });
+
+  const [savedSentences, setSavedSentences] = useState<SavedSentenceItem[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('yanadu_saved_sentences');
+      if (saved) return JSON.parse(saved);
+    }
+    return [
+      {
+        id: 'init-sent-1',
+        en: 'Not until we step out of our comfort zone can we genuinely broaden our perspective.',
+        ko: '우리가 안전지대를 벗어나서야 비로소 시야를 진정으로 넓힐 수 있다.',
+        note: '부정어 Not until 문두 이동 ➔ 주절 can we broaden 도치 어순 주의',
+        category: '수능·내신 핵심구문',
+        mastered: false,
+      },
+      {
+        id: 'init-sent-2',
+        en: 'You really pull off that bold statement look!',
+        ko: '그 과감한 포인트 스타일을 정말 멋지게 소화하시네요!',
+        note: 'pull off(소화하기 까다로운 스타일·과제를 멋지게 해내다)',
+        category: '실전 회화·패션',
+        mastered: false,
+      },
+    ];
+  });
+
+  const [editingWordIdx, setEditingWordIdx] = useState<number | null>(null);
+  const [editWordMeaning, setEditWordMeaning] = useState<string>('');
+  const [editWordCollocation, setEditWordCollocation] = useState<string>('');
+  const [editWordNote, setEditWordNote] = useState<string>('');
+
+  const [editingSentId, setEditingSentId] = useState<string | null>(null);
+  const [editSentEn, setEditSentEn] = useState<string>('');
+  const [editSentKo, setEditSentKo] = useState<string>('');
+  const [editSentNote, setEditSentNote] = useState<string>('');
+
+  const [newCustomWord, setNewCustomWord] = useState<string>('');
+  const [newCustomWordMeaning, setNewCustomWordMeaning] = useState<string>('');
+  const [newCustomWordNote, setNewCustomWordNote] = useState<string>('');
+  const [newCustomSentEn, setNewCustomSentEn] = useState<string>('');
+  const [newCustomSentKo, setNewCustomSentKo] = useState<string>('');
+  const [newCustomSentNote, setNewCustomSentNote] = useState<string>('');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('yanadu_bookmarks', JSON.stringify(bookmarkedWords));
+    }
+  }, [bookmarkedWords]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('yanadu_saved_sentences', JSON.stringify(savedSentences));
+    }
+  }, [savedSentences]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('yanadu_completed_days', JSON.stringify(completedDays));
+    }
+  }, [completedDays]);
+
+  const toggleSaveSentence = (item: Omit<SavedSentenceItem, 'id' | 'mastered'>) => {
+    setSavedSentences((prev) => {
+      const exists = prev.some((s) => s.en === item.en);
+      if (exists) return prev.filter((s) => s.en !== item.en);
+      return [
+        {
+          id: `sent-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          ...item,
+          mastered: false,
+        },
+        ...prev,
+      ];
+    });
+  };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const savedDate = localStorage.getItem('yanadu_last_study_date');
+    if (savedDate !== todayKey) {
+      const nextTheme = THEMES[dayOfYear % THEMES.length].id;
+      const nextWbDay = (dayOfYear % 100) + 1;
+      const todayPlat = INITIAL_MEDIA_PLATFORMS[dayOfYear % INITIAL_MEDIA_PLATFORMS.length];
+      const todayKw = todayPlat.keywords[dayOfYear % todayPlat.keywords.length];
+
+      setSelectedThemeId(nextTheme);
+      setWordbookDay(nextWbDay);
+      setSelectedLiveKeyword({
+        platformName: todayPlat.name,
+        rank: todayKw.rank,
+        koTitle: todayKw.koTitle,
+        enExpression: todayKw.enExpression,
+        extUrl: todayKw.extUrl,
+      });
+      localStorage.setItem('yanadu_last_study_date', todayKey);
+    }
+  }, [todayKey, dayOfYear]);
+
+  const handleRefreshLiveTrends = async () => {
+    setIsRefreshingTrends(true);
+    const now = new Date();
+    const timeLabel = `${String(now.getHours()).padStart(2, '0')}:${String(
+      now.getMinutes()
+    ).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')} 실시간 반영됨`;
+
+    try {
+      const res = await fetch(
+        'https://api.rss2json.com/v1/api.json?rss_url=https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko'
+      );
+      let liveHeadlines: string[] = [];
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.items?.length) {
+          liveHeadlines = data.items
+            .slice(0, 5)
+            .map((it: { title: string }) => it.title.split(' - ')[0]);
+        }
+      }
+
+      setMediaPlatforms((prev) =>
+        prev.map((plat) => {
+          const rotated = [...plat.keywords]
+            .sort(() => Math.random() - 0.5)
+            .map((k, idx) => {
+              if (
+                plat.id === 'GOOGLE_TRENDS' &&
+                idx < liveHeadlines.length &&
+                liveHeadlines[idx]
+              ) {
+                return {
+                  ...k,
+                  rank: idx + 1,
+                  koTitle: `[실시간] ${liveHeadlines[idx]}`,
+                };
+              }
+              return {
+                ...k,
+                rank: idx + 1,
+              };
+            });
+          return { ...plat, keywords: rotated };
+        })
+      );
+      setLastTrendSyncTime(timeLabel);
+    } catch {
+      setMediaPlatforms((prev) =>
+        prev.map((plat) => ({
+          ...plat,
+          keywords: [...plat.keywords]
+            .reverse()
+            .map((k, idx) => ({ ...k, rank: idx + 1 })),
+        }))
+      );
+      setLastTrendSyncTime(timeLabel);
+    } finally {
+      setIsRefreshingTrends(false);
+    }
+  };
+
+  const [diagramTab, setDiagramTab] = useState<'all' | 'comp' | 'pos'>('all');
+  const [selectedComp, setSelectedComp] = useState<CompId | null>('DO');
+  const [selectedPos, setSelectedPos] = useState<PosId | null>('N');
+  const [selectedTokenIdx, setSelectedTokenIdx] = useState<number | null>(0);
+  const [writingInputs, setWritingInputs] = useState<Record<string, string>>({});
+
+  // 필기 도구 5종 (펜 4종 + 지우개) & 사파리 텍스트 선택 방지 적용
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const padWrapperRef = useRef<HTMLDivElement | null>(null);
+  const isDrawingRef = useRef<boolean>(false);
+  const lastPointRef = useRef<{ x: number; y: number } | null>(null);
+
+  const [isFloatingPad, setIsFloatingPad] = useState<boolean>(true);
+  const [isPadLocked, setIsPadLocked] = useState<boolean>(true);
+  const [isPadMinimized, setIsPadMinimized] = useState<boolean>(false);
+  const [penOnlyMode, setPenOnlyMode] = useState<boolean>(true);
+  const [penType, setPenType] = useState<
+    'fountain' | 'marker' | 'ballpoint' | 'highlighter' | 'eraser'
+  >('marker');
+  const [penColor, setPenColor] = useState<'#2563eb' | '#0f172a' | '#10b981' | '#e11d48'>('#2563eb');
+  const [penWidth, setPenWidth] = useState<number>(6);
+  const [padHeight, setPadHeight] = useState<number>(210);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const wrapper = padWrapperRef.current;
+    if (!canvas || !wrapper) return;
+
+    const blockSafariTouchAndSelect = (e: Event) => {
+      if (isPadLocked) {
+        e.preventDefault();
+      }
+    };
+
+    canvas.addEventListener('touchstart', blockSafariTouchAndSelect, { passive: false });
+    canvas.addEventListener('touchmove', blockSafariTouchAndSelect, { passive: false });
+    canvas.addEventListener('selectstart', blockSafariTouchAndSelect);
+    canvas.addEventListener('contextmenu', blockSafariTouchAndSelect);
+    wrapper.addEventListener('selectstart', blockSafariTouchAndSelect);
+    wrapper.addEventListener('contextmenu', blockSafariTouchAndSelect);
+
+    return () => {
+      canvas.removeEventListener('touchstart', blockSafariTouchAndSelect);
+      canvas.removeEventListener('touchmove', blockSafariTouchAndSelect);
+      canvas.removeEventListener('selectstart', blockSafariTouchAndSelect);
+      canvas.removeEventListener('contextmenu', blockSafariTouchAndSelect);
+      wrapper.removeEventListener('selectstart', blockSafariTouchAndSelect);
+      wrapper.removeEventListener('contextmenu', blockSafariTouchAndSelect);
+    };
+  }, [isPadLocked, isPadMinimized]);
+
+  const syncCanvasResolution = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    const dpr = window.devicePixelRatio || 1;
+    const targetW = Math.round(rect.width * dpr);
+    const targetH = Math.round(rect.height * dpr);
+
+    if (canvas.width !== targetW || canvas.height !== targetH) {
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = canvas.width;
+      tempCanvas.height = canvas.height;
+      const tempCtx = tempCanvas.getContext('2d');
+      if (tempCtx && canvas.width > 0 && canvas.height > 0) {
+        tempCtx.drawImage(canvas, 0, 0);
+      }
+
+      canvas.width = targetW;
+      canvas.height = targetH;
+      const ctx = canvas.getContext('2d', { desynchronized: true });
+      if (ctx) {
+        ctx.scale(dpr, dpr);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        if (tempCanvas.width > 0 && tempCanvas.height > 0) {
+          ctx.drawImage(
+            tempCanvas,
+            0,
+            0,
+            tempCanvas.width,
+            tempCanvas.height,
+            0,
+            0,
+            rect.width,
+            rect.height
+          );
+        }
+      }
+    }
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => syncCanvasResolution(), 60);
+    window.addEventListener('resize', syncCanvasResolution);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', syncCanvasResolution);
+    };
+  }, [isFloatingPad, isPadMinimized, padHeight, layoutMode, activeMode]);
+
+  const getExactPointerPos = (
+    canvas: HTMLCanvasElement,
+    clientX: number,
+    clientY: number
+  ) => {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: clientX - rect.left,
+      y: clientY - rect.top,
+    };
+  };
+
+  const startDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isPadLocked) return;
+    if (penOnlyMode && e.pointerType === 'touch') {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+
+    e.preventDefault();
+    e.stopPropagation();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const pos = getExactPointerPos(canvas, e.clientX, e.clientY);
+    isDrawingRef.current = true;
+    lastPointRef.current = pos;
+
+    const ctx = canvas.getContext('2d', { desynchronized: true });
+    if (!ctx) return;
+
+    const actualColor =
+      penColor === '#0f172a' && darkMode ? '#f8fafc' : penColor;
+
+    if (penType === 'eraser') {
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.globalAlpha = 1.0;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = Math.max(28, penWidth * 3.5);
+    } else if (penType === 'highlighter') {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 0.32;
+      ctx.strokeStyle = '#facc15';
+      ctx.lineCap = 'square';
+      ctx.lineJoin = 'bevel';
+      ctx.lineWidth = Math.max(20, penWidth * 2.8);
+    } else if (penType === 'marker') {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1.0;
+      ctx.strokeStyle = actualColor;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = penWidth * 1.35;
+    } else if (penType === 'fountain') {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1.0;
+      ctx.strokeStyle = actualColor;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      const pressureFactor =
+        e.pointerType === 'pen' && e.pressure > 0 ? 0.6 + e.pressure * 1.5 : 1.1;
+      ctx.lineWidth = penWidth * pressureFactor;
+    } else {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1.0;
+      ctx.strokeStyle = actualColor;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = penWidth;
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+    ctx.lineTo(pos.x + 0.05, pos.y + 0.05);
+    ctx.stroke();
+  };
+
+  const draw = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isDrawingRef.current || !isPadLocked) return;
+    if (penOnlyMode && e.pointerType === 'touch') {
+      e.preventDefault();
+      return;
+    }
+
+    e.preventDefault();
+    e.stopPropagation();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d', { desynchronized: true });
+    if (!ctx) return;
+
+    if (penType === 'fountain' && e.pointerType === 'pen' && e.pressure > 0) {
+      ctx.lineWidth = penWidth * (0.6 + e.pressure * 1.5);
+    }
+
+    const nativeEvt = e.nativeEvent as PointerEvent;
+    const events =
+      typeof nativeEvt.getCoalescedEvents === 'function'
+        ? nativeEvt.getCoalescedEvents()
+        : [nativeEvt];
+
+    ctx.beginPath();
+    if (lastPointRef.current) {
+      ctx.moveTo(lastPointRef.current.x, lastPointRef.current.y);
+    }
+
+    for (const ev of events) {
+      const pt = getExactPointerPos(canvas, ev.clientX, ev.clientY);
+      ctx.lineTo(pt.x, pt.y);
+      lastPointRef.current = pt;
+    }
+    ctx.stroke();
+  };
+
+  const endDrawing = () => {
+    isDrawingRef.current = false;
+    lastPointRef.current = null;
+  };
+
+  const clearCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  };
+
+  const [quizLevelTab, setQuizLevelTab] = useState<
+    'word' | 'beginner' | 'intermediate' | 'advanced'
+  >('beginner');
+  const [selectedBeginnerOpt, setSelectedBeginnerOpt] = useState<number | null>(null);
+  const [selectedInterOpt, setSelectedInterOpt] = useState<number | null>(null);
+  const [showInterHint, setShowInterHint] = useState<boolean>(false);
+  const [selectedAdvOpts, setSelectedAdvOpts] = useState<number[]>([]);
+  const [userWritingMission, setUserWritingMission] = useState<string>('');
+
+  const [targetSpeakingMins, setTargetSpeakingMins] = useState<number>(5);
+  const [speakingSeconds, setSpeakingSeconds] = useState<number>(0);
+  const [isVoiceActive, setIsVoiceActive] = useState<boolean>(false);
+  const [chatInput, setChatInput] = useState<string>('');
+  const [chatHistory, setChatHistory] = useState<ChatTurn[]>([
+    {
+      role: 'coach',
+      text: 'Welcome! All grammatical structures, 16 grammar elements (7 components + 9 parts of speech), and the 5-tool writing pad are ready!',
+      nuanceTip: '단어·문장 보관함에서 뜻과 메모를 직접 수정하고, 암기 완료 상태도 자유롭게 전환해 보세요!',
+    },
+  ]);
+  const [correctionInput, setCorrectionInput] = useState<string>('');
+  const [correctionResult, setCorrectionResult] = useState<{
+    original: string;
+    naturalEn: string;
+    wordOrderFix: string;
+    grammarExplanation: string;
+    opicUpgrade: string;
+  } | null>(null);
+  const [studyStats, setStudyStats] = useState({
+    masteredWords: 120,
+    completedSentences: 64,
+    quizAccuracy: 96,
+    speakingMinutes: 55,
+    streakDays: 12,
+  });
+
+  const baseTheme = THEMES.find((t) => t.id === selectedThemeId) || THEMES[0];
+
+  // [문법 오류 완벽 교정] 동사원형 실시간 키워드(kwEn)가 결합될 때 'how to + 동사원형' 또는 조동사 뒤에 오도록 설계하여 'focus on layer' 같은 비문 방지!
+  const currentTheme: ThemeData = (() => {
+    if (!selectedLiveKeyword) return baseTheme;
+
+    const kwEn = selectedLiveKeyword.enExpression;
+    const kwKo = selectedLiveKeyword.koTitle;
+    const kwFirstWord = kwEn.split(' ')[0] || 'trend';
+
+    const liveVocabItem: VocabItem = {
+      id: 0,
+      type: '일상 회화',
+      recommendLevel: learningLevel,
+      word: kwEn,
+      masked: `${kwFirstWord.slice(0, 2)} ⬛ ⬛ ⬛`,
+      ipa: '/실시간 트렌드 핵심 표현/',
+      pron: `[실시간 키워드 발음 듣기 🔊]`,
+      soundMethod: `앞 단어 끝소리와 뒤 단어 첫 모음을 한 호흡의 소리블록(${kwEn})으로 부드럽게 이어 발음합니다.`,
+      soundBlock: `${kwFirstWord} / ${kwEn.split(' ').slice(1).join(' ') || 'now'}`,
+      meaning: `[실검 ${selectedLiveKeyword.rank}위] ${kwKo}`,
+      enDef: `Live Trend Expression from ${selectedLiveKeyword.platformName}`,
+      exampleBlank: `Let's practice how to ______ in our daily conversation.`,
+      pos: 'V',
+      posLabel: '핵심 표현 블록 (V/N)',
+      comp: 'DO',
+      compLabel: '핵심 성분 (V·DO)',
+      roleDesc: '방금 왼쪽 실시간 트렌드에서 선택한 최우선 집중 학습 표현',
+      collocation: kwEn,
+      collocationKo: kwKo,
+      paraphraseTip: `[실시간 연동 완료] 클릭하신 "${kwKo}" 이슈를 아래 직독직해와 16개 문법 요소 해부 카드로 즉시 학습합니다!`,
+    };
+
+    const liveSentence: TrainingSentence = {
+      id: 0,
+      levelTag: learningLevel,
+      tag: `🔥 [실시간 ${selectedLiveKeyword.rank}위 집중 문장] ${selectedLiveKeyword.platformName}`,
+      targetWord: kwEn,
+      wordOrderFormula: `[도입 패턴] + [how to + 동사원형 표현 (${kwEn})] + [수식어(M)]`,
+      structure: '주어(S) + 동사(V) + 목적어(how to부정사구) + 수식어(M)',
+      soundBlockEn:
+        learningLevel === 'beginner'
+          ? `We really need / to learn how to / ${kwEn} / today.`
+          : learningLevel === 'intermediate'
+          ? `Everyone is talking about / how to ${kwEn} / effectively.`
+          : `I was wondering if we could / ${kwEn} / from a broader perspective.`,
+      soundMethodGuide: `방금 선택하신 실시간 검색어 "${kwEn}"에 가장 강한 강세를 실어 또렷하게 발음하세요!`,
+      ipaLine: `/Live Trend Sentence — ${kwEn}/`,
+      koLine: `오늘의 핫이슈(S) / [${kwKo}]하는 방법을(DO) / 실전 문장으로 자연스럽게 익힙니다(V+M).`,
+      enLine:
+        learningLevel === 'beginner'
+          ? `We really need(S+V) / to learn how to [${kwEn}](DO) / today(M).`
+          : learningLevel === 'intermediate'
+          ? `Everyone is talking about(S+V) / how to [${kwEn}](O) / right now(M).`
+          : `I was wondering(S+V) / if we could [${kwEn}](O) / effortlessly(M).`,
+      rawEn:
+        learningLevel === 'beginner'
+          ? `We really need to learn how to ${kwEn} today.`
+          : learningLevel === 'intermediate'
+          ? `Everyone is talking about how to ${kwEn} right now.`
+          : `I was wondering if we could ${kwEn} effortlessly.`,
+      pronLine: `[실시간 문장 발음: 위 🔊 듣기 버튼을 눌러 원어민 연음을 확인하세요]`,
+      naturalKo: `[실시간 ${selectedLiveKeyword.rank}위 응용] 우리는 오늘 "${kwKo} (${kwEn})" 표현을 실전 영어로 자연스럽게 구사할 수 있습니다.`,
+      paraphraseVersion: `What I love most is that we can apply "${kwEn}" right away in real life.`,
+      grammarPoint: `의문사 + to부정사(how to + 동사원형) 명사구 구조를 사용하여 어떤 동사구 키워드도 문법 오류 없이 목적어 자리에 결합됩니다.`,
+      contextNuance: `${selectedLiveKeyword.platformName} 실시간 ${selectedLiveKeyword.rank}위 화젯거리를 원어민 스몰톡으로 즉시 연결한 문장입니다.`,
+    };
+
+    return {
+      ...baseTheme,
+      title: `🔥 [${selectedLiveKeyword.platformName} ${selectedLiveKeyword.rank}위] ${kwKo}`,
+      badge: `실시간 트렌드 연동 · ${baseTheme.badge}`,
+      levelTracks: {
+        beginner: {
+          ...baseTheme.levelTracks.beginner,
+          patternEn: `Let's practice / "${kwEn}" / step by step!`,
+          patternSoundBlock: `Let's practice / ${kwEn} / step by step!`,
+          patternMeaningKo: `[실시간 초급] "${kwKo}" 표현을 단계별로 쉽게 연습해 봅시다!`,
+        },
+        intermediate: {
+          ...baseTheme.levelTracks.intermediate,
+          patternEn: `Everyone is talking about / how to ${kwEn} / these days.`,
+          patternSoundBlock: `Everyone is talking about / how to ${kwEn} / these days.`,
+          patternMeaningKo: `[실시간 중급] 요즘 모두가 "${kwKo}"하는 방법에 대해 이야기하고 있습니다.`,
+        },
+        advanced: {
+          ...baseTheme.levelTracks.advanced,
+          patternEn: `I was wondering if we could / ${kwEn} / effectively.`,
+          patternSoundBlock: `I was wondering / if we could / ${kwEn} / effectively.`,
+          patternMeaningKo: `[실시간 고급] "${kwKo}" 트렌드를 실무와 일상에 효과적으로 적용해 볼 수 있을지 논의해 보고 싶습니다.`,
+        },
+      },
+      vocab: [liveVocabItem, ...baseTheme.vocab.slice(0, 9)],
+      sentences: [liveSentence, ...baseTheme.sentences],
+      quiz: {
+        ...baseTheme.quiz,
+        intermediate: {
+          sentenceBefore: 'Everyone is talking about how to',
+          sentenceAfter: 'in today’s trending issue.',
+          hint: `방금 왼쪽에서 클릭하신 [${selectedLiveKeyword.platformName} ${selectedLiveKeyword.rank}위: ${kwKo}] 영어 표현입니다!`,
+          options: [kwEn, 'take a rain check', 'miss the boat', 'call it a day'],
+          answerIdx: 0,
+          explanation: `방금 선택하신 실시간 트렌드 ${selectedLiveKeyword.rank}위 표현인 "${kwEn}"(${kwKo})이 정답입니다!`,
+        },
+      },
+    };
+  })();
+
+  const currentLevelTrack = currentTheme.levelTracks[learningLevel];
+  const currentExamCourse =
+    EXAM_MASTER_COURSES.find((c) => c.id === selectedExamTrack) || EXAM_MASTER_COURSES[0];
+
+  const activeSentenceForDiagram = customDissectSentence
+    ? {
+        rawEn: customDissectSentence.en,
+        naturalKo: customDissectSentence.ko,
+        tag: customDissectSentence.title,
+      }
+    : currentTheme.sentences[activeDiagramSentenceIdx] || currentTheme.sentences[0];
+
+  const currentDiagramEx: DiagramSentence = buildDynamicDiagramSentence(
+    activeSentenceForDiagram.rawEn,
+    activeSentenceForDiagram.naturalKo,
+    activeSentenceForDiagram.tag
+  );
+
+  const currentMediaObj =
+    mediaPlatforms.find((m) => m.id === activeMediaPlatform) || mediaPlatforms[0];
+
+  useEffect(() => {
+    setSelectedBeginnerOpt(null);
+    setSelectedInterOpt(null);
+    setShowInterHint(false);
+    setSelectedAdvOpts([]);
+    setRevealedWordIds([]);
+    setActiveDiagramSentenceIdx(0);
+    setSelectedTokenIdx(0);
+    setCustomDissectSentence(null);
+  }, [selectedThemeId, selectedLiveKeyword]);
+
+  useEffect(() => {
+    if (!isVoiceActive) return;
+    const timer = setInterval(() => {
+      setSpeakingSeconds((prev) => {
+        if (prev + 1 >= targetSpeakingMins * 60) {
+          setIsVoiceActive(false);
+          return targetSpeakingMins * 60;
+        }
+        if ((prev + 1) % 60 === 0) {
+          setStudyStats((s) => ({ ...s, speakingMinutes: s.speakingMinutes + 1 }));
+        }
+        return prev + 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isVoiceActive, targetSpeakingMins]);
+
+  const toggleKoreanPron = (key: string) => {
+    setRevealedPronKeys((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    );
+  };
+
+  const isPronVisible = (key: string) => showAllKoreanPron || revealedPronKeys.includes(key);
+
+  const toggleBookmark = (item: {
+    word: string;
+    ipa: string;
+    meaning: string;
+    collocation: string;
+    posLabel: string;
+    compLabel: string;
+    levelBadge?: string;
+  }) => {
+    setBookmarkedWords((prev) => {
+      const exists = prev.some((b) => b.word === item.word);
+      if (exists) return prev.filter((b) => b.word !== item.word);
+      setStudyStats((s) => ({ ...s, masteredWords: s.masteredWords + 1 }));
+      return [{ ...item, customNote: '', mastered: false }, ...prev];
+    });
+  };
+
+  const fetchLiveDictionary = async (wordToSearch: string) => {
+    const clean = wordToSearch.trim().split(' ')[0];
+    if (!clean) return;
+    setIsLoadingDict(true);
+    try {
+      const res = await fetch(
+        `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(clean)}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const first = data[0];
+        const meaningObj = first?.meanings?.[0]?.definitions?.[0];
+        setLiveDictResult({
+          word: first?.word || clean,
+          phonetic: first?.phonetic || first?.phonetics?.[0]?.text || '/발음기호/',
+          definition: meaningObj?.definition || '영영 사전 정의를 불러왔습니다.',
+          example:
+            meaningObj?.example ||
+            `Let's practice using "${clean}" in our ${learningLevel} track.`,
+        });
+      } else {
+        setLiveDictResult({
+          word: clean,
+          phonetic: '/실전 구어/입시 핵심 표현/',
+          definition: '원어민 실전 구동사·수능 핵심 표현입니다. 우측 네이버/구글 사전 버튼으로 상세 예문을 확인하세요.',
+          example: `You really pulled off "${clean}" effortlessly!`,
+        });
+      }
+    } catch {
+      setLiveDictResult({
+        word: clean,
+        phonetic: '/사전 안내/',
+        definition: '우측 사전 바로가기 링크를 이용해 주세요.',
+        example: `Practice "${clean}" step by step.`,
+      });
+    } finally {
+      setIsLoadingDict(false);
+    }
+  };
+
+  const speakText = (
+    text: string,
+    customAccent?: 'en-US' | 'en-GB' | 'en-AU' | 'en-IN',
+    customRate?: number
+  ) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const cleanText = text.replace(/\[|\]|"/g, '');
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    const targetLang = customAccent || accent;
+    utterance.lang = targetLang;
+    utterance.rate = customRate || speechRate;
+
+    const voices = window.speechSynthesis.getVoices();
+    const matchedVoice = voices.find((v) => v.lang.includes(targetLang));
+    if (matchedVoice) utterance.voice = matchedVoice;
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const getGoogleTranslateUrl = (text: string) => {
+    const clean = text.replace(/\[|\]/g, '');
+    return `https://translate.google.com/?sl=en&tl=ko&text=${encodeURIComponent(clean)}&op=translate`;
+  };
+
+  const getNaverDictUrl = (text: string) => {
+    const clean = text.replace(/\[|\]/g, '');
+    return `https://en.dict.naver.com/#/search?query=${encodeURIComponent(clean)}`;
+  };
+
+  const handleRunCorrection = (e: React.FormEvent) => {
+    e.preventDefault();
+    const raw = correctionInput.trim();
+    if (!raw) return;
+    const capitalized = raw.charAt(0).toUpperCase() + raw.slice(1);
+    const withPeriod =
+      capitalized.endsWith('.') || capitalized.endsWith('?')
+        ? capitalized
+        : `${capitalized}.`;
+
+    setCorrectionResult({
+      original: raw,
+      naturalEn: `[수능·내신 서술형 패러프레이징] ${currentLevelTrack.patternEn.replace('~', raw)}`,
+      wordOrderFix:
+        '서술형 감점 방지 점검: [주어(S) + 동사(V) + 목적어(DO)/보어(SC·OC)] 수일치와 5형식 보어 품사(형용사)를 확인하세요.',
+      grammarExplanation: `입력하신 "${withPeriod}" 문장을 외운 답이 아닌 구조적 어순으로 변형하면 내신 서술형 답안이 됩니다.`,
+      opicUpgrade: `[고급 확장] Not only does it clarify the meaning, but ${withPeriod}`,
+    });
+    setStudyStats((s) => ({ ...s, completedSentences: s.completedSentences + 1 }));
+  };
+
+  const handleSendChat = (e: React.FormEvent) => {
+    e.preventDefault();
+    const msg = chatInput.trim();
+    if (!msg) return;
+    const userTurn: ChatTurn = { role: 'user', text: msg };
+    const coachReply: ChatTurn = {
+      role: 'coach',
+      text: `[${learningLevel.toUpperCase()} COACH] Great structure! "${msg}" shows strong command of word order. Try transforming it with "${currentTheme.vocab[0].collocation}"!`,
+      correction: `💡 레벨업 & 서술형 추천 표현: "${currentLevelTrack.patternEn}"`,
+      nuanceTip: `현재 배속(${speechRate}x)에 맞춰 의미단위(소리블록)로 끊어 읽어보세요!`,
+    };
+    setChatHistory((prev) => [...prev, userTurn, coachReply]);
+    setChatInput('');
+    speakText(coachReply.text);
+  };
+
+  const renderHighlightedSentence = (line: string) => {
+    const parts = line.split(/(\[[^\]]+\])/g);
+    return parts.map((part, idx) => {
+      if (part.startsWith('[') && part.endsWith(']')) {
+        const word = part.slice(1, -1);
+        return (
+          <strong
+            key={idx}
+            className="underline decoration-2 decoration-blue-500 underline-offset-4 font-extrabold text-blue-600 dark:text-yellow-300 px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/70"
+          >
+            {word}
+          </strong>
+        );
+      }
+      return <span key={idx}>{part}</span>;
+    });
+  };
+
+  const fontClass =
+    fontStyle === 'serif'
+      ? 'font-serif'
+      : fontStyle === 'mono'
+      ? 'font-mono'
+      : 'font-sans';
+
+  const themeAccentBg =
+    colorTheme === 'emerald'
+      ? 'bg-emerald-600'
+      : colorTheme === 'indigo'
+      ? 'bg-indigo-600'
+      : colorTheme === 'amber'
+      ? 'bg-amber-600'
+      : 'bg-blue-600';
+
+  const filteredWordbook = getExpandedWordbookByDay(wordbookLevel, wordbookDay);
+  const generatedSyntaxList = generateCombinatorialSentences(syntaxSeed, 12);
+  const customPassageAnalysis = analyzeCustomSchoolPassage(customSchoolText);
+  const examVocabTestList = getExpandedWordbookByDay('고등·수능 핵심', vocabQuizSeed);
+  // ==========================================================================
   // [파트 4] 누락 없는 전체 화면 UI + 양방향 보관함 + 필기 도구 5종(펜 4종+지우개)
   // ==========================================================================
   return (
