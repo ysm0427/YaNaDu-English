@@ -4150,6 +4150,12 @@ export default function App() {
                 >
                   {layoutMode === 'split' ? '📐 스플릿뷰' : '📐 와이드'}
                 </button>
+                <button
+                  onClick={() => setFontStyle(fontStyle === 'sans' ? 'serif' : fontStyle === 'serif' ? 'mono' : 'sans')}
+                  className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 font-bold"
+                >
+                  🔤 글씨체({fontStyle})
+                </button>
               </div>
             </div>
           </header>
