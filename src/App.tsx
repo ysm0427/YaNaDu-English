@@ -5801,14 +5801,14 @@ export default function App() {
     return deterministicShuffle(wordbookEntries, vocabChallengeSetSeed).slice(0, 20);
   }, [wordbookEntries, vocabChallengeSetSeed]);
 
-  const period1CorrectCount = useMemo(() => {
-    let count = 0;
-    period1QuizItems.forEach((item, idx) => {
-      const key = `${vocabChallengeSetSeed}-${idx}`;
-      if (period1Answers[key] === 0) count++;
-    });
-    return count;
-  }, [period1QuizItems, period1Answers, vocabChallengeSetSeed]);
+ const period1CorrectCount = useMemo(() => {
+  let count = 0;
+  period1QuizItems.forEach((_item, idx) => {
+    const key = `${vocabChallengeSetSeed}-${idx}`;
+    if (period1Answers[key] === 0) count++;
+  });
+  return count;
+}, [period1QuizItems, period1Answers, vocabChallengeSetSeed]);
 
   const quiz406CorrectCount = useMemo(() => {
     let count = 0;
@@ -6756,14 +6756,14 @@ export default function App() {
                         >
                           현재 테마 문장 ({currentSentence.tag})
                         </button>
-                        {DIAGRAM_EXAMPLES.map((ex, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => {
-                              setDiagramSourceMode('standard');
-                              setSelectedStandardExIdx(idx);
-                              setSelectedTokenIdx(0);
-                            }}
+{DIAGRAM_EXAMPLES.map((_ex, idx) => (
+  <button
+    key={idx}
+    onClick={() => {
+      setDiagramSourceMode('standard');
+      setSelectedStandardExIdx(idx);
+      setSelectedTokenIdx(0);
+    }}
                             className={`px-2.5 py-1 rounded-lg font-bold ${
                               diagramSourceMode === 'standard' &&
                               selectedStandardExIdx === idx
