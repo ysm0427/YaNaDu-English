@@ -1,15 +1,57 @@
 // ============================================================================
-// src/studyData.ts (100% 사전·기출 검증 데이터 에디션)
-// - 임의 단어 증폭 및 무작위 문장 조각 합성기 완전 폐기
-// - 미국식(en-US) 표준 발음기호(IPA), 예문-성분(Comp)-품사(Pos) 1:1 일치 검증 완료
-// - 각 표제어별 실제 파생어(명·형·부)·유의어 족보 및 어법 구분 설명 수록
+// src/studyData.ts
+// - 순환 참조 방지를 위한 공통 타입 독립 정의 및 단방향 Export
+// - 미국식(en-US) 발음기호(IPA), 한글 연음 발음, 의미 단위 소리블록 수록
+// - 시드 기반 결정론적 피셔-예이츠(Fisher-Yates) 어순 셔플 및 Safari 호환 분석기
 // ============================================================================
-import type { CompId, PosId, WordbookEntry } from './App';
+
+export type CompId = 'S' | 'V' | 'IO' | 'DO' | 'SC' | 'OC' | 'M';
+export type PosId =
+  | 'N'
+  | 'Pron'
+  | 'V'
+  | 'Adj'
+  | 'Adv'
+  | 'Prep'
+  | 'Conj'
+  | 'Det'
+  | 'Interj';
+
+export type WordbookLevel =
+  | '중등 필수'
+  | '고등·수능 핵심'
+  | '비즈니스·실무'
+  | '오픽(OPIc)·구동사';
+
+export interface WordbookEntry {
+  day: number;
+  level: WordbookLevel;
+  word: string;
+  matchedForm: string;
+  ipa: string;
+  pron: string;
+  soundBlock: string;
+  soundMethod: string;
+  meaning: string;
+  pos: PosId;
+  posLabel: string;
+  comp: CompId;
+  compLabel: string;
+  collocation: string;
+  collocationKo: string;
+  exampleEn: string;
+  examplePron: string;
+  exampleKo: string;
+  derivativesTip: string;
+}
 
 interface VerifiedVocabSeed {
   word: string;
+  matchedForm: string;
   ipa: string;
   pron: string;
+  soundBlock: string;
+  soundMethod: string;
   meaning: string;
   pos: PosId;
   posName: string;
@@ -18,18 +60,50 @@ interface VerifiedVocabSeed {
   collocation: string;
   collocationKo: string;
   exampleEn: string;
+  examplePron: string;
   exampleKo: string;
-  derivativesAndTip: string;
+  derivativesTip: string;
+}
+
+// 시드 기반 결정론적 셔플 유틸리티 (원래 순서와 동일해지지 않도록 보장)
+export function deterministicShuffle<T>(items: readonly T[], seed: number): T[] {
+  const arr = [...items];
+  if (arr.length <= 1) return arr;
+
+  let currentSeed = (Math.abs(Math.floor(Number.isFinite(seed) ? seed : 1)) + 1) * 2654435761;
+  for (let i = arr.length - 1; i > 0; i--) {
+    currentSeed = (currentSeed * 1664525 + 1013904223) >>> 0;
+    const j = currentSeed % (i + 1);
+    const temp = arr[i];
+    arr[i] = arr[j];
+    arr[j] = temp;
+  }
+
+  // 만약 우연히 원본 순서와 완전히 같다면 첫 번째와 마지막 원소를 스왑
+  const isSameOrder = arr.every((val, idx) => val === items[idx]);
+  if (isSameOrder && arr.length >= 2) {
+    const first = arr[0];
+    arr[0] = arr[arr.length - 1];
+    arr[arr.length - 1] = first;
+  }
+  return arr;
+}
+
+export function escapeRegExp(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 // ----------------------------------------------------------------------------
-// 1. 4대 영역 검증 코어 어휘 & 실제 파생어 족보 DB (각 20개 × 4영역 = 80개 핵심 표제어 패밀리)
+// 1. 4대 영역 코어 어휘 & 파생어 족보 DB (미국식 IPA · 한글발음 · 품사/성분 일치)
 // ----------------------------------------------------------------------------
 const VERIFIED_MID_VOCAB: VerifiedVocabSeed[] = [
   {
     word: 'schedule',
+    matchedForm: 'schedule',
     ipa: '/ˈskedʒ.uːl/',
     pron: '[스케줄]',
+    soundBlock: 'check / the schedule',
+    soundMethod: 'check 끝 자음 /k/를 가볍게 닫고 the schedule[더 스케줄]을 한 호흡으로 이어 발음합니다.',
     meaning: '일정, 계획표',
     pos: 'N',
     posName: '명사',
@@ -38,28 +112,36 @@ const VERIFIED_MID_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'check the schedule',
     collocationKo: '일정을 확인하다',
     exampleEn: 'We carefully checked the schedule in the morning.',
+    examplePron: '[위 케어풀리 첵트 / 더 스케줄 / 인 더 모닝]',
     exampleKo: '우리는 아침에 일정을 꼼꼼히 확인했다.',
-    derivativesAndTip: '동사: schedule(일정을 잡다) · 형용사: scheduled(예정된) | 예문에서 checked의 목적어(DO)로 쓰임',
+    derivativesTip: '동사: schedule(일정을 잡다) · 형용사: scheduled(예정된) | 예문에서 checked의 직접목적어(DO)',
   },
   {
     word: 'improve',
+    matchedForm: 'improve',
     ipa: '/ɪmˈpruːv/',
     pron: '[임프루브]',
+    soundBlock: 'improve / your English',
+    soundMethod: '강세가 두 번째 음절(-prove)에 오며 끝소리 /v/는 윗니로 아랫입술을 살짝 스치듯 소리 냅니다.',
     meaning: '향상시키다, 개선하다',
     pos: 'V',
     posName: '동사',
     comp: 'V',
-    compName: '서술어(동사)',
+    compName: '동사(서술어)',
     collocation: 'improve fluency',
     collocationKo: '유창성을 높이다',
     exampleEn: 'Reading in meaningful chunks will improve your English.',
     exampleKo: '의미 단위로 끊어 읽는 것은 영어 실력을 향상시킬 것이다.',
-    derivativesAndTip: '명사: improvement(향상, 개선) | 타동사로 뒤에 목적어(your English)를 바로 취함',
+    examplePron: '[리딩 인 미닝풀 청크스 / 윌 임프루브 / 유어 잉글리시]',
+    derivativesTip: '명사: improvement(향상, 개선) | 조동사 will과 결합해 문장의 서술어(V) 역할 수행',
   },
   {
     word: 'available',
+    matchedForm: 'available',
     ipa: '/əˈveɪ.lə.bəl/',
     pron: '[어베일러블]',
+    soundBlock: 'available / right now',
+    soundMethod: '두 번째 음절(-vail-)에 강세를 두고 뒷부분(-able)은 약하게 [러블]로 흘려 읽습니다.',
     meaning: '이용 가능한, 시간이 되는',
     pos: 'Adj',
     posName: '형용사',
@@ -68,28 +150,36 @@ const VERIFIED_MID_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'available right now',
     collocationKo: '지금 바로 시간이 되는',
     exampleEn: 'Are you available for a quick meeting today?',
+    examplePron: '[아 유 어베일러블 / 포 러 퀵 미팅 투데이]',
     exampleKo: '오늘 짧은 회의에 시간 괜찮으신가요?',
-    derivativesAndTip: '명사: availability(이용 가능성) | 주어(you)의 상태를 보충 설명하는 주격보어(SC)',
+    derivativesTip: '명사: availability(이용 가능성) | 주어(you)의 상태를 보충 설명하는 주격보어(SC)',
   },
   {
     word: 'recommend',
+    matchedForm: 'recommend',
     ipa: '/ˌrek.əˈmend/',
     pron: '[레커멘드]',
+    soundBlock: 'highly / recommend',
+    soundMethod: '마지막 음절(-mend)에 주강세가 오며 [레커멘드]로 리듬감 있게 발음합니다.',
     meaning: '추천하다, 권고하다',
     pos: 'V',
     posName: '동사',
     comp: 'V',
-    compName: '서술어(동사)',
+    compName: '동사(서술어)',
     collocation: 'highly recommend',
     collocationKo: '적극 추천하다',
     exampleEn: 'I highly recommend this book to beginners.',
+    examplePron: '[아이 하일리 레커멘드 / 디스 북 / 투 비기너즈]',
     exampleKo: '나는 초보자들에게 이 책을 적극 추천한다.',
-    derivativesAndTip: '명사: recommendation(추천, 권고) | recommend A to B(B에게 A를 추천하다) 구조 주의',
+    derivativesTip: '명사: recommendation(추천, 권고) | recommend A to B(B에게 A를 추천하다) 어순 주의',
   },
   {
     word: 'comfortable',
+    matchedForm: 'comfortable',
     ipa: '/ˈkʌm.fɚ.t̬ə.bəl/',
     pron: '[컴프터블]',
+    soundBlock: 'make yourself / comfortable',
+    soundMethod: '미국식 회화에서는 가운데 모음이 약화되어 흔히 3~4음절 [컴프터블/컴퍼터블]로 빠르게 발음됩니다.',
     meaning: '편안한, 쾌적한',
     pos: 'Adj',
     posName: '형용사',
@@ -98,13 +188,17 @@ const VERIFIED_MID_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'make yourself comfortable',
     collocationKo: '편안하게 계시다',
     exampleEn: 'Please make yourself comfortable in the lounge.',
+    examplePron: '[플리즈 메익 유어셀프 컴프터블 / 인 더 라운지]',
     exampleKo: '라운지에서 편히 계세요.',
-    derivativesAndTip: '명사/동사: comfort(편안함/위로하다) · 부사: comfortably | 5형식 make + 목적어(yourself) + 목적격보어(OC: 형용사)',
+    derivativesTip: '명사/동사: comfort(편안함/위로하다) · 부사: comfortably | 5형식 make + 목적어(yourself) + 목적격보어(OC)',
   },
   {
     word: 'opportunity',
+    matchedForm: 'opportunity',
     ipa: '/ˌɑː.pɚˈtuː.nə.t̬i/',
     pron: '[아퍼투너티]',
+    soundBlock: 'seize / the opportunity',
+    soundMethod: '미국식 발음에서는 첫 모음이 /ɑː/[아]로 소리 나며 끝의 t는 부드럽게 [티/리]로 발음됩니다.',
     meaning: '기회',
     pos: 'N',
     posName: '명사',
@@ -113,13 +207,17 @@ const VERIFIED_MID_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'seize the opportunity',
     collocationKo: '기회를 잡다',
     exampleEn: 'Do not miss this golden opportunity.',
+    examplePron: '[두 낫 미스 / 디스 골든 아퍼투너티]',
     exampleKo: '이 절호의 기회를 놓치지 마세요.',
-    derivativesAndTip: '유의어: chance(기회) | 타동사 miss의 직접목적어(DO) 역할',
+    derivativesTip: '유의어: chance(기회) | 타동사 miss의 직접목적어(DO) 역할',
   },
   {
     word: 'environment',
+    matchedForm: 'environment',
     ipa: '/ɪnˈvaɪ.rən.mənt/',
     pron: '[인바이런먼트]',
+    soundBlock: 'protect / the environment',
+    soundMethod: '두 번째 음절(-vi-)을 [바이]로 뚜렷하게 소리 내어 [인바이런먼트]로 발음합니다.',
     meaning: '환경, 주변 상황',
     pos: 'N',
     posName: '명사',
@@ -128,13 +226,17 @@ const VERIFIED_MID_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'protect the environment',
     collocationKo: '환경을 보호하다',
     exampleEn: 'We must protect the natural environment.',
+    examplePron: '[위 머스트 프로텍트 / 더 내추럴 인바이런먼트]',
     exampleKo: '우리는 자연환경을 보호해야 한다.',
-    derivativesAndTip: '형용사: environmental(환경의) · 부사: environmentally(환경적으로)',
+    derivativesTip: '형용사: environmental(환경의) · 부사: environmentally(환경적으로)',
   },
   {
     word: 'experience',
+    matchedForm: 'experience',
     ipa: '/ɪkˈspɪr.i.əns/',
     pron: '[익스피리언스]',
+    soundBlock: 'gain / valuable experience',
+    soundMethod: 'ex- 뒤의 /p/는 된소리 [익스피리언스]로 발음하며 두 번째 음절에 강세를 둡니다.',
     meaning: '경험, 체험',
     pos: 'N',
     posName: '명사',
@@ -143,28 +245,36 @@ const VERIFIED_MID_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'gain valuable experience',
     collocationKo: '귀중한 경험을 쌓다',
     exampleEn: 'Traveling abroad gives us valuable experience.',
+    examplePron: '[트래블링 어브로드 / 기브즈 어스 / 밸류어블 익스피리언스]',
     exampleKo: '해외여행은 우리에게 귀중한 경험을 준다.',
-    derivativesAndTip: '형용사: experienced(경험이 풍부한, 숙련된) | 4형식 gives + 간접목적어(us) + 직접목적어(DO: experience)',
+    derivativesTip: '형용사: experienced(숙련된) | 4형식 gives + 간접목적어(IO: us) + 직접목적어(DO: experience)',
   },
   {
     word: 'communicate',
+    matchedForm: 'communicate',
     ipa: '/kəˈmjuː.nə.keɪt/',
     pron: '[커뮤니케이트]',
+    soundBlock: 'communicate / clearly',
+    soundMethod: '두 번째 음절(-mu-)에 강세를 주어 [커뮤니케이트]로 또렷이 발음합니다.',
     meaning: '소통하다, 의사소통하다',
     pos: 'V',
     posName: '동사',
     comp: 'V',
-    compName: '서술어(동사)',
+    compName: '동사(서술어)',
     collocation: 'communicate clearly',
     collocationKo: '명확하게 소통하다',
     exampleEn: 'Good leaders communicate clearly with their team.',
+    examplePron: '[굿 리더즈 / 커뮤니케이트 클리얼리 / 위드 데어 팀]',
     exampleKo: '좋은 리더는 팀원들과 명확하게 소통한다.',
-    derivativesAndTip: '명사: communication(의사소통) · 형용사: communicative(소통을 잘하는)',
+    derivativesTip: '명사: communication(의사소통) · 형용사: communicative(소통을 잘하는)',
   },
   {
     word: 'essential',
+    matchedForm: 'essential',
     ipa: '/ɪˈsen.ʃəl/',
     pron: '[이센셜]',
+    soundBlock: 'essential / for success',
+    soundMethod: '-sen-에 강한 강세를 두고 끝음절 -tial은 부드럽게 [셜]로 발음합니다.',
     meaning: '필수적인, 본질적인',
     pos: 'Adj',
     posName: '형용사',
@@ -173,73 +283,93 @@ const VERIFIED_MID_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'essential for success',
     collocationKo: '성공에 필수적인',
     exampleEn: 'Consistency is essential for mastering a language.',
+    examplePron: '[컨시스턴시 이즈 이센셜 / 포 마스터링 어 랭귀지]',
     exampleKo: '꾸준함은 언어를 마스터하는 데 필수적이다.',
-    derivativesAndTip: '명사: essence(본질, 핵심) · 부사: essentially(본질적으로) | be동사 뒤 주격보어(SC)',
+    derivativesTip: '명사: essence(본질, 핵심) · 부사: essentially(본질적으로) | be동사 뒤 주격보어(SC)',
   },
   {
     word: 'concentrate',
+    matchedForm: 'concentrate',
     ipa: '/ˈkɑːn.sən.treɪt/',
     pron: '[칸선트레이트]',
+    soundBlock: 'concentrate / on my work',
+    soundMethod: '첫 음절(con-)을 미국식 /kɑːn/[칸]으로 열어 발음하고 전치사 on과 자연스럽게 이어 읽습니다.',
     meaning: '집중하다, 전념하다',
     pos: 'V',
     posName: '동사',
-    comp: 'OC',
-    compName: '목적격보어',
+    comp: 'V',
+    compName: '동사(서술어)',
     collocation: 'concentrate on work',
     collocationKo: '업무에 집중하다',
-    exampleEn: 'Quiet music helps me concentrate on my work.',
-    exampleKo: '잔잔한 음악은 내가 업무에 집중하도록 도와준다.',
-    derivativesAndTip: '명사: concentration(집중) | 5형식 helps + 목적어(me) + 목적격보어(OC: 원형부정사 concentrate)',
+    exampleEn: 'I concentrate best on my work in a quiet library.',
+    examplePron: '[아이 칸선트레이트 베스트 / 안 마이 워크 / 이너 콰이엇 라이브러리]',
+    exampleKo: '나는 조용한 도서관에서 업무에 가장 잘 집중한다.',
+    derivativesTip: '명사: concentration(집중) | 전치사 on과 결합해 대상을 나타내며 문장의 본동사(V)로 쓰임',
   },
   {
     word: 'participate',
+    matchedForm: 'participated',
     ipa: '/pɑːrˈtɪs.ə.peɪt/',
     pron: '[파티서페이트]',
+    soundBlock: 'participate / in the event',
+    soundMethod: '두 번째 음절(-ti-)에 강세를 두며 과거형 participated in은 [파티서페이티딘]으로 연음됩니다.',
     meaning: '참여하다, 참가하다',
     pos: 'V',
     posName: '동사',
     comp: 'V',
-    compName: '서술어(동사)',
+    compName: '동사(서술어)',
     collocation: 'participate in the event',
     collocationKo: '행사에 참여하다',
     exampleEn: 'Many students participated in the debate contest.',
+    examplePron: '[매니 스튜던츠 파티서페이티딘 / 더 디베이트 컨테스트]',
     exampleKo: '많은 학생들이 토론 대회에 참가했다.',
-    derivativesAndTip: '명사: participation(참여), participant(참가자) | 동의 숙어: take part in',
+    derivativesTip: '명사: participation(참여), participant(참가자) | 동의 숙어: take part in',
   },
   {
     word: 'encourage',
+    matchedForm: 'encouraged',
     ipa: '/ɪnˈkɝː.ɪdʒ/',
     pron: '[인커리지]',
+    soundBlock: 'encourage / the players',
+    soundMethod: '가운데 -cour-를 미국식 r모음 /ɝː/[커-]로 부드럽게 굴려 발음합니다.',
     meaning: '격려하다, 장려하다',
     pos: 'V',
     posName: '동사',
     comp: 'V',
-    compName: '서술어(동사)',
+    compName: '동사(서술어)',
     collocation: 'encourage players to try',
     collocationKo: '선수들이 시도하도록 격려하다',
     exampleEn: 'The coach encouraged the players to try again.',
+    examplePron: '[더 코치 인커리지드 / 더 플레이어즈 / 투 트라이 어겐]',
     exampleKo: '코치는 선수들이 다시 시도하도록 격려했다.',
-    derivativesAndTip: '명사: encouragement(격려) · 반의어: discourage(단념시키다) | encourage + O + to부정사(OC)',
+    derivativesTip: '명사: encouragement(격려) · 반의어: discourage(단념시키다) | encourage + O + to부정사(OC)',
   },
   {
     word: 'recognize',
+    matchedForm: 'recognize',
     ipa: '/ˈrek.əɡ.naɪz/',
     pron: '[레커그나이즈]',
+    soundBlock: 'recognize / the value',
+    soundMethod: '첫 음절(rec-)에 강세를 두고 끝의 -nize는 [나이즈]로 명확히 소리 냅니다.',
     meaning: '인식하다, 인정하다',
     pos: 'V',
     posName: '동사',
     comp: 'V',
-    compName: '서술어(동사)',
+    compName: '동사(서술어)',
     collocation: 'recognize the value',
     collocationKo: '가치를 인식하다',
     exampleEn: 'We should recognize the value of daily habits.',
+    examplePron: '[위 슈드 레커그나이즈 / 더 밸류 오브 데일리 해비츠]',
     exampleKo: '우리는 매일의 습관이 지닌 가치를 인식해야 한다.',
-    derivativesAndTip: '명사: recognition(인식, 인정) · 형용사: recognizable(알아볼 수 있는)',
+    derivativesTip: '명사: recognition(인식, 인정) · 형용사: recognizable(알아볼 수 있는)',
   },
   {
     word: 'independent',
+    matchedForm: 'independent',
     ipa: '/ˌɪn.dɪˈpen.dənt/',
     pron: '[인디펜던트]',
+    soundBlock: 'make you / independent',
+    soundMethod: '세 번째 음절(-pen-)에 강세를 두어 [인디펜던트]로 발음합니다.',
     meaning: '독립적인, 자주적인',
     pos: 'Adj',
     posName: '형용사',
@@ -248,13 +378,17 @@ const VERIFIED_MID_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'make you independent',
     collocationKo: '독립적으로 만들다',
     exampleEn: 'Thinking critically makes you independent.',
+    examplePron: '[씽킹 크리티컬리 / 메익스 유 인디펜던트]',
     exampleKo: '비판적으로 사고하는 것은 당신을 독립적으로 만든다.',
-    derivativesAndTip: '명사: independence(독립) · 반의어: dependent(의존적인) | makes + 목적어(you) + 목적격보어(OC)',
+    derivativesTip: '명사: independence(독립) · 반의어: dependent(의존적인) | makes + 목적어(you) + 목적격보어(OC)',
   },
   {
     word: 'responsible',
+    matchedForm: 'responsible',
     ipa: '/rɪˈspɑːn.sə.bəl/',
     pron: '[리스판서블]',
+    soundBlock: 'be responsible / for',
+    soundMethod: '두 번째 음절(-spon-)을 미국식 [스판]으로 발음하고 전치사 for와 세트로 묶어 읽습니다.',
     meaning: '책임이 있는, 담당하는',
     pos: 'Adj',
     posName: '형용사',
@@ -263,13 +397,17 @@ const VERIFIED_MID_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'be responsible for',
     collocationKo: '~에 책임이 있다',
     exampleEn: 'Who is responsible for managing this project?',
+    examplePron: '[후 이즈 리스판서블 / 포 매니징 디스 프로젝트]',
     exampleKo: '누가 이 프로젝트 관리를 담당하고 있나요?',
-    derivativesAndTip: '명사: responsibility(책임, 의무) · 부사: responsibly(책임감 있게)',
+    derivativesTip: '명사: responsibility(책임, 의무) · 부사: responsibly(책임감 있게)',
   },
   {
     word: 'influence',
+    matchedForm: 'influence',
     ipa: '/ˈɪn.flu.əns/',
     pron: '[인플루언스]',
+    soundBlock: 'have a strong influence / on',
+    soundMethod: '첫 음절(in-)에 강세를 두고 [인플루언스]로 부드럽게 이어 읽습니다.',
     meaning: '영향, 영향력',
     pos: 'N',
     posName: '명사',
@@ -278,13 +416,17 @@ const VERIFIED_MID_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'have a strong influence on',
     collocationKo: '~에 강한 영향을 미치다',
     exampleEn: 'Books have a strong influence on our perspective.',
+    examplePron: '[북스 해버 스트롱 인플루언스 / 안 아워 퍼스펙티브]',
     exampleKo: '책은 우리의 관점에 강한 영향을 미친다.',
-    derivativesAndTip: '형용사: influential(영향력 있는) | have an influence on = affect(영향을 미치다)',
+    derivativesTip: '형용사: influential(영향력 있는) | 동사 have의 직접목적어(DO) 역할',
   },
   {
     word: 'confident',
+    matchedForm: 'confident',
     ipa: '/ˈkɑːn.fə.dənt/',
     pron: '[칸피던트]',
+    soundBlock: 'feel / confident',
+    soundMethod: '첫 음절(con-)에 강세를 두고 나머지는 약하게 [피던트]로 발음합니다.',
     meaning: '자신감 있는, 확신하는',
     pos: 'Adj',
     posName: '형용사',
@@ -292,14 +434,18 @@ const VERIFIED_MID_VOCAB: VerifiedVocabSeed[] = [
     compName: '주격보어',
     collocation: 'feel confident in speaking',
     collocationKo: '말하기에 자신감을 느끼다',
-    exampleEn: 'Consistent practice helps you feel confident.',
-    exampleKo: '꾸준한 연습은 당신이 자신감을 느끼도록 돕는다.',
-    derivativesAndTip: '명사: confidence(자신감, 신뢰) · 부사: confidently(자신 있게) | 감각동사 feel의 보어(SC)',
+    exampleEn: 'Consistent practice makes learners feel confident.',
+    examplePron: '[컨시스턴트 프랙티스 / 메익스 러너즈 필 칸피던트]',
+    exampleKo: '꾸준한 연습은 학습자들이 자신감을 느끼게 해 준다.',
+    derivativesTip: '명사: confidence(자신감, 신뢰) · 부사: confidently(자신 있게) | 연결동사 feel의 보어(SC)',
   },
   {
     word: 'creative',
+    matchedForm: 'creative',
     ipa: '/kriˈeɪ.t̬ɪv/',
     pron: '[크리에이티브]',
+    soundBlock: 'a creative / approach',
+    soundMethod: '-a- 음절에 강세를 두고 미국식 t는 부드럽게 [티브/리브]로 발음합니다.',
     meaning: '창의적인, 독창적인',
     pos: 'Adj',
     posName: '형용사',
@@ -308,31 +454,39 @@ const VERIFIED_MID_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'a creative approach',
     collocationKo: '창의적인 접근법',
     exampleEn: 'We need a creative approach to solve this issue.',
+    examplePron: '[위 니더 크리에이티브 어프로치 / 투 솔브 디스 이슈]',
     exampleKo: '우리는 이 문제를 해결하기 위해 창의적인 접근법이 필요하다.',
-    derivativesAndTip: '동사: create(창조하다) · 명사: creativity(창의성) | 명사(approach)를 앞에서 꾸미는 수식어(M)',
+    derivativesTip: '동사: create(창조하다) · 명사: creativity(창의성) · 부사: creatively | 명사(approach) 앞 수식어(M)',
   },
   {
     word: 'appreciate',
+    matchedForm: 'appreciate',
     ipa: '/əˈpriː.ʃi.eɪt/',
     pron: '[어프리시에이트]',
+    soundBlock: 'really appreciate / your help',
+    soundMethod: '두 번째 음절(-pre-)에 강세를 두어 [어프리시에이트]로 발음합니다.',
     meaning: '감사하다, 진가를 알아보다',
     pos: 'V',
     posName: '동사',
     comp: 'V',
-    compName: '서술어(동사)',
+    compName: '동사(서술어)',
     collocation: 'really appreciate your help',
     collocationKo: '도움에 진심으로 감사하다',
     exampleEn: 'I really appreciate your quick feedback.',
+    examplePron: '[아이 릴리 어프리시에이트 / 유어 퀵 피드백]',
     exampleKo: '빠른 피드백에 진심으로 감사드립니다.',
-    derivativesAndTip: '명사: appreciation(감사, 감상, 이해) | appreciate 뒤에는 사람(you)이 아니라 대상(help, feedback)이 목적어로 옴',
+    derivativesTip: '명사: appreciation(감사, 감상, 이해) | 목적어 자리에 사람(you)이 아닌 대상(help, feedback)이 옴',
   },
 ];
 
 const VERIFIED_CSAT_VOCAB: VerifiedVocabSeed[] = [
   {
     word: 'perspective',
+    matchedForm: 'perspective',
     ipa: '/pɚˈspek.tɪv/',
     pron: '[퍼스펙티브]',
+    soundBlock: 'broaden / our perspective',
+    soundMethod: '두 번째 음절(-spec-)에 강한 강세를 두어 [퍼스펙티브]로 또렷이 발음합니다.',
     meaning: '관점, 시각, 조망',
     pos: 'N',
     posName: '명사',
@@ -341,13 +495,17 @@ const VERIFIED_CSAT_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'broaden our perspective',
     collocationKo: '시야(관점)를 넓히다',
     exampleEn: 'Reading diverse texts broadens our perspective on life.',
+    examplePron: '[리딩 다이버스 텍스츠 / 브로든즈 아워 퍼스펙티브 / 안 라이프]',
     exampleKo: '다양한 글을 읽는 것은 삶에 대한 우리의 시야를 넓혀준다.',
-    derivativesAndTip: '유의어: viewpoint, standpoint, outlook(관점) | 동사 broadens의 직접목적어(DO)',
+    derivativesTip: '유의어: viewpoint, standpoint, outlook(관점) | 타동사 broadens의 직접목적어(DO)',
   },
   {
     word: 'significant',
+    matchedForm: 'significant',
     ipa: '/sɪɡˈnɪf.ə.kənt/',
     pron: '[시그니피컨트]',
+    soundBlock: 'a significant / correlation',
+    soundMethod: '-nif- 음절에 강세를 두어 [시그니피컨트]로 리듬감 있게 발음합니다.',
     meaning: '중요한, 상당한, 의미 있는',
     pos: 'Adj',
     posName: '형용사',
@@ -356,13 +514,17 @@ const VERIFIED_CSAT_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'a significant correlation',
     collocationKo: '유의미한(상당한) 상관관계',
     exampleEn: 'There is a significant correlation between habit and success.',
+    examplePron: '[데어 리저 시그니피컨트 코럴레이션 / 비트윈 해빗 앤 석세스]',
     exampleKo: '습관과 성공 사이에는 상당한 상관관계가 있다.',
-    derivativesAndTip: '명사: significance(중요성, 의의) · 부사: significantly(상당히, 의미 있게)',
+    derivativesTip: '명사: significance(중요성, 의의) · 부사: significantly(상당히, 의미 있게)',
   },
   {
     word: 'simultaneously',
+    matchedForm: 'simultaneously',
     ipa: '/ˌsaɪ.məlˈteɪ.ni.əs.li/',
     pron: '[사이멀테이니어슬리]',
+    soundBlock: 'occurred / simultaneously',
+    soundMethod: '세 번째 음절(-ta-)에 주강세를 두고 [사이멀-테이니어슬리] 두 덩어리 느낌으로 읽습니다.',
     meaning: '동시에, 일제히',
     pos: 'Adv',
     posName: '부사',
@@ -371,13 +533,17 @@ const VERIFIED_CSAT_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'occur simultaneously',
     collocationKo: '동시에 발생하다',
     exampleEn: 'Two major changes occurred simultaneously in the market.',
+    examplePron: '[투 메이저 체인지즈 / 어커드 사이멀테이니어슬리 / 인 더 마켓]',
     exampleKo: '시장에서 두 가지 주요 변화가 동시에 발생했다.',
-    derivativesAndTip: '형용사: simultaneous(동시의) | 동의 표현: at the same time',
+    derivativesTip: '형용사: simultaneous(동시의) | 동의 표현: at the same time',
   },
   {
     word: 'inevitable',
+    matchedForm: 'inevitable',
     ipa: '/ɪˈnev.ə.t̬ə.bəl/',
     pron: '[이네버터블]',
+    soundBlock: 'an inevitable / part',
+    soundMethod: 'an과 첫 모음 /ɪ/를 이어 [어니네버터블]로 부드럽게 연음합니다.',
     meaning: '피할 수 없는, 필연적인',
     pos: 'Adj',
     posName: '형용사',
@@ -386,13 +552,17 @@ const VERIFIED_CSAT_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'an inevitable part',
     collocationKo: '피할 수 없는 부분',
     exampleEn: 'Change is an inevitable part of human history.',
+    examplePron: '[체인지 이즈 / 어니네버터블 파트 / 오브 휴먼 히스토리]',
     exampleKo: '변화는 인류 역사의 피할 수 없는 일부이다.',
-    derivativesAndTip: '부사: inevitably(필연적으로, 어쩔 수 없이) | 유의어: unavoidable',
+    derivativesTip: '부사: inevitably(필연적으로, 어쩔 수 없이) | 유의어: unavoidable',
   },
   {
     word: 'cognitive',
+    matchedForm: 'cognitive',
     ipa: '/ˈkɑːɡ.nə.t̬ɪv/',
     pron: '[카그너티브]',
+    soundBlock: 'cognitive / flexibility',
+    soundMethod: '첫 음절(cog-)을 미국식 [카그]로 강하게 소리 내어 [카그너티브]로 발음합니다.',
     meaning: '인지의, 인식의',
     pos: 'Adj',
     posName: '형용사',
@@ -401,13 +571,17 @@ const VERIFIED_CSAT_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'cognitive flexibility',
     collocationKo: '인지적 유연성',
     exampleEn: 'Learning a new language boosts cognitive flexibility.',
+    examplePron: '[러닝 어 뉴 랭귀지 / 부스츠 카그너티브 플렉서빌러티]',
     exampleKo: '새로운 언어를 배우는 것은 인지적 유연성을 높여준다.',
-    derivativesAndTip: '명사: cognition(인지, 인식) · 동사: recognize(인식하다)',
+    derivativesTip: '명사: cognition(인지, 인식) · 부사: cognitively(인지적으로) | 명사(flexibility) 앞 수식어(M)',
   },
   {
     word: 'phenomenon',
+    matchedForm: 'phenomenon',
     ipa: '/fəˈnɑː.mə.nɑːn/',
     pron: '[퍼나머난]',
+    soundBlock: 'analyze / the phenomenon',
+    soundMethod: '두 번째 음절(-nom-)을 [나]로 강하게 발음하여 [퍼나머난]으로 읽습니다.',
     meaning: '현상, 사건',
     pos: 'N',
     posName: '명사',
@@ -416,13 +590,17 @@ const VERIFIED_CSAT_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'analyze the phenomenon',
     collocationKo: '현상을 분석하다',
     exampleEn: 'Scientists analyzed the natural phenomenon carefully.',
+    examplePron: '[사이언티스츠 애널라이즈드 / 더 내추럴 퍼나머난 / 케어풀리]',
     exampleKo: '과학자들은 그 자연 현상을 면밀히 분석했다.',
-    derivativesAndTip: '복수형 주의: phenomena(현상들) · 형용사: phenomenal(경이로운, 놀라운)',
+    derivativesTip: '복수형 주의: phenomena(현상들) · 형용사: phenomenal(경이로운, 놀라운)',
   },
   {
     word: 'bias',
+    matchedForm: 'bias',
     ipa: '/ˈbaɪ.əs/',
     pron: '[바이어스]',
+    soundBlock: 'overcome / confirmation bias',
+    soundMethod: '첫 음절(bi-)을 [바이]로 길게 빼고 뒤는 가볍게 [어스]로 마무리합니다.',
     meaning: '편향, 편견, 선입견',
     pos: 'N',
     posName: '명사',
@@ -431,43 +609,55 @@ const VERIFIED_CSAT_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'overcome confirmation bias',
     collocationKo: '확증 편향을 극복하다',
     exampleEn: 'Critical thinking helps us overcome confirmation bias.',
+    examplePron: '[크리티컬 씽킹 / 헬프스 어스 오버컴 / 칸퍼메이션 바이어스]',
     exampleKo: '비판적 사고는 우리가 확증 편향을 극복하도록 돕는다.',
-    derivativesAndTip: '형용사: biased(편향된, 편견을 가진) ↔ unbiased(공정한, 편견 없는)',
+    derivativesTip: '형용사: biased(편향된, 편견을 가진) ↔ unbiased(공정한, 편견 없는)',
   },
   {
     word: 'foster',
+    matchedForm: 'foster',
     ipa: '/ˈfɑː.stɚ/',
     pron: '[파스터]',
+    soundBlock: 'foster / mutual understanding',
+    soundMethod: '첫 모음을 미국식 /ɑː/[파]로 넓게 열어 [파스터]로 발음합니다.',
     meaning: '조성하다, 촉진하다, 기르다',
     pos: 'V',
     posName: '동사',
     comp: 'V',
-    compName: '서술어(동사)',
+    compName: '동사(서술어)',
     collocation: 'foster mutual understanding',
     collocationKo: '상호 이해를 증진하다',
     exampleEn: 'Open discussions foster mutual understanding and creativity.',
+    examplePron: '[오픈 디스커션즈 / 파스터 뮤추얼 언더스탠딩 / 앤 크리에이티비티]',
     exampleKo: '열린 토론은 상호 이해와 창의성을 촉진한다.',
-    derivativesAndTip: '유의어: promote, cultivate, encourage, nurture(촉진하다, 함양하다)',
+    derivativesTip: '유의어: promote, cultivate, encourage, nurture(촉진하다, 함양하다)',
   },
   {
     word: 'transcend',
+    matchedForm: 'transcends',
     ipa: '/trænˈsend/',
     pron: '[트랜센드]',
+    soundBlock: 'transcend / cultural barriers',
+    soundMethod: 'c가 s 앞뒤에서 묵음이 되어 [트랜센드]로 소리 나며 뒷음절에 강세가 있습니다.',
     meaning: '초월하다, 뛰어넘다',
     pos: 'V',
     posName: '동사',
     comp: 'V',
-    compName: '서술어(동사)',
+    compName: '동사(서술어)',
     collocation: 'transcend cultural barriers',
     collocationKo: '문화적 장벽을 초월하다',
     exampleEn: 'Great music transcends language and cultural barriers.',
+    examplePron: '[그레이트 뮤직 트랜센즈 / 랭귀지 앤 컬처럴 배리어즈]',
     exampleKo: '위대한 음악은 언어와 문화적 장벽을 초월한다.',
-    derivativesAndTip: '명사: transcendence(초월) · 형용사: transcendent(초월적인)',
+    derivativesTip: '명사: transcendence(초월) · 형용사: transcendent(초월적인)',
   },
   {
     word: 'rigidity',
+    matchedForm: 'rigidity',
     ipa: '/rɪˈdʒɪd.ə.t̬i/',
     pron: '[리지더티]',
+    soundBlock: 'prevent / cognitive rigidity',
+    soundMethod: '두 번째 음절(-gid-)에 강세를 두어 [리지더티]로 발음합니다.',
     meaning: '경직성, 엄격함',
     pos: 'N',
     posName: '명사',
@@ -476,13 +666,17 @@ const VERIFIED_CSAT_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'prevent cognitive rigidity',
     collocationKo: '사고의 경직성을 막다',
     exampleEn: 'Exposure to new ideas prevents cognitive rigidity.',
+    examplePron: '[익스포저 투 뉴 아이디어즈 / 프리벤츠 카그너티브 리지더티]',
     exampleKo: '새로운 아이디어에 노출되는 것은 인지적 경직성을 예방한다.',
-    derivativesAndTip: '형용사: rigid(경직된, 엄격한) ↔ 반의 명사: flexibility(유연성)',
+    derivativesTip: '형용사: rigid(경직된, 엄격한) ↔ 반의 명사: flexibility(유연성)',
   },
   {
     word: 'ambiguous',
+    matchedForm: 'ambiguous',
     ipa: '/æmˈbɪɡ.ju.əs/',
     pron: '[앰비규어스]',
+    soundBlock: 'remained / ambiguous',
+    soundMethod: '-big-에 강세를 두고 뒤의 -uous를 부드럽게 [규어스]로 이어 읽습니다.',
     meaning: '모호한, 애매한',
     pos: 'Adj',
     posName: '형용사',
@@ -491,13 +685,17 @@ const VERIFIED_CSAT_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'remain ambiguous',
     collocationKo: '모호한 상태로 남다',
     exampleEn: 'The wording of the contract remained somewhat ambiguous.',
+    examplePron: '[더 워딩 오브 더 컨트랙트 / 리메인드 썸왓 앰비규어스]',
     exampleKo: '그 계약서의 문구는 다소 모호한 상태로 남아 있었다.',
-    derivativesAndTip: '명사: ambiguity(모호성) · 반의어: explicit, clear(명확한) | 2형식 동사 remained의 보어(SC)',
+    derivativesTip: '명사: ambiguity(모호성) · 반의어: explicit, clear(명확한) | 2형식 동사 remained의 보어(SC)',
   },
   {
     word: 'intrinsic',
+    matchedForm: 'Intrinsic',
     ipa: '/ɪnˈtrɪn.zɪk/',
     pron: '[인트린직]',
+    soundBlock: 'intrinsic / motivation',
+    soundMethod: '-trin-에 강세를 두며 뒤의 s는 유성음화되어 [직/식]으로 발음됩니다.',
     meaning: '내재적인, 본질적인, 고유의',
     pos: 'Adj',
     posName: '형용사',
@@ -506,13 +704,17 @@ const VERIFIED_CSAT_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'intrinsic motivation',
     collocationKo: '내재적 동기',
     exampleEn: 'Intrinsic motivation lasts longer than external rewards.',
+    examplePron: '[인트린직 모티베이션 / 래스츠 롱거 댄 익스터널 리워즈]',
     exampleKo: '내재적 동기는 외적 보상보다 더 오래 지속된다.',
-    derivativesAndTip: '부사: intrinsically(본질적으로) · 반의어: extrinsic(외재적인, 외부의)',
+    derivativesTip: '부사: intrinsically(본질적으로) · 반의어: extrinsic(외재적인, 외부의)',
   },
   {
     word: 'vulnerability',
+    matchedForm: 'vulnerability',
     ipa: '/ˌvʌl.nɚ.əˈbɪl.ə.t̬i/',
     pron: '[벌너러빌러티]',
+    soundMethod: '-bil- 음절에 주강세를 두고 [벌너러-빌러티]로 끊어 리듬을 타면 발음하기 쉽습니다.',
+    soundBlock: 'acknowledge / vulnerability',
     meaning: '취약성, 연약함',
     pos: 'N',
     posName: '명사',
@@ -521,13 +723,17 @@ const VERIFIED_CSAT_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'acknowledge vulnerability',
     collocationKo: '취약성을 인정하다',
     exampleEn: 'Showing vulnerability can actually build deeper trust.',
+    examplePron: '[쇼잉 벌너러빌러티 / 캔 액추얼리 빌드 / 디퍼 트러스트]',
     exampleKo: '취약함을 보여주는 것이 실제로는 더 깊은 신뢰를 쌓을 수 있다.',
-    derivativesAndTip: '형용사: vulnerable(취약한, 상처받기 쉬운 — to와 결합)',
+    derivativesTip: '형용사: vulnerable(취약한, 상처받기 쉬운 — 주로 전치사 to와 결합)',
   },
   {
     word: 'sustainable',
+    matchedForm: 'sustainable',
     ipa: '/səˈsteɪ.nə.bəl/',
     pron: '[서스테이너블]',
+    soundBlock: 'sustainable / growth',
+    soundMethod: '두 번째 음절(-stain-)에 강세를 두어 [서스테이너블]로 발음합니다.',
     meaning: '지속 가능한',
     pos: 'Adj',
     posName: '형용사',
@@ -536,13 +742,17 @@ const VERIFIED_CSAT_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'sustainable growth',
     collocationKo: '지속 가능한 성장',
     exampleEn: 'Modern enterprises focus heavily on sustainable growth.',
+    examplePron: '[모던 엔터프라이지즈 / 포커스 헤빌리 / 안 서스테이너블 그로쓰]',
     exampleKo: '현대 기업들은 지속 가능한 성장에 크게 집중한다.',
-    derivativesAndTip: '동사: sustain(유지하다, 지탱하다) · 명사: sustainability(지속 가능성)',
+    derivativesTip: '동사: sustain(유지하다, 지탱하다) · 명사: sustainability(지속 가능성)',
   },
   {
     word: 'paradigm',
+    matchedForm: 'paradigm',
     ipa: '/ˈper.ə.daɪm/',
     pron: '[패러다임]',
+    soundBlock: 'shift / the paradigm',
+    soundMethod: '끝의 철자 g는 묵음(소리가 나지 않음)이므로 [패러다임]으로 발음합니다.',
     meaning: '패러다임, 인식의 틀',
     pos: 'N',
     posName: '명사',
@@ -551,13 +761,17 @@ const VERIFIED_CSAT_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'shift the paradigm',
     collocationKo: '인식의 틀을 바꾸다',
     exampleEn: 'Digital technology has shifted the educational paradigm.',
+    examplePron: '[디지털 테크놀로지 / 해즈 시프티드 / 디 에듀케이셔널 패러다임]',
     exampleKo: '디지털 기술은 교육의 패러다임을 바꾸어 놓았다.',
-    derivativesAndTip: '핵심 결합: paradigm shift(패러다임의 전환)',
+    derivativesTip: '핵심 결합: paradigm shift(패러다임의 전환) | 타동사 shifted의 목적어(DO)',
   },
   {
     word: 'empirical',
+    matchedForm: 'empirical',
     ipa: '/ɪmˈpɪr.ɪ.kəl/',
     pron: '[임피리컬]',
+    soundBlock: 'empirical / evidence',
+    soundMethod: '두 번째 음절(-pir-)에 강세를 두어 [임피리컬]로 또렷이 발음합니다.',
     meaning: '경험적인, 실증적인',
     pos: 'Adj',
     posName: '형용사',
@@ -566,13 +780,17 @@ const VERIFIED_CSAT_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'empirical evidence',
     collocationKo: '실증적 증거',
     exampleEn: 'The hypothesis must be supported by empirical evidence.',
+    examplePron: '[더 하이파써시스 / 머스트 비 서포티드 / 바이 임피리컬 에비던스]',
     exampleKo: '그 가설은 실증적 증거에 의해 뒷받침되어야 한다.',
-    derivativesAndTip: '부사: empirically(실증적으로, 경험적으로) ↔ 반의어: theoretical(이론적인)',
+    derivativesTip: '부사: empirically(실증적으로, 경험적으로) ↔ 반의어: theoretical(이론적인)',
   },
   {
     word: 'reciprocal',
+    matchedForm: 'reciprocal',
     ipa: '/rɪˈsɪp.rə.kəl/',
     pron: '[리시프러컬]',
+    soundBlock: 'a reciprocal / relationship',
+    soundMethod: '두 번째 음절(-cip-)에 강세를 두어 [리시프러컬]로 발음합니다.',
     meaning: '상호 간의, 호혜적인',
     pos: 'Adj',
     posName: '형용사',
@@ -581,28 +799,36 @@ const VERIFIED_CSAT_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'a reciprocal relationship',
     collocationKo: '상호 호혜적인 관계',
     exampleEn: 'Lasting trust is built upon a reciprocal relationship.',
+    examplePron: '[래스팅 트러스트 이즈 빌트 / 어폰 어 리시프러컬 릴레이션십]',
     exampleKo: '지속적인 신뢰는 상호 호혜적인 관계 위에 구축된다.',
-    derivativesAndTip: '명사: reciprocity(상호성, 호혜) · 유의어: mutual(상호의)',
+    derivativesTip: '명사: reciprocity(상호성, 호혜) · 유의어: mutual(상호의)',
   },
   {
     word: 'consolidate',
+    matchedForm: 'consolidates',
     ipa: '/kənˈsɑː.lə.deɪt/',
     pron: '[컨살러데이트]',
+    soundBlock: 'consolidate / long-term memory',
+    soundMethod: '두 번째 음절(-sol-)을 미국식 [살]로 강하게 소리 내어 [컨살러데이트]로 발음합니다.',
     meaning: '강화하다, 공고히 하다, 통합하다',
     pos: 'V',
     posName: '동사',
-    comp: 'OC',
-    compName: '목적격보어',
+    comp: 'V',
+    compName: '동사(서술어)',
     collocation: 'consolidate long-term memory',
     collocationKo: '장기 기억을 공고히 굳히다',
-    exampleEn: 'Reviewing notes helps consolidate long-term memory.',
-    exampleKo: '노트를 복습하는 것은 장기 기억을 공고히 굳히는 데 도움이 된다.',
-    derivativesAndTip: '명사: consolidation(강화, 통합) | helps 뒤에서 목적어를 바로 생략하고 원형부정사 보어(OC)로 쓰임',
+    exampleEn: 'Consistent review consolidates long-term memory effectively.',
+    examplePron: '[컨시스턴트 리뷰 / 컨살러데이츠 롱텀 메모리 / 이펙티블리]',
+    exampleKo: '꾸준한 복습은 장기 기억을 효과적으로 공고히 굳혀준다.',
+    derivativesTip: '명사: consolidation(강화, 통합) | 주어(Consistent review)의 본동사(V)로 쓰임',
   },
   {
     word: 'autonomy',
+    matchedForm: 'autonomy',
     ipa: '/ɔːˈtɑː.nə.mi/',
     pron: '[오타너미]',
+    soundBlock: 'grant / greater autonomy',
+    soundMethod: '두 번째 음절(-ton-)에 강세를 두어 [오타너미]로 발음합니다.',
     meaning: '자율성, 자치권',
     pos: 'N',
     posName: '명사',
@@ -611,13 +837,17 @@ const VERIFIED_CSAT_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'grant greater autonomy',
     collocationKo: '더 큰 자율성을 부여하다',
     exampleEn: 'Giving learners autonomy increases their motivation.',
+    examplePron: '[기빙 러너즈 오타너미 / 인크리시즈 데어 모티베이션]',
     exampleKo: '학습자들에게 자율성을 부여하는 것은 동기를 높인다.',
-    derivativesAndTip: '형용사: autonomous(자율적인, 자치의) | 4형식 Giving + IO(learners) + DO(autonomy)',
+    derivativesTip: '형용사: autonomous(자율적인, 자치의) | 4형식 동명사 Giving + IO(learners) + DO(autonomy)',
   },
   {
     word: 'predominant',
+    matchedForm: 'predominant',
     ipa: '/prɪˈdɑː.mə.nənt/',
     pron: '[프리다머넌트]',
+    soundBlock: 'the predominant / source',
+    soundMethod: '두 번째 음절(-dom-)에 강세를 두어 [프리다머넌트]로 발음합니다.',
     meaning: '지배적인, 두드러진, 우세한',
     pos: 'Adj',
     posName: '형용사',
@@ -626,46 +856,58 @@ const VERIFIED_CSAT_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'the predominant source',
     collocationKo: '주된(지배적인) 원천',
     exampleEn: 'Online platforms have become the predominant source of news.',
+    examplePron: '[온라인 플랫폼즈 해브 비컴 / 더 프리다머넌트 소스 오브 뉴스]',
     exampleKo: '온라인 플랫폼은 뉴스의 지배적인 원천이 되었다.',
-    derivativesAndTip: '부사: predominantly(대부분, 주로) · 동사: predominate(지배하다, 우세하다)',
+    derivativesTip: '부사: predominantly(대부분, 주로) · 동사: predominate(지배하다, 우세하다)',
   },
 ];
 
 const VERIFIED_BIZ_VOCAB: VerifiedVocabSeed[] = [
   {
     word: 'streamline',
+    matchedForm: 'streamline',
     ipa: '/ˈstriːm.laɪn/',
     pron: '[스트림라인]',
+    soundBlock: 'streamline / the workflow',
+    soundMethod: '첫 음절(stream-)을 길게 뽑아 [스트림라인]으로 한 번에 발음합니다.',
     meaning: '(업무·절차를) 간소화하다, 효율화하다',
     pos: 'V',
     posName: '동사',
     comp: 'V',
-    compName: '서술어(동사)',
+    compName: '동사(서술어)',
     collocation: 'streamline the workflow',
     collocationKo: '업무 공정을 효율화하다',
-    exampleEn: 'We need to streamline the entire workflow this quarter.',
-    exampleKo: '우리는 이번 분기에 전체 업무 공정을 간소화해야 한다.',
-    derivativesAndTip: '분사형 형용사: streamlined(간소화된, 능률적인)',
+    exampleEn: 'We will streamline the entire workflow this quarter.',
+    examplePron: '[위 윌 스트림라인 / 디 인타이어 워크플로우 / 디스 쿼터]',
+    exampleKo: '우리는 이번 분기에 전체 업무 공정을 간소화할 것이다.',
+    derivativesTip: '분사형 형용사: streamlined(간소화된, 능률적인)',
   },
   {
     word: 'expedite',
+    matchedForm: 'expedite',
     ipa: '/ˈek.spə.daɪt/',
     pron: '[엑스퍼다이트]',
+    soundBlock: 'expedite / the review process',
+    soundMethod: '첫 음절(ex-)에 강세를 두고 끝음절(-dite)은 [다이트]로 또렷이 발음합니다.',
     meaning: '(처리·진행을) 신속히 처리하다, 앞당기다',
     pos: 'V',
     posName: '동사',
     comp: 'V',
-    compName: '서술어(동사)',
+    compName: '동사(서술어)',
     collocation: 'expedite the review process',
     collocationKo: '검토 절차를 신속히 처리하다',
     exampleEn: 'Could you please expedite the review process?',
+    examplePron: '[쿠쥬 플리즈 엑스퍼다이트 / 더 리뷰 프로세스]',
     exampleKo: '검토 절차를 좀 더 신속히 진행해 주실 수 있나요?',
-    derivativesAndTip: '형용사: expeditious(신속한, 빠른) · 유의어: accelerate, speed up',
+    derivativesTip: '형용사: expeditious(신속한, 빠른) · 유의어: accelerate, speed up',
   },
   {
     word: 'feasible',
+    matchedForm: 'feasible',
     ipa: '/ˈfiː.zə.bəl/',
     pron: '[피저블]',
+    soundBlock: 'make the schedule / feasible',
+    soundMethod: '첫 음절(fea-)를 길게 [피-]로 내고 s는 유성음 /z/[저]로 부드럽게 발음합니다.',
     meaning: '실현 가능한, 실행할 수 있는',
     pos: 'Adj',
     posName: '형용사',
@@ -674,13 +916,17 @@ const VERIFIED_BIZ_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'make the schedule feasible',
     collocationKo: '일정을 실현 가능하게 만들다',
     exampleEn: 'Streamlining the process makes the schedule feasible.',
+    examplePron: '[스트림라이닝 더 프로세스 / 메익스 더 스케줄 피저블]',
     exampleKo: '절차를 간소화하는 것은 그 일정을 실현 가능하게 만든다.',
-    derivativesAndTip: '명사: feasibility(실현 가능성, 타당성) | 5형식 makes + 목적어(the schedule) + 목적격보어(OC: 형용사)',
+    derivativesTip: '명사: feasibility(실현 가능성, 타당성) | 5형식 makes + 목적어(the schedule) + 목적격보어(OC: 형용사)',
   },
   {
     word: 'tentative',
+    matchedForm: 'tentative',
     ipa: '/ˈten.tə.t̬ɪv/',
     pron: '[텐터티브]',
+    soundBlock: 'a tentative / schedule',
+    soundMethod: '첫 음절(ten-)에 강세를 두고 미국식에서는 흔히 [텐터티브/테너티브]로 부드럽게 발음합니다.',
     meaning: '잠정적인, 가안의',
     pos: 'Adj',
     posName: '형용사',
@@ -689,13 +935,17 @@ const VERIFIED_BIZ_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'a tentative schedule',
     collocationKo: '잠정적인 일정',
     exampleEn: 'We have set a tentative schedule for the product launch.',
+    examplePron: '[위 해브 셋 어 텐터티브 스케줄 / 포 더 프로덕트 런치]',
     exampleKo: '우리는 제품 출시를 위한 잠정 일정을 잡았다.',
-    derivativesAndTip: '부사: tentatively(잠정적으로, 시험 삼아) ↔ 반의어: confirmed, final(확정된)',
+    derivativesTip: '부사: tentatively(잠정적으로) ↔ 반의어: confirmed, final(확정된)',
   },
   {
     word: 'meticulously',
+    matchedForm: 'meticulously',
     ipa: '/məˈtɪk.jə.ləs.li/',
     pron: '[머티큘러슬리]',
+    soundBlock: 'checked / meticulously',
+    soundMethod: '두 번째 음절(-tic-)에 강한 강세를 두어 [머티큘러슬리]로 발음합니다.',
     meaning: '꼼꼼하게, 세심하게, 빈틈없이',
     pos: 'Adv',
     posName: '부사',
@@ -704,28 +954,36 @@ const VERIFIED_BIZ_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'check meticulously',
     collocationKo: '빈틈없이 확인하다',
     exampleEn: 'Our team meticulously checked every single detail.',
+    examplePron: '[아워 팀 머티큘러슬리 첵트 / 에브리 싱글 디테일]',
     exampleKo: '우리 팀은 모든 세부 사항을 꼼꼼하게 확인했다.',
-    derivativesAndTip: '형용사: meticulous(꼼꼼한, 세심한) · 유의어: thoroughly, carefully',
+    derivativesTip: '형용사: meticulous(꼼꼼한, 세심한) · 유의어: thoroughly, carefully',
   },
   {
     word: 'accommodate',
+    matchedForm: 'accommodated',
     ipa: '/əˈkɑː.mə.deɪt/',
     pron: '[어카머데이트]',
+    soundBlock: 'accommodate / a request',
+    soundMethod: '두 번째 음절(-com-)을 미국식 [카]로 열어 [어카머데이트]로 발음합니다.',
     meaning: '(요청·요구를) 수용하다, 편의를 봐주다, 숙박시키다',
     pos: 'V',
     posName: '동사',
     comp: 'V',
-    compName: '서술어(동사)',
+    compName: '동사(서술어)',
     collocation: 'accommodate a request',
     collocationKo: '요청을 수용하다',
-    exampleEn: 'Would it be possible to accommodate a late check-out?',
-    exampleKo: '레이트 체크아웃 요청을 수용해 주실 수 있을까요?',
-    derivativesAndTip: '명사: accommodation(숙소, 수용, 합의) · 형용사: accommodating(협조적인, 편의를 잘 봐주는)',
+    exampleEn: 'The hotel gladly accommodated our late check-out request.',
+    examplePron: '[더 호텔 글래들리 어카머데이티드 / 아워 레이트 체크아웃 리퀘스트]',
+    exampleKo: '호텔 측은 우리의 레이트 체크아웃 요청을 기꺼이 수용해 주었다.',
+    derivativesTip: '명사: accommodation(숙소, 수용) · 형용사: accommodating(협조적인) | 철자 c 2개, m 2개 주의',
   },
   {
     word: 'complimentary',
+    matchedForm: 'complimentary',
     ipa: '/ˌkɑːm.pləˈmen.t̬ɚ.i/',
     pron: '[캄플러멘터리]',
+    soundBlock: 'complimentary / breakfast',
+    soundMethod: '세 번째 음절(-men-)에 주강세가 오며 [캄플러멘터리]로 발음합니다.',
     meaning: '무료로 제공되는, 우대의',
     pos: 'Adj',
     posName: '형용사',
@@ -734,13 +992,17 @@ const VERIFIED_BIZ_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'complimentary breakfast',
     collocationKo: '무료 조식',
     exampleEn: 'Our hotel booking includes complimentary breakfast.',
+    examplePron: '[아워 호텔 부킹 인클루즈 / 캄플러멘터리 브렉퍼스트]',
     exampleKo: '우리 호텔 예약에는 무료 조식이 포함되어 있다.',
-    derivativesAndTip: '철자 혼동 주의: complementary(상호 보완적인 — e) vs complimentary(무료의/칭찬하는 — i)',
+    derivativesTip: '철자 혼동 주의: complementary(상호 보완적인 — e) vs complimentary(무료의/칭찬하는 — i)',
   },
   {
     word: 'itinerary',
+    matchedForm: 'itinerary',
     ipa: '/aɪˈtɪn.ə.rer.i/',
     pron: '[아이티너레리]',
+    soundBlock: 'update / the itinerary',
+    soundMethod: '첫 글자 i를 [아이]로 소리 내고 두 번째 음절(-tin-)에 강세를 둡니다.',
     meaning: '여행 상세 일정표, 여정',
     pos: 'N',
     posName: '명사',
@@ -749,43 +1011,55 @@ const VERIFIED_BIZ_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'update the itinerary',
     collocationKo: '여행 일정표를 업데이트하다',
     exampleEn: 'Please check your updated flight itinerary.',
+    examplePron: '[플리즈 체크 / 유어 업데이티드 플라이트 아이티너레리]',
     exampleKo: '업데이트된 항공편 일정표를 확인해 주세요.',
-    derivativesAndTip: '비즈니스 출장 및 여행 실무에서 날짜·시간별 이동 계획표를 뜻하는 표준 명사',
+    derivativesTip: '비즈니스 출장 및 여행 실무에서 날짜·시간별 이동 계획표를 뜻하는 명사',
   },
   {
     word: 'spearhead',
+    matchedForm: 'spearheaded',
     ipa: '/ˈspɪr.hed/',
     pron: '[스피어헤드]',
+    soundBlock: 'spearhead / the campaign',
+    soundMethod: 'spear(창끝)와 head(머리)가 합쳐진 단어로 첫 음절에 강세를 둡니다.',
     meaning: '(프로젝트·운동을) 최전선에서 이끌다, 선도하다',
     pos: 'V',
     posName: '동사',
     comp: 'V',
-    compName: '서술어(동사)',
+    compName: '동사(서술어)',
     collocation: 'spearhead the campaign',
     collocationKo: '캠페인을 선도하다',
-    exampleEn: 'She was appointed to spearhead the global campaign.',
-    exampleKo: '그녀는 글로벌 캠페인을 진두지휘하도록 임명되었다.',
-    derivativesAndTip: '명사: spearhead(선봉장) · 유의어: lead, head up',
+    exampleEn: 'She spearheaded the global marketing campaign this year.',
+    examplePron: '[쉬 스피어헤디드 / 더 글로벌 마케팅 캠페인 디스 이어]',
+    exampleKo: '그녀는 올해 글로벌 마케팅 캠페인을 진두지휘했다.',
+    derivativesTip: '명사: spearhead(선봉장) · 유의어: lead, head up',
   },
   {
     word: 'complement',
+    matchedForm: 'complements',
     ipa: '/ˈkɑːm.plə.ment/',
     pron: '[캄플러먼트]',
+    soundBlock: 'complement / the design',
+    soundMethod: '첫 음절(com-)을 미국식 [캄]으로 발음하여 [캄플러먼트]로 읽습니다.',
     meaning: '보완하다, (서로 어울려) 돋보이게 하다',
     pos: 'V',
     posName: '동사',
     comp: 'V',
-    compName: '서술어(동사)',
+    compName: '동사(서술어)',
     collocation: 'complement the design',
     collocationKo: '디자인을 보완해 돋보이게 하다',
     exampleEn: 'The tailored coat complements the minimalist design.',
+    examplePron: '[더 테일러드 코트 캄플러먼츠 / 더 미니멀리스트 디자인]',
     exampleKo: '그 테일러드 코트는 미니멀한 디자인을 한층 돋보이게 보완한다.',
-    derivativesAndTip: '형용사: complementary(상호 보완적인) | compliment(칭찬하다)와 철자 구별 필수',
+    derivativesTip: '형용사: complementary(상호 보완적인) | compliment(칭찬하다)와 철자 구별 필수',
   },
   {
     word: 'silhouette',
+    matchedForm: 'silhouette',
     ipa: '/ˌsɪl.uˈet/',
     pron: '[실루엣]',
+    soundBlock: 'a structured / silhouette',
+    soundMethod: '철자 속 h는 묵음이며 끝 음절(-ette)에 강세를 두어 [실루엣]으로 발음합니다.',
     meaning: '실루엣, 윤곽, 전체적인 옷의 라인',
     pos: 'N',
     posName: '명사',
@@ -793,104 +1067,132 @@ const VERIFIED_BIZ_VOCAB: VerifiedVocabSeed[] = [
     compName: '직접목적어',
     collocation: 'a structured silhouette',
     collocationKo: '구조적인 실루엣(라인)',
-    exampleEn: 'Fashion critics praised the structured silhouette of the coat.',
-    exampleKo: '패션 비평가들은 그 코트의 구조적인 실루엣을 호평했다.',
-    derivativesAndTip: '철자 속 h는 묵음(소리가 나지 않음)이며 끝 음절(-ette)에 강세가 옴',
+    exampleEn: 'Designers praised the structured silhouette of the coat.',
+    examplePron: '[디자이너즈 프레이즈드 / 더 스트럭처드 실루엣 오브 더 코트]',
+    exampleKo: '디자이너들은 그 코트의 구조적인 실루엣을 호평했다.',
+    derivativesTip: '동사 flatter(체형·실루엣을 살려주다)나 complement와 자주 결합함',
   },
   {
     word: 'aesthetic',
+    matchedForm: 'aesthetic',
     ipa: '/esˈθet̬.ɪk/',
     pron: '[에스쎄틱]',
+    soundBlock: 'a modern / aesthetic',
+    soundMethod: '가운데 th는 무성 마찰음 /θ/이므로 된소리 [ㄸ]이 아닌 [쎄]로 바람을 빼며 [에스쎄틱]으로 발음합니다.',
     meaning: '미학, 미적 감각 (형용사: 미학적인)',
     pos: 'N',
     posName: '명사',
     comp: 'DO',
     compName: '직접목적어',
-    collocation: 'modern aesthetics',
-    collocationKo: '현대적 미학',
-    exampleEn: 'The collection blends classic heritage with modern aesthetics.',
-    exampleKo: '그 컬렉션은 고전적 유산과 현대적 미학을 조화롭게 결합한다.',
-    derivativesAndTip: '부사: aesthetically(미학적으로 — aesthetically pleasing: 미적으로 아름다운)',
+    collocation: 'a minimalist aesthetic',
+    collocationKo: '미니멀한 미적 감각(미학)',
+    exampleEn: 'The new flagship store showcases a clean modern aesthetic.',
+    examplePron: '[더 뉴 플래그십 스토어 쇼케이시즈 / 어 클린 모던 에스쎄틱]',
+    exampleKo: '그 새로운 플래그십 스토어는 깔끔하고 현대적인 미학을 보여준다.',
+    derivativesTip: '부사: aesthetically(미학적으로 — aesthetically pleasing: 미적으로 아름다운)',
   },
   {
     word: 'negotiate',
+    matchedForm: 'negotiated',
     ipa: '/nəˈɡoʊ.ʃi.eɪt/',
     pron: '[너고우시에이트]',
+    soundBlock: 'negotiate / a contract',
+    soundMethod: '두 번째 음절(-go-)에 강세를 두어 [너고우시에이트]로 발음합니다.',
     meaning: '협상하다, 교섭하다',
     pos: 'V',
     posName: '동사',
     comp: 'V',
-    compName: '서술어(동사)',
+    compName: '동사(서술어)',
     collocation: 'negotiate a contract',
     collocationKo: '계약을 협상하다',
     exampleEn: 'We successfully negotiated a mutually beneficial contract.',
+    examplePron: '[위 석세스풀리 너고우시에이티드 / 어 뮤추얼리 베니피셜 컨트랙트]',
     exampleKo: '우리는 상호 이익이 되는 계약을 성공적으로 협상했다.',
-    derivativesAndTip: '명사: negotiation(협상) · 형용사: negotiable(협상 가능한)',
+    derivativesTip: '명사: negotiation(협상) · 형용사: negotiable(협상 가능한)',
   },
   {
     word: 'collaborate',
+    matchedForm: 'collaborated',
     ipa: '/kəˈlæb.ə.reɪt/',
     pron: '[컬래버레이트]',
+    soundBlock: 'collaborate / closely',
+    soundMethod: '두 번째 음절(-lab-)에 강세를 두어 [컬래버레이트]로 발음합니다.',
     meaning: '협업하다, 공동으로 작업하다',
     pos: 'V',
     posName: '동사',
     comp: 'V',
-    compName: '서술어(동사)',
+    compName: '동사(서술어)',
     collocation: 'collaborate closely',
     collocationKo: '긴밀하게 협업하다',
-    exampleEn: 'Engineers and designers collaborated closely to meet the deadline.',
-    exampleKo: '엔지니어와 디자이너들은 마감일을 맞추기 위해 긴밀히 협업했다.',
-    derivativesAndTip: '명사: collaboration(협업, 공동 작업) · 형용사: collaborative(협력적인)',
+    exampleEn: 'Engineers and designers collaborated closely on the project.',
+    examplePron: '[엔지니어즈 앤 디자이너즈 / 컬래버레이티드 클로슬리 / 안 더 프로젝트]',
+    exampleKo: '엔지니어와 디자이너들은 그 프로젝트에서 긴밀히 협업했다.',
+    derivativesTip: '명사: collaboration(협업, 공동 작업) · 형용사: collaborative(협력적인)',
   },
   {
     word: 'implement',
+    matchedForm: 'implement',
     ipa: '/ˈɪm.plə.ment/',
     pron: '[임플러먼트]',
+    soundBlock: 'implement / the new policy',
+    soundMethod: '첫 음절(im-)에 강세를 두고 [임플러먼트]로 명확히 발음합니다.',
     meaning: '(계획·정책을) 시행하다, 실행에 옮기다',
     pos: 'V',
     posName: '동사',
     comp: 'V',
-    compName: '서술어(동사)',
+    compName: '동사(서술어)',
     collocation: 'implement the new policy',
     collocationKo: '새 정책을 시행하다',
     exampleEn: 'We will implement the updated security policy next Monday.',
+    examplePron: '[위 윌 임플러먼트 / 디 업데이티드 시큐리티 팔러시 / 넥스트 먼데이]',
     exampleKo: '우리는 다음 주 월요일에 업데이트된 보안 정책을 시행할 것이다.',
-    derivativesAndTip: '명사: implementation(시행, 이행) · 유의어: carry out, execute',
+    derivativesTip: '명사: implementation(시행, 이행) · 유의어: carry out, execute',
   },
   {
     word: 'prioritize',
+    matchedForm: 'prioritize',
     ipa: '/praɪˈɔːr.ə.taɪz/',
     pron: '[프라이오러타이즈]',
+    soundBlock: 'prioritize / urgent tasks',
+    soundMethod: '두 번째 음절(-or-)에 강세를 두어 [프라이오러타이즈]로 발음합니다.',
     meaning: '우선순위를 매기다, 우선시하다',
     pos: 'V',
     posName: '동사',
     comp: 'V',
-    compName: '서술어(동사)',
+    compName: '동사(서술어)',
     collocation: 'prioritize urgent tasks',
     collocationKo: '긴급 업무를 우선시하다',
-    exampleEn: "Let's prioritize the most impactful tasks first.",
-    exampleKo: '가장 영향력이 큰 업무부터 먼저 우선순위에 둡시다.',
-    derivativesAndTip: '명사: priority(우선순위, 우선 사항 — top priority: 최우선 과제)',
+    exampleEn: 'We must prioritize the most impactful tasks first.',
+    examplePron: '[위 머스트 프라이오러타이즈 / 더 모스트 임팩트풀 태스크스 퍼스트]',
+    exampleKo: '우리는 가장 영향력이 큰 업무부터 먼저 우선순위에 두어야 한다.',
+    derivativesTip: '명사: priority(우선순위, 우선 사항 — top priority: 최우선 과제)',
   },
   {
     word: 'allocate',
+    matchedForm: 'allocate',
     ipa: '/ˈæl.ə.keɪt/',
     pron: '[앨러케이트]',
+    soundBlock: 'allocate / our budget',
+    soundMethod: '첫 음절(al-)에 강세를 두어 [앨러케이트]로 발음합니다.',
     meaning: '(예산·자원을) 할당하다, 배분하다',
     pos: 'V',
     posName: '동사',
     comp: 'V',
-    compName: '서술어(동사)',
+    compName: '동사(서술어)',
     collocation: 'allocate our budget',
     collocationKo: '예산을 배분하다',
     exampleEn: 'We need to allocate our marketing budget more efficiently.',
+    examplePron: '[위 니드 투 앨러케이트 / 아워 마케팅 버짓 / 모어 이피션틀리]',
     exampleKo: '우리는 마케팅 예산을 더 효율적으로 배분해야 한다.',
-    derivativesAndTip: '명사: allocation(할당, 배분) | allocate A to B(A를 B에 할당하다)',
+    derivativesTip: '명사: allocation(할당, 배분) | allocate A to B(A를 B에 할당하다)',
   },
   {
     word: 'benchmark',
+    matchedForm: 'benchmark',
     ipa: '/ˈbentʃ.mɑːrk/',
     pron: '[벤치마크]',
+    soundBlock: 'set / a new benchmark',
+    soundMethod: 'set과 a를 이어 [세러 뉴 벤치마크]로 리듬감 있게 발음합니다.',
     meaning: '기준점, 지표 (동사: 벤치마킹하다)',
     pos: 'N',
     posName: '명사',
@@ -899,28 +1201,36 @@ const VERIFIED_BIZ_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'set a new benchmark',
     collocationKo: '새로운 기준점을 세우다',
     exampleEn: 'This model set a new benchmark for battery performance.',
+    examplePron: '[디스 모델 세러 뉴 벤치마크 / 포 배터리 퍼포먼스]',
     exampleKo: '이 모델은 배터리 성능의 새로운 기준점을 세웠다.',
-    derivativesAndTip: '유의 표현: set the standard(표준을 정립하다)',
+    derivativesTip: '유의 표현: set the standard(표준을 정립하다)',
   },
   {
     word: 'leverage',
+    matchedForm: 'leverage',
     ipa: '/ˈlev.ɚ.ɪdʒ/',
     pron: '[레버리지]',
+    soundBlock: 'leverage / data analytics',
+    soundMethod: '첫 음절(lev-)에 강세를 두어 [레버리지]로 발음합니다.',
     meaning: '(기존 자산·도구를) 지렛대 삼아 최대한 활용하다',
     pos: 'V',
     posName: '동사',
     comp: 'V',
-    compName: '서술어(동사)',
+    compName: '동사(서술어)',
     collocation: 'leverage data analytics',
     collocationKo: '데이터 분석을 적극 활용하다',
     exampleEn: 'We can leverage data analytics to improve customer service.',
+    examplePron: '[위 캔 레버리지 데이터 애널리틱스 / 투 임프루브 커스터머 서비스]',
     exampleKo: '우리는 고객 서비스를 개선하기 위해 데이터 분석을 적극 활용할 수 있다.',
-    derivativesAndTip: '명사: leverage(지렛대 작용, 영향력) · 유의어: utilize, take advantage of',
+    derivativesTip: '명사: leverage(지렛대 작용, 영향력) · 유의어: utilize, take advantage of',
   },
   {
     word: 'milestone',
+    matchedForm: 'milestone',
     ipa: '/ˈmaɪl.stoʊn/',
     pron: '[마일스톤]',
+    soundBlock: 'a major / milestone',
+    soundMethod: 'mile[마일]과 stone[스톤]을 합쳐 첫 음절에 강세를 둡니다.',
     meaning: '중요한 이정표, 획기적 단계',
     pos: 'N',
     posName: '명사',
@@ -929,76 +1239,96 @@ const VERIFIED_BIZ_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'a major milestone',
     collocationKo: '중요한 이정표',
     exampleEn: 'Completing this phase is a major milestone for our team.',
+    examplePron: '[컴플리팅 디스 페이즈 / 이저 메이저 마일스톤 / 포 아워 팀]',
     exampleKo: '이 단계를 완수하는 것은 우리 팀에게 중요한 이정표이다.',
-    derivativesAndTip: '동명사구 주어(Completing this phase)를 보충 설명하는 주격보어(SC)',
+    derivativesTip: '동명사구 주어(Completing this phase)를 보충 설명하는 주격보어(SC)',
   },
 ];
 
 const VERIFIED_OPIC_VOCAB: VerifiedVocabSeed[] = [
   {
     word: 'unwind',
+    matchedForm: 'unwind',
     ipa: '/ʌnˈwaɪnd/',
     pron: '[언와인드]',
+    soundBlock: 'unwind / after work',
+    soundMethod: '명사 wind(바람 /wɪnd/)가 아니라 동사 wind(감다 /waɪnd/)의 반대말이므로 [언와인드]로 발음합니다.',
     meaning: '긴장을 풀다, 휴식하다',
     pos: 'V',
     posName: '동사',
-    comp: 'OC',
-    compName: '목적격보어',
-    collocation: 'help me unwind',
-    collocationKo: '내가 긴장을 풀도록 돕다',
-    exampleEn: 'Taking an evening walk helps me unwind after work.',
-    exampleKo: '저녁 산책을 하는 것은 퇴근 후 긴장을 푸는 데 도움이 된다.',
-    derivativesAndTip: '발음 주의: wind(바람 /wɪnd/)가 아니라 감다(/waɪnd/)의 반대말이므로 [언와인드]로 발음 | helps + O + OC(원형부정사)',
+    comp: 'V',
+    compName: '동사(서술어)',
+    collocation: 'unwind after work',
+    collocationKo: '퇴근 후 긴장을 풀다',
+    exampleEn: 'I usually unwind after work by taking a quiet walk.',
+    examplePron: '[아이 유주얼리 언와인드 애프터 워크 / 바이 테이킹 어 콰이엇 워크]',
+    exampleKo: '나는 보통 조용히 산책을 하며 퇴근 후 긴장을 푼다.',
+    derivativesTip: '과거·과거분사형: unwound - unwound | 주어(I)의 본동사(V) 역할 수행',
   },
   {
     word: 'pull off',
+    matchedForm: 'pulled off',
     ipa: '/pʊl ɔːf/',
     pron: '[풀 오프]',
+    soundBlock: 'pull off / a bold look',
+    soundMethod: 'pull의 끝 /l/과 off의 모음을 자연스럽게 이어 [풀로프]처럼 연음합니다.',
     meaning: '(소화하기 어려운 스타일·일 등을) 멋지게 소화해 내다, 해내다',
     pos: 'V',
     posName: '동사구',
     comp: 'V',
-    compName: '서술어(동사)',
+    compName: '동사(서술어)',
     collocation: 'pull off a bold look',
     collocationKo: '과감한 룩을 멋지게 소화하다',
     exampleEn: 'You really pulled off that bold statement look!',
+    examplePron: '[유 릴리 풀도프 / 댓 볼드 스테이트먼트 룩]',
     exampleKo: '그 과감한 포인트 룩을 정말 멋지게 소화해 내셨네요!',
-    derivativesAndTip: '아무나 소화하기 힘든 패션이나 까다로운 과제를 성공적으로 해냈을 때 쓰는 구동사',
+    derivativesTip: '아무나 소화하기 힘든 패션이나 까다로운 과제를 성공적으로 해냈을 때 쓰는 구동사',
   },
   {
     word: 'wrap up',
+    matchedForm: 'wrap up',
     ipa: '/ræp ʌp/',
     pron: '[래펍]',
+    soundBlock: 'wrap up / the meeting',
+    soundMethod: '첫 글자 w는 묵음이며 wrap의 /p/와 up이 이어져 [래펍]으로 한 단어처럼 소리 납니다.',
     meaning: '(회의·업무 등을) 마무리하다, 끝내다',
     pos: 'V',
     posName: '동사구',
     comp: 'V',
-    compName: '서술어(동사)',
+    compName: '동사(서술어)',
     collocation: 'wrap up the meeting',
     collocationKo: '회의를 마무리하다',
     exampleEn: "Let's wrap up today's meeting in five minutes.",
+    examplePron: '[레츠 래펍 투데이즈 미팅 / 인 파이브 미니츠]',
     exampleKo: '5분 안에 오늘 회의를 마무리합시다.',
-    derivativesAndTip: '유의 표현: finish up, bring to a close(마무리 짓다)',
+    derivativesTip: '유의 표현: finish up, bring to a close(마무리 짓다)',
   },
   {
     word: 'touch base',
+    matchedForm: 'touch base',
     ipa: '/tʌtʃ beɪs/',
     pron: '[터치 베이스]',
+    soundBlock: 'touch base / with you',
+    soundMethod: '야구에서 주자가 베이스를 밟고 확인하는 것에서 유래했으며 두 단어를 또렷이 발음합니다.',
     meaning: '잠깐 연락해 상황(근황)을 공유하다',
     pos: 'V',
     posName: '동사구',
     comp: 'V',
-    compName: '서술어(동사)',
+    compName: '동사(서술어)',
     collocation: 'touch base with you',
     collocationKo: '당신과 잠깐 연락해 현황을 공유하다',
-    exampleEn: 'I just wanted to touch base with you before Friday.',
-    exampleKo: '금요일이 되기 전에 당신과 잠깐 연락해 진행 상황을 공유하고 싶었습니다.',
-    derivativesAndTip: '비즈니스 실무에서 길게 회의하기보다 짧게 안부나 진행 상황을 점검할 때 쓰는 필수 표현',
+    exampleEn: 'I will touch base with you again before Friday.',
+    examplePron: '[아이 윌 터치 베이스 위드 유 어겐 / 비포 프라이데이]',
+    exampleKo: '금요일이 되기 전에 당신과 다시 잠깐 연락해 진행 상황을 공유하겠습니다.',
+    derivativesTip: '비즈니스 실무에서 길게 회의하기보다 짧게 진행 상황을 점검할 때 쓰는 필수 표현',
   },
   {
     word: 'heads-up',
+    matchedForm: 'heads-up',
     ipa: '/ˈhedz.ʌp/',
     pron: '[헤즈업]',
+    soundBlock: 'give me / a quick heads-up',
+    soundMethod: 'heads의 /z/와 up이 이어져 [헤즈업]으로 부드럽게 연음됩니다.',
     meaning: '사전 귀띔, 미리 알림',
     pos: 'N',
     posName: '명사',
@@ -1007,13 +1337,17 @@ const VERIFIED_OPIC_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'give me a quick heads-up',
     collocationKo: '나에게 미리 살짝 귀띔해 주다',
     exampleEn: 'Thanks for giving me a quick heads-up on the schedule change.',
+    examplePron: '[땡스 포 기빙 미 어 퀵 헤즈업 / 안 더 스케줄 체인지]',
     exampleKo: '일정 변경에 대해 미리 귀띔해 주셔서 감사합니다.',
-    derivativesAndTip: '4형식 동명사 giving + 간접목적어(me) + 직접목적어(DO: a quick heads-up)',
+    derivativesTip: '4형식 동명사 giving + 간접목적어(IO: me) + 직접목적어(DO: a quick heads-up)',
   },
   {
     word: 'go-to',
+    matchedForm: 'go-to',
     ipa: '/ˈɡoʊ.tuː/',
     pron: '[고우투]',
+    soundBlock: 'my go-to / cafe',
+    soundMethod: '첫 음절(go-)에 강세를 두고 명사 앞에서 한 덩어리로 붙여 읽습니다.',
     meaning: '늘 믿고 찾는, 단골의, 가장 선호하는',
     pos: 'Adj',
     posName: '형용사',
@@ -1022,223 +1356,281 @@ const VERIFIED_OPIC_VOCAB: VerifiedVocabSeed[] = [
     collocation: 'my go-to cafe',
     collocationKo: '내가 늘 찾는 단골 카페',
     exampleEn: 'This quiet neighborhood cafe is my go-to spot on weekends.',
+    examplePron: '[디스 콰이엇 네이버후드 카페 / 이즈 마이 고우투 스팟 / 안 위켄즈]',
     exampleKo: '이 조용한 동네 카페는 내가 주말마다 늘 찾는 단골 장소이다.',
-    derivativesAndTip: '반드시 하이픈(-)을 붙여 명사 앞에서 수식어(M)로 사용 (예: go-to outfit, go-to place)',
+    derivativesTip: '하이픈(-)을 붙여 명사 앞에서 수식어(M)로 사용 (예: go-to outfit, go-to place)',
   },
   {
     word: 'drop off',
+    matchedForm: 'drop off',
     ipa: '/drɑːp ɔːf/',
     pron: '[드랍 오프]',
+    soundBlock: 'drop off / our bags',
+    soundMethod: 'drop의 /p/와 off가 이어져 [드라포프]처럼 자연스럽게 연결됩니다.',
     meaning: '(짐·세탁물 등을) 맡기다, (사람을) 내려주다',
     pos: 'V',
     posName: '동사구',
     comp: 'V',
-    compName: '서술어(동사)',
+    compName: '동사(서술어)',
     collocation: 'drop off our bags',
     collocationKo: '가방(짐)을 맡기다',
     exampleEn: 'Can we drop off our bags before check-in?',
+    examplePron: '[캔 위 드랍 오프 아워 백스 / 비포 체크인]',
     exampleKo: '체크인 시간 전에 저희 짐을 먼저 맡길 수 있을까요?',
-    derivativesAndTip: '반의 구동사: pick up(찾아가다, 태우러 가다)',
+    derivativesTip: '반의 구동사: pick up(찾아가다, 태우러 가다)',
   },
   {
     word: 'freshen up',
+    matchedForm: 'freshen up',
     ipa: '/ˈfreʃ.ən ʌp/',
     pron: '[프레셔넙]',
+    soundBlock: 'freshen up / in the lounge',
+    soundMethod: 'freshen의 끝 /n/과 up이 연음되어 [프레셔넙]으로 발음됩니다.',
     meaning: '간단히 씻고 단장하다, 재정비하다',
     pos: 'V',
     posName: '동사구',
     comp: 'V',
-    compName: '서술어(동사)',
+    compName: '동사(서술어)',
     collocation: 'freshen up in the lounge',
     collocationKo: '라운지에서 간단히 씻고 재정비하다',
-    exampleEn: 'I would like to freshen up during our layover.',
-    exampleKo: '경유 대기 시간 동안 간단히 씻고 재정비하고 싶습니다.',
-    derivativesAndTip: '장거리 비행 후나 외출 전에 세수·화장 수정 등으로 산뜻하게 다듬을 때 쓰는 표현',
+    exampleEn: 'I will freshen up in the airport lounge during our layover.',
+    examplePron: '[아이 윌 프레셔넙 인 디 에어포트 라운지 / 듀링 아워 레이오버]',
+    exampleKo: '경유 대기 시간 동안 공항 라운지에서 간단히 씻고 재정비할 것이다.',
+    derivativesTip: '장거리 비행 후나 외출 전에 세수·화장 수정 등으로 산뜻하게 다듬을 때 쓰는 표현',
   },
   {
     word: 'binge-watch',
+    matchedForm: 'binge-watched',
     ipa: '/ˈbɪndʒ.wɑːtʃ/',
     pron: '[빈지워치]',
+    soundBlock: 'binge-watch / the whole season',
+    soundMethod: 'binge[빈지]와 watch[워치]를 붙여 첫 음절에 강세를 둡니다.',
     meaning: '(드라마·시리즈를) 몰아서 정주행하다',
     pos: 'V',
     posName: '동사',
     comp: 'V',
-    compName: '서술어(동사)',
+    compName: '동사(서술어)',
     collocation: 'binge-watch the whole season',
     collocationKo: '시즌 전체를 몰아보다(정주행하다)',
     exampleEn: 'I binge-watched the whole season over the weekend.',
+    examplePron: '[아이 빈지워치트 더 홀 시즌 / 오버 더 위켄드]',
     exampleKo: '나는 주말 동안 그 드라마 시즌 전체를 몰아서 정주행했다.',
-    derivativesAndTip: '명사형: binge-watching(몰아보기, 정주행)',
+    derivativesTip: '명사형: binge-watching(몰아보기, 정주행)',
   },
   {
     word: 'go viral',
+    matchedForm: 'went viral',
     ipa: '/ɡoʊ ˈvaɪ.rəl/',
     pron: '[고우 바이럴]',
+    soundBlock: 'went viral / overnight',
+    soundMethod: 'viral의 첫 음절(vi-)에 강세를 두어 [바이럴]로 발음합니다.',
     meaning: '(영상·소식이) 입소문을 타고 빠르게 확산되다, 화제가 되다',
     pos: 'V',
     posName: '동사구',
     comp: 'V',
-    compName: '서술어(동사)',
+    compName: '동사(서술어)',
     collocation: 'go viral overnight',
     collocationKo: '하룻밤 사이에 화제가 되다',
     exampleEn: 'The short dance video went viral overnight.',
+    examplePron: '[더 쇼트 댄스 비디오 / 웬트 바이럴 오버나이트]',
     exampleKo: '그 짧은 댄스 영상은 하룻밤 사이에 큰 화제가 되었다.',
-    derivativesAndTip: '2형식 변화동사 go + 형용사 보어(viral: 바이러스처럼 퍼지는)',
+    derivativesTip: '2형식 변화동사 go(과거형 went) + 형용사 보어(viral: 바이러스처럼 퍼지는) 결합구',
   },
   {
     word: 'live up to the hype',
+    matchedForm: 'lived up to the hype',
     ipa: '/lɪv ʌp tə ðə haɪp/',
     pron: '[리법 투 더 하입]',
+    soundBlock: 'lived up / to the hype',
+    soundMethod: 'live up을 [리법]으로 연음하고 끝 단어 hype[하입]에 강한 강세를 줍니다.',
     meaning: '소문·기대만큼 실제로도 훌륭하다(명불허전이다)',
     pos: 'V',
     posName: '동사구',
     comp: 'V',
-    compName: '서술어(동사)',
+    compName: '동사(서술어)',
     collocation: 'definitely live up to the hype',
     collocationKo: '확실히 소문(기대)에 부응하다',
     exampleEn: 'The new bakery definitely lived up to the hype.',
+    examplePron: '[더 뉴 베이커리 데피니틀리 리브드 업 투 더 하입]',
     exampleKo: '그 새로 생긴 베이커리는 확실히 소문만큼 훌륭했다.',
-    derivativesAndTip: 'hype(과장된 홍보·떠들썩한 소문) + live up to(~에 부응하다)',
+    derivativesTip: 'hype(과장된 홍보·떠들썩한 소문) + live up to(~에 부응하다)',
   },
   {
     word: 'hit the nail on the head',
+    matchedForm: 'hit the nail on the head',
     ipa: '/hɪt ðə neɪl ɑːn ðə hed/',
     pron: '[힛 더 네일 안 더 헤드]',
+    soundBlock: 'hit the nail / on the head',
+    soundMethod: 'nail[네일]과 head[헤드] 두 명사에 강세를 실어 리듬감 있게 발음합니다.',
     meaning: '핵심(정곡)을 정확히 찌르다',
     pos: 'V',
     posName: '동사구',
     comp: 'V',
-    compName: '서술어(동사)',
+    compName: '동사(서술어)',
     collocation: 'hit the nail on the head',
     collocationKo: '정곡을 정확히 찌르다',
     exampleEn: 'Your comment really hit the nail on the head.',
+    examplePron: '[유어 코멘트 릴리 힛 더 네일 안 더 헤드]',
     exampleKo: '당신의 의견은 정말 핵심을 정확히 찔렀습니다.',
-    derivativesAndTip: '3단 변화 주의: hit - hit - hit (과거형도 형태가 같음)',
+    derivativesTip: '3단 변화 주의: hit - hit - hit (과거형도 형태가 동일함)',
   },
   {
     word: 'clear my head',
+    matchedForm: 'clear my head',
     ipa: '/klɪr maɪ hed/',
     pron: '[클리어 마이 헤드]',
+    soundBlock: 'clear / my head',
+    soundMethod: 'clear[클리어]와 head[헤드]를 또렷하게 발음합니다.',
     meaning: '복잡한 머리를 식히다, 생각을 정리하다',
     pos: 'V',
     posName: '동사구',
     comp: 'V',
-    compName: '서술어(동사)',
-    collocation: 'take a walk to clear my head',
-    collocationKo: '머리를 식히기 위해 산책하다',
-    exampleEn: 'I usually take a walk in the park to clear my head.',
-    exampleKo: '나는 보통 복잡한 머리를 식히기 위해 공원을 산책한다.',
-    derivativesAndTip: 'OPIc 산책·조깅·여가 주제에서 스트레스 해소 이유를 설명할 때 가장 자연스러운 표현',
+    compName: '동사(서술어)',
+    collocation: 'clear my head with a walk',
+    collocationKo: '산책으로 머리를 식히다',
+    exampleEn: 'I usually clear my head with a walk in the park.',
+    examplePron: '[아이 유주얼리 클리어 마이 헤드 / 위더 워크 인 더 파크]',
+    exampleKo: '나는 보통 공원 산책으로 복잡한 머리를 식힌다.',
+    derivativesTip: 'OPIc 산책·조깅·여가 주제에서 스트레스 해소 방법을 설명할 때 가장 자연스러운 표현',
   },
   {
     word: 'stick to',
+    matchedForm: 'stick to',
     ipa: '/stɪk tuː/',
     pron: '[스틱 투]',
+    soundBlock: 'stick to / my routine',
+    soundMethod: 'stick의 끝 /k/를 가볍게 받치고 to my routine을 이어 읽습니다.',
     meaning: '(계획·원칙 등을) 바꾸지 않고 꾸준히 지키다, 고수하다',
     pos: 'V',
     posName: '동사구',
     comp: 'V',
-    compName: '서술어(동사)',
+    compName: '동사(서술어)',
     collocation: 'stick to my routine',
     collocationKo: '루틴을 꾸준히 지키다',
-    exampleEn: 'I try hard to stick to my daily exercise routine.',
-    exampleKo: '나는 매일 운동하는 루틴을 꾸준히 지키려고 노력한다.',
-    derivativesAndTip: '여기서 to는 전치사이므로 뒤에 동사원형이 아니라 명사/동명사(V-ing)가 와야 함',
+    exampleEn: 'I always stick to my daily exercise routine.',
+    examplePron: '[아이 올웨이즈 스틱 투 / 마이 데일리 엑서사이즈 루틴]',
+    exampleKo: '나는 항상 매일 운동하는 루틴을 꾸준히 지킨다.',
+    derivativesTip: '여기서 to는 전치사이므로 뒤에 명사구 또는 동명사구(V-ing)가 옵니다',
   },
   {
     word: 'recharge my batteries',
+    matchedForm: 'recharge my batteries',
     ipa: '/riːˈtʃɑːrdʒ maɪ ˈbæt̬.ɚ.iz/',
     pron: '[리차지 마이 배러리즈]',
+    soundBlock: 'recharge / my batteries',
+    soundMethod: '미국식 발음에서 batteries의 tt는 플랩 현상으로 부드럽게 [배러리즈]로 소리 납니다.',
     meaning: '에너지를 재충전하다, 활력을 되찾다',
     pos: 'V',
     posName: '동사구',
-    comp: 'OC',
-    compName: '목적격보어',
-    collocation: 'help me recharge my batteries',
-    collocationKo: '내가 에너지를 재충전하도록 돕다',
-    exampleEn: 'Listening to jazz music helps me recharge my batteries.',
-    exampleKo: '재즈 음악을 듣는 것은 내가 에너지를 재충전하는 데 도움이 된다.',
-    derivativesAndTip: '5형식 helps + 목적어(me) + 목적격보어(OC: 원형부정사구 recharge my batteries)',
+    comp: 'V',
+    compName: '동사(서술어)',
+    collocation: 'recharge my batteries on weekends',
+    collocationKo: '주말에 에너지를 재충전하다',
+    exampleEn: 'I recharge my batteries on weekends by listening to jazz.',
+    examplePron: '[아이 리차지 마이 배러리즈 안 위켄즈 / 바이 리스닝 투 재즈]',
+    exampleKo: '나는 주말에 재즈 음악을 들으며 에너지를 재충전한다.',
+    derivativesTip: '단수 battery가 아닌 복수형 batteries를 쓰는 관용 표현임에 주의',
   },
   {
     word: 'on the same page',
+    matchedForm: 'on the same page',
     ipa: '/ɑːn ðə seɪm peɪdʒ/',
     pron: '[안 더 세임 페이지]',
+    soundBlock: 'on / the same page',
+    soundMethod: 'same[세임]과 page[페이지]의 이중모음 /eɪ/를 충분히 살려 발음합니다.',
     meaning: '(전치사구) 서로 생각·이해가 일치하는, 같은 내용을 공유하는',
     pos: 'Prep',
     posName: '전치사구(형용사역할)',
     comp: 'SC',
     compName: '주격보어',
-    collocation: 'make sure we are on the same page',
-    collocationKo: '우리의 이해가 일치하는지 확인하다',
-    exampleEn: "Let's review the plan so that everyone is on the same page.",
+    collocation: 'be on the same page',
+    collocationKo: '서로 이해가 일치하다',
+    exampleEn: 'Let us review the plan so that everyone is on the same page.',
+    examplePron: '[레츠 리뷰 더 플랜 / 소 댓 에브리원 이즈 안 더 세임 페이지]',
     exampleKo: '모두가 같은 내용을 공유할 수 있도록 계획을 다시 검토합시다.',
-    derivativesAndTip: '전치사구(on the same page) 전체가 be동사(is) 뒤에서 주어(everyone)의 상태를 나타내는 주격보어(SC) 역할',
+    derivativesTip: '전치사구(on the same page) 전체가 be동사(is) 뒤에서 주어(everyone)의 상태를 나타내는 주격보어(SC) 역할',
   },
   {
     word: 'try on',
+    matchedForm: 'try on',
     ipa: '/traɪ ɑːn/',
     pron: '[트라이 안]',
+    soundBlock: 'try on / this jacket',
+    soundMethod: 'try[트라이]와 on[안]을 부드럽게 연결하여 발음합니다.',
     meaning: '(옷·신발 등을) 입어보다, 신어보다',
     pos: 'V',
     posName: '동사구',
     comp: 'V',
-    compName: '서술어(동사)',
+    compName: '동사(서술어)',
     collocation: 'try on this jacket',
     collocationKo: '이 재킷을 입어보다',
     exampleEn: 'Can I try on this jacket in a medium size?',
+    examplePron: '[캐나이 트라이 안 디스 재킷 / 이너 미디엄 사이즈]',
     exampleKo: '이 재킷을 미디엄 사이즈로 입어볼 수 있을까요?',
-    derivativesAndTip: '어순 주의: 대명사(it/them)가 목적어일 때는 반드시 사이에 위치함 (try it on [O] / try on it [X])',
+    derivativesTip: '어순 주의: 대명사(it/them)가 목적어일 때는 반드시 사이에 위치함 (try it on [O] / try on it [X])',
   },
   {
     word: 'go well with',
+    matchedForm: 'goes really well with',
     ipa: '/ɡoʊ wel wɪð/',
     pron: '[고우 웰 위드]',
+    soundBlock: 'go well / with jeans',
+    soundMethod: 'well에 강세를 실어 [고우 웰 위드]로 자연스럽게 이어 읽습니다.',
     meaning: '~와 잘 어울리다',
     pos: 'V',
     posName: '동사구',
     comp: 'V',
-    compName: '서술어(동사)',
+    compName: '동사(서술어)',
     collocation: 'go well with jeans',
     collocationKo: '청바지와 잘 어울리다',
     exampleEn: 'This linen shirt goes really well with your jeans.',
+    examplePron: '[디스 린넨 셔츠 고우즈 릴리 웰 / 위드 유어 진즈]',
     exampleKo: '이 린넨 셔츠는 당신의 청바지와 정말 잘 어울립니다.',
-    derivativesAndTip: '유의 동사: match, complement(~와 잘 어울리다)',
+    derivativesTip: '유의 동사: match, complement(~와 잘 어울리다)',
   },
   {
     word: 'keep an eye on',
+    matchedForm: 'keep an eye on',
     ipa: '/kiːp ən aɪ ɑːn/',
     pron: '[키퍼나이 안]',
+    soundBlock: 'keep an eye / on market trends',
+    soundMethod: 'keep-an-eye 세 단어가 연음되어 [키퍼나이]처럼 한 호흡으로 소리 납니다.',
     meaning: '~을 주의 깊게 지켜보다, 눈여겨보다',
     pos: 'V',
     posName: '동사구',
     comp: 'V',
-    compName: '서술어(동사)',
+    compName: '동사(서술어)',
     collocation: 'keep an eye on market trends',
     collocationKo: '시장 트렌드를 주의 깊게 지켜보다',
-    exampleEn: 'We always keep a close eye on global market trends.',
-    exampleKo: '우리는 항상 글로벌 시장 트렌드를 면밀히 주시한다.',
-    derivativesAndTip: 'keep an eye on = monitor, watch closely',
+    exampleEn: 'We always keep an eye on global market trends.',
+    examplePron: '[위 올웨이즈 키퍼나이 안 / 글로벌 마켓 트렌즈]',
+    exampleKo: '우리는 항상 글로벌 시장 트렌드를 주의 깊게 지켜본다.',
+    derivativesTip: '동의 표현: monitor, watch closely(~을 주시하다)',
   },
   {
     word: 'grab a bite',
+    matchedForm: 'grab a bite',
     ipa: '/ɡræb ə baɪt/',
     pron: '[그래버 바이트]',
+    soundBlock: 'grab a bite / before the movie',
+    soundMethod: 'grab의 끝 /b/와 관사 a가 이어져 [그래버 바이트]로 발음됩니다.',
     meaning: '간단히 요기하다, 가볍게 식사하다',
     pos: 'V',
     posName: '동사구',
     comp: 'V',
-    compName: '서술어(동사)',
-    collocation: 'grab a quick bite',
-    collocationKo: '간단히 빨리 식사하다',
-    exampleEn: "Let's grab a quick bite before the movie starts.",
+    compName: '동사(서술어)',
+    collocation: 'grab a bite before the movie',
+    collocationKo: '영화 보기 전에 간단히 식사하다',
+    exampleEn: "Let's grab a bite before the movie starts.",
+    examplePron: '[레츠 그래버 바이트 / 비포 더 무비 스타츠]',
     exampleKo: '영화가 시작하기 전에 간단히 요기합시다.',
-    derivativesAndTip: '격식 있는 식사(have dinner)보다 부담 없이 빠르게 먹는 식사를 뜻하는 일상 구어 표현',
+    derivativesTip: '격식 있는 식사(have dinner)보다 부담 없이 빠르게 먹는 식사를 뜻하는 일상 구어 표현',
   },
 ];
 
+// 입력 경계값(0, 음수, NaN)을 안전하게 보정하여 어휘 엔트리를 반환
 export function getExpandedWordbookByDay(
-  level: '중등 필수' | '고등·수능 핵심' | '비즈니스·실무' | '오픽(OPIc)·구동사',
+  level: WordbookLevel,
   day: number
 ): WordbookEntry[] {
   const pool =
@@ -1250,25 +1642,21 @@ export function getExpandedWordbookByDay(
       ? VERIFIED_BIZ_VOCAB
       : VERIFIED_OPIC_VOCAB;
 
-  // Day 번호에 따라 정렬 순서만 순환하여 보여주며, 임의로 부사를 덧붙여 문장을 왜곡하지 않음
-  const offset = ((day - 1) * 5) % pool.length;
+  const safeDay =
+    Number.isFinite(day) && day >= 1 ? Math.min(100, Math.floor(day)) : 1;
+  const offset = (((safeDay - 1) * 5) % pool.length + pool.length) % pool.length;
 
   return Array.from({ length: pool.length }, (_, idx) => {
     const item = pool[(offset + idx) % pool.length];
-    const colWords = item.collocation.split(' ');
-    const soundBlockStr =
-      colWords.length >= 3
-        ? `${colWords.slice(0, 2).join(' ')} / ${colWords.slice(2).join(' ')}`
-        : item.collocation;
-
     return {
-      day,
+      day: safeDay,
       level,
       word: item.word,
+      matchedForm: item.matchedForm,
       ipa: item.ipa,
       pron: item.pron,
-      soundBlock: soundBlockStr,
-      soundMethod: item.derivativesAndTip,
+      soundBlock: item.soundBlock,
+      soundMethod: item.soundMethod,
       meaning: item.meaning,
       pos: item.pos,
       posLabel: `${item.posName} (${item.pos})`,
@@ -1277,22 +1665,29 @@ export function getExpandedWordbookByDay(
       collocation: item.collocation,
       collocationKo: item.collocationKo,
       exampleEn: item.exampleEn,
-      exampleKo: `${item.exampleKo} — 📌 [${item.derivativesAndTip}]`,
+      examplePron: item.examplePron,
+      exampleKo: item.exampleKo,
+      derivativesTip: item.derivativesTip,
     };
   });
 }
 
 // ----------------------------------------------------------------------------
-// 2. [100% 검증 완료된 고정 구문 아카이브 12선]
-//    (기존 무작위 조각 합성기를 완전히 폐기하고 문법·시제가 완벽한 정문만 수록)
+// 2. [고정 구문 아카이브 12선]
+//    - targetWord(표제어)와 matchedForm(문장 내 실제 등장 형태) 분리
+//    - 미국식 IPA(ipaLine) 및 실전 연음 한글 발음(pronLine) 전 문장 수록
+//    - 문장 전체 어절을 대상으로 시드 기반 피셔-예이츠(Fisher-Yates) 셔플 수행
 // ----------------------------------------------------------------------------
 export interface GeneratedSyntaxItem {
   id: string;
   openerRule: string;
   sentenceEn: string;
+  ipaLine: string;
+  pronLine: string;
   sentenceKo: string;
   paraphrasedEn: string;
   targetWord: string;
+  matchedForm: string;
   scrambleTokens: string[];
 }
 
@@ -1300,118 +1695,178 @@ const VERIFIED_SYNTAX_ARCHIVE: Omit<GeneratedSyntaxItem, 'id' | 'scrambleTokens'
   {
     openerRule: '부정어 문두 도치 (Not until 부사절 + 조동사 + 주어 + 동사원형)',
     sentenceEn: 'Not until we step out of our comfort zone can we genuinely broaden our perspective.',
+    ipaLine: '/nɑːt ənˈtɪl wi step aʊt əv ˈaʊ.ɚ ˈkʌm.fɚt zoʊn kæn wi ˈdʒen.ju.ɪn.li ˈbrɔː.dən ˈaʊ.ɚ pɚˈspek.tɪv/',
+    pronLine: '[낫 언틸 위 스텝 아우러브 아워 컴포트 존 / 캔 위 제뉴인리 브로든 아워 퍼스펙티브]',
     sentenceKo: '우리가 익숙한 안전지대를 벗어나서야 비로소 시야를 진정으로 넓힐 수 있다.',
     paraphrasedEn: 'It is not until we step out of our comfort zone that we can genuinely broaden our perspective.',
     targetWord: 'perspective',
+    matchedForm: 'perspective',
   },
   {
     openerRule: 'Only + 부사구 문두 도치 (Only by V-ing + 조동사 + 주어 + 동사원형)',
     sentenceEn: 'Only by exposing ourselves to diverse viewpoints can we overcome confirmation bias.',
+    ipaLine: '/ˈoʊn.li baɪ ɪkˈspoʊ.zɪŋ aʊrˈselvz tə daɪˈvɝːs ˈvjuː.pɔɪnts kæn wi ˌoʊ.vɚˈkʌm ˌkɑːn.fɚˈmeɪ.ʃən ˈbaɪ.əs/',
+    pronLine: '[온리 바이 익스포징 아워셀브즈 투 다이버스 뷰포인츠 / 캔 위 오버컴 칸퍼메이션 바이어스]',
     sentenceKo: '다양한 관점에 스스로를 노출시킴으로써만 우리는 확증 편향을 극복할 수 있다.',
     paraphrasedEn: 'We can overcome confirmation bias only when we expose ourselves to diverse viewpoints.',
     targetWord: 'bias',
+    matchedForm: 'bias',
   },
   {
     openerRule: '5형식 동사 make + 목적어(DO) + 목적격보어(OC: 형용사)',
     sentenceEn: 'Streamlining the approval process makes the entire project feasible within the deadline.',
+    ipaLine: '/ˈstriːm.laɪ.nɪŋ ðə əˈpruː.vəl ˈprɑː.ses meɪks ðə ɪnˈtaɪr ˈprɑː.dʒekt ˈfiː.zə.bəl wɪˈðɪn ðə ˈded.laɪn/',
+    pronLine: '[스트림라이닝 디 어프루벌 프로세스 / 메익스 디 인타이어 프로젝트 피저블 / 위딘 더 데드라인]',
     sentenceKo: '결재 절차를 간소화하는 것은 마감일 내에 전체 프로젝트를 실현 가능하게 만든다.',
     paraphrasedEn: 'If we streamline the approval process, the entire project becomes feasible within the deadline.',
     targetWord: 'feasible',
+    matchedForm: 'feasible',
   },
   {
     openerRule: '선행사 포함 관계대명사 What 명사절 주어 (의사분열문)',
     sentenceEn: 'What matters most in sustainable growth is balancing innovation with ethical responsibility.',
+    ipaLine: '/wʌt ˈmæt̬.ɚz moʊst ɪn səˈsteɪ.nə.bəl ɡroʊθ ɪz ˈbæl.ən.sɪŋ ˌɪn.əˈveɪ.ʃən wɪð ˈeθ.ɪ.kəl rɪˌspɑːn.səˈbɪl.ə.t̬i/',
+    pronLine: '[왓 매러즈 모스트 인 서스테이너블 그로쓰 / 이즈 밸런싱 이노베이션 / 위드 에씨컬 리스판서빌러티]',
     sentenceKo: '지속 가능한 성장에서 가장 중요한 것은 혁신과 윤리적 책임의 균형을 맞추는 것이다.',
     paraphrasedEn: 'The most important thing in sustainable growth is to balance innovation with ethical responsibility.',
     targetWord: 'sustainable',
+    matchedForm: 'sustainable',
   },
   {
     openerRule: '가정법 과거완료 도치 (Had it not been for + 명사구, 주어 + could have p.p.)',
     sentenceEn: 'Had it not been for their close collaboration, the team could not have met the tentative deadline.',
+    ipaLine: '/hæd ɪt nɑːt bɪn fɔːr ðer kloʊs kəˌlæb.əˈreɪ.ʃən ðə tiːm kʊd nɑːt hæv met ðə ˈten.tə.t̬ɪv ˈded.laɪn/',
+    pronLine: '[해딧 낫 빈 포 데어 클로스 컬래버레이션 / 더 팀 쿠드 낫 해브 멧 / 더 텐터티브 데드라인]',
     sentenceKo: '만약 그들의 긴밀한 협업이 없었더라면, 팀은 잠정 마감일을 맞추지 못했을 것이다.',
     paraphrasedEn: 'Without their close collaboration, the team could not have met the tentative deadline.',
     targetWord: 'collaborate',
+    matchedForm: 'collaboration',
   },
   {
     openerRule: '과거분사(p.p.)로 시작하는 수동 분사구문 (Being 생략)',
     sentenceEn: 'Supported by solid empirical evidence, the new hypothesis shifted the scientific paradigm.',
+    ipaLine: '/səˈpɔːr.t̬ɪd baɪ ˈsɑː.lɪd ɪmˈpɪr.ɪ.kəl ˈev.ə.dəns ðə nuː haɪˈpɑː.θə.sɪs ˈʃɪf.tɪd ðə ˌsaɪ.ənˈtɪf.ɪk ˈper.ə.daɪm/',
+    pronLine: '[서포티드 바이 살리드 임피리컬 에비던스 / 더 뉴 하이파써시스 시프티드 / 더 사이언티픽 패러다임]',
     sentenceKo: '탄탄한 실증적 증거에 의해 뒷받침되면서, 그 새로운 가설은 과학적 패러다임을 바꾸어 놓았다.',
     paraphrasedEn: 'Because it was supported by solid empirical evidence, the new hypothesis shifted the scientific paradigm.',
     targetWord: 'empirical',
+    matchedForm: 'empirical',
   },
   {
     openerRule: 'The 비교급 S + V, the 비교급 S + V (비례 상관구문)',
     sentenceEn: 'The more autonomy we grant to learners, the more intrinsic motivation they demonstrate.',
+    ipaLine: '/ðə mɔːr ɔːˈtɑː.nə.mi wi ɡrænt tə ˈlɝː.nɚz ðə mɔːr ɪnˈtrɪn.zɪk ˌmoʊ.t̬əˈveɪ.ʃən ðeɪ ˈdem.ən.streɪt/',
+    pronLine: '[더 모어 오타너미 위 그랜트 투 러너즈 / 더 모어 인트린직 모티베이션 데이 데먼스트레이트]',
     sentenceKo: '우리가 학습자들에게 더 많은 자율성을 부여할수록, 그들은 더 큰 내재적 동기를 발휘한다.',
     paraphrasedEn: 'Granting greater autonomy to learners directly increases their intrinsic motivation.',
     targetWord: 'autonomy',
+    matchedForm: 'autonomy',
   },
   {
     openerRule: '복합관계부사 양보 부사절 (No matter how + 형용사/부사 + 주어 + 동사)',
     sentenceEn: 'No matter how complex the phenomenon may seem, we can analyze it through systematic research.',
+    ipaLine: '/noʊ ˈmæt̬.ɚ haʊ kɑːmˈpleks ðə fəˈnɑː.mə.nɑːn meɪ siːm wi kæn ˈæn.əl.aɪz ɪt θruː ˌsɪs.təˈmæt̬.ɪk ˈriː.sɝːtʃ/',
+    pronLine: '[노 매러 하우 캄플렉스 더 퍼나머난 메이 심 / 위 캔 애널라이즈 잇 / 쓰루 시스터매틱 리서치]',
     sentenceKo: '그 현상이 아무리 복잡해 보일지라도, 우리는 체계적인 연구를 통해 그것을 분석할 수 있다.',
     paraphrasedEn: 'However complex the phenomenon may seem, systematic research allows us to analyze it.',
     targetWord: 'phenomenon',
+    matchedForm: 'phenomenon',
   },
   {
     openerRule: 'It is A that ~ 강조구문 (주어 강조 및 수일치)',
     sentenceEn: 'It is consistent daily practice that builds long-term fluency and confidence.',
+    ipaLine: '/ɪt ɪz kənˈsɪs.tənt ˈdeɪ.li ˈpræk.tɪs ðæt bɪldz ˈlɔːŋ.tɝːm ˈfluː.ən.si ænd ˈkɑːn.fə.dəns/',
+    pronLine: '[이리즈 컨시스턴트 데일리 프랙티스 / 댓 빌즈 롱텀 플루언시 앤 칸피던스]',
     sentenceKo: '장기적인 유창성과 자신감을 길러주는 것은 바로 꾸준한 매일의 연습이다.',
     paraphrasedEn: 'Consistent daily practice is what builds long-term fluency and confidence.',
     targetWord: 'confident',
+    matchedForm: 'confidence',
   },
   {
     openerRule: '계속적 용법의 주격 관계대명사 (, which — 앞 절 전체 선행사)',
     sentenceEn: 'The hotel kindly accommodated our late check-out request, which made our trip much more comfortable.',
+    ipaLine: '/ðə hoʊˈtel ˈkaɪnd.li əˈkɑː.mə.deɪ.t̬ɪd ˈaʊ.ɚ leɪt ˈtʃek.aʊt rɪˈkwest wɪtʃ meɪd ˈaʊ.ɚ trɪp mʌtʃ mɔːr ˈkʌm.fɚ.t̬ə.bəl/',
+    pronLine: '[더 호텔 카인들리 어카머데이티드 아워 레이트 체크아웃 리퀘스트 / 위치 메이드 아워 트립 머치 모어 컴프터블]',
     sentenceKo: '호텔 측에서 레이트 체크아웃 요청을 친절히 수용해 주었는데, 그것이 우리 여행을 훨씬 더 편안하게 만들어 주었다.',
     paraphrasedEn: 'Because the hotel accommodated our late check-out request, our trip became much more comfortable.',
     targetWord: 'accommodate',
+    matchedForm: 'accommodated',
   },
   {
     openerRule: '동명사구 주어와 단수 동사 수일치 (Recognizing ~ fosters)',
     sentenceEn: 'Recognizing our own cognitive biases fosters intellectual humility and open-mindedness.',
+    ipaLine: '/ˈrek.əɡ.naɪ.zɪŋ ˈaʊ.ɚ oʊn ˈkɑːɡ.nə.t̬ɪv ˈbaɪ.ə.sɪz ˈfɑː.stɚz ˌɪn.t̬əlˈek.tʃu.əl hjuːˈmɪl.ə.t̬i ænd ˌoʊ.pənˈmaɪn.dɪd.nəs/',
+    pronLine: '[레커그나이징 아워 오운 카그너티브 바이어시즈 / 파스터즈 인털렉추얼 휴밀러티 앤 오픈마인디드니스]',
     sentenceKo: '우리 자신의 인지적 편향을 인식하는 것은 지적 겸손함과 열린 마음을 길러준다.',
     paraphrasedEn: 'When we recognize our own cognitive biases, we can foster intellectual humility.',
     targetWord: 'foster',
+    matchedForm: 'fosters',
   },
   {
     openerRule: '조건 접속사 Provided that (만약 ~한다면 = If)',
     sentenceEn: 'Provided that we allocate our resources efficiently, we can expedite the entire launch schedule.',
+    ipaLine: '/prəˈvaɪ.dɪd ðæt wi ˈæl.ə.keɪt ˈaʊ.ɚ ˈriː.sɔːr.sɪz ɪˈfɪʃ.ənt.li wi kæn ˈek.spə.daɪt ðə ɪnˈtaɪr lɔːntʃ ˈskedʒ.uːl/',
+    pronLine: '[프로바이디드 댓 위 앨러케이트 아워 리소시즈 이피션틀리 / 위 캔 엑스퍼다이트 디 인타이어 런치 스케줄]',
     sentenceKo: '만약 우리가 자원을 효율적으로 배분한다면, 전체 출시 일정을 앞당길 수 있다.',
     paraphrasedEn: 'By allocating our resources efficiently, we can expedite the entire launch schedule.',
     targetWord: 'expedite',
+    matchedForm: 'expedite',
   },
 ];
 
-export function generateCombinatorialSentences(seed: number, count: number = 12): GeneratedSyntaxItem[] {
+export function generateCombinatorialSentences(
+  seed: number,
+  count: number = 12
+): GeneratedSyntaxItem[] {
   const total = VERIFIED_SYNTAX_ARCHIVE.length;
-  const safeCount = Math.min(count, total);
-  const offset = (seed - 1) % total;
+  const safeSeed = Number.isFinite(seed) && seed >= 1 ? Math.floor(seed) : 1;
+  const safeCount =
+    Number.isFinite(count) && count >= 1
+      ? Math.min(Math.floor(count), total)
+      : total;
+  const offset = ((safeSeed - 1) % total + total) % total;
 
   return Array.from({ length: safeCount }, (_, i) => {
     const item = VERIFIED_SYNTAX_ARCHIVE[(offset + i) % total];
+    const fullTokens = item.sentenceEn.split(/\s+/);
     return {
-      id: `verified-syntax-${seed}-${i}`,
+      id: `verified-syntax-${safeSeed}-${i}`,
       openerRule: item.openerRule,
       sentenceEn: item.sentenceEn,
+      ipaLine: item.ipaLine,
+      pronLine: item.pronLine,
       sentenceKo: item.sentenceKo,
       paraphrasedEn: item.paraphrasedEn,
       targetWord: item.targetWord,
-      scrambleTokens: item.sentenceEn.split(' ').slice(0, 10),
+      matchedForm: item.matchedForm,
+      scrambleTokens: deterministicShuffle(fullTokens, safeSeed * 17 + i),
     };
   });
 }
 
 // ----------------------------------------------------------------------------
-// 3. 수능·내신 '모듈 1~5교시' 전용 학술 독해 지문 & 핵심 어법 문제 은행
+// 3. 학술 독해 6대 주제 지문 & 빈출 어법 10문항 은행
 // ----------------------------------------------------------------------------
-export const EBS_MAJOR_TOPICS = [
+export interface AcademicTopicItem {
+  id: string;
+  category: string;
+  title: string;
+  passageEn: string;
+  passagePron: string;
+  passageKo: string;
+  paraphraseSummary: string;
+  keywords: string[];
+}
+
+export const EBS_MAJOR_TOPICS: AcademicTopicItem[] = [
   {
     id: 'topic-phil',
-    category: '🧠 철학·인문·인지심리 (빈칸 추론 핵심 소재)',
+    category: '🧠 철학·인지심리 (빈칸 추론 핵심 주제)',
     title: '확증 편향(Confirmation Bias)과 인지적 유연성(Cognitive Flexibility)',
     passageEn:
       'Human beings have a natural tendency to favor information that confirms their existing beliefs. Not until we consciously expose ourselves to different perspectives can we overcome this confirmation bias and achieve intellectual maturity.',
+    passagePron:
+      '[휴먼 비잉즈 해버 내추럴 텐던시 투 페이버 인포메이션 댓 컨펌즈 데어 이그지스팅 빌리프스. 낫 언틸 위 컨셔슬리 익스포즈 아워셀브즈 투 디프런트 퍼스펙티브즈 / 캔 위 오버컴 디스 칸퍼메이션 바이어스 앤 어치브 인털렉추얼 머추어리티.]',
     passageKo:
       '인간은 자신의 기존 신념을 확인해 주는 정보를 선호하는 자연스러운 경향이 있다. 우리가 의식적으로 다양한 관점에 스스로를 노출시켜서야 비로소 이 확증 편향을 극복하고 지적 성숙을 이룰 수 있다.',
     paraphraseSummary:
@@ -1424,10 +1879,12 @@ export const EBS_MAJOR_TOPICS = [
   },
   {
     id: 'topic-econ',
-    category: '📈 경제·경영 (요약문 완성 핵심 소재)',
+    category: '📈 경제·경영 (요약문 완성 핵심 주제)',
     title: '지속 가능한 경영(Sustainability)과 브랜드 가치',
     passageEn:
       'In the contemporary global market, consumers no longer evaluate a brand solely by its price tag. What matters most is whether the enterprise seamlessly blends its classic heritage with sustainable and ethical practices.',
+    passagePron:
+      '[인 더 컨템퍼러리 글로벌 마켓 / 컨슈머즈 노 롱거 이밸류에이트 어 브랜드 솔리 바이 이츠 프라이스 태그. 왓 매러즈 모스트 이즈 / 웨더 디 엔터프라이즈 심리슬리 블렌즈 이츠 클래식 헤리티지 / 위드 서스테이너블 앤 에씨컬 프랙티시즈.]',
     passageKo:
       '현대 글로벌 시장에서 소비자들은 더 이상 가격표만으로 브랜드를 평가하지 않는다. 가장 중요한 것은 기업이 고전적 헤리티지를 지속 가능하고 윤리적인 관행과 조화롭게 결합하는지 여부이다.',
     paraphraseSummary:
@@ -1440,34 +1897,74 @@ export const EBS_MAJOR_TOPICS = [
   },
   {
     id: 'topic-sci',
-    category: '🔬 뇌과학·인지과학 (순서·삽입 핵심 소재)',
-    title: '신경 가소성(Neuroplasticity)과 의미 단위(Chunking) 반복 학습',
+    category: '🔬 인지과학·언어습득 (순서·삽입 핵심 주제)',
+    title: '의미 단위 청킹(Chunking)과 효율적 기억 인출',
     passageEn:
-      'Whenever we practice a foreign language in meaningful chunks rather than isolated words, our neural pathways are simultaneously strengthened. Consistent repetition makes fluent retrieval feasible and natural.',
+      'When learners practice a foreign language in meaningful chunks rather than isolated words, working memory processes the input more efficiently. Consistent repetition of these phrases makes fluent retrieval feasible in real conversations.',
+    passagePron:
+      '[웬 러너즈 프랙티스 어 포린 랭귀지 인 미닝풀 청크스 / 래더 댄 아이솔레이티드 워즈 / 워킹 메모리 프로세시즈 디 인풋 모어 이피션틀리. 컨시스턴트 레퍼티션 오브 디즈 프레이지즈 / 메익스 플루언트 리트리벌 피저블 인 리얼 컨버세이션즈.]',
     passageKo:
-      '우리가 고립된 단어가 아니라 의미 있는 덩어리(청크) 단위로 외국어를 연습할 때마다, 우리의 신경 경로는 동시에 강화된다. 일관된 반복은 유창한 언어 인출을 실현 가능하고 자연스럽게 만들어 준다.',
+      '학습자들이 고립된 단어가 아니라 의미 있는 덩어리(청크) 단위로 외국어를 연습할 때, 작업 기억은 입력 정보를 더 효율적으로 처리한다. 이러한 구절들의 일관된 반복은 실전 대화에서 유창한 언어 인출을 실현 가능하게 만들어 준다.',
     paraphraseSummary:
-      'Practicing language in meaningful chunks consolidates neural connections and facilitates fluent retrieval.',
+      'Practicing language in meaningful chunks supports working memory and facilitates fluent retrieval.',
     keywords: [
-      'neural pathway (신경 경로)',
-      'simultaneously (동시에)',
+      'meaningful chunks (의미 단위 덩어리)',
+      'working memory (작업 기억)',
       'make retrieval feasible (인출을 가능하게 만들다)',
     ],
   },
   {
     id: 'topic-env',
-    category: '🌿 환경·생태학 (모의고사 필수 소재)',
-    title: '생태계 상호 의존성(Reciprocal Interdependence)과 생물 다양성',
+    category: '🌿 환경·생태학 (어휘·빈칸 핵심 주제)',
+    title: '핵심종(Keystone Species)과 생태계 상호 의존성',
     passageEn:
-      'Every species in an ecosystem exists within a delicate web of reciprocal relationships. Eliminating even a seemingly minor organism can trigger an inevitable cascade of environmental disruptions.',
+      'Many species in an ecosystem exist within a delicate web of reciprocal relationships. Losing a keystone species can trigger a widespread cascade of ecological disruptions across the entire habitat.',
+    passagePron:
+      '[매니 스피시즈 인 언 이코시스템 / 이그지스트 위딘 어 델리킷 웹 오브 리시프러컬 릴레이션십스. 루징 어 키스톤 스피시즈 / 캔 트리거 어 와이드스프레드 캐스케이드 오브 이컬라지컬 디스럽션즈 / 어크로스 디 인타이어 해비탯.]',
     passageKo:
-      '생태계의 모든 종은 상호 호혜적인 관계의 정교한 그물망 속에 존재한다. 겉보기에 사소해 보이는 유기체 하나를 제거하는 것만으로도 환경 파괴의 필연적인 연쇄 반응을 촉발할 수 있다.',
+      '생태계의 많은 종들은 상호 호혜적인 관계의 정교한 그물망 속에 존재한다. 핵심종(Keystone Species)을 잃는 것은 서식지 전체에 걸쳐 생태계 교란의 광범위한 연쇄 반응을 촉발할 수 있다.',
     paraphraseSummary:
-      'Because ecological survival depends on reciprocal balance, losing a single species can lead to inevitable disruption.',
+      'Because ecological stability relies on reciprocal balance, losing a keystone species can cause widespread disruption.',
     keywords: [
       'reciprocal relationship (상호 호혜적 관계)',
-      'seemingly minor (겉보기에 사소한)',
-      'inevitable cascade (필연적 연쇄 반응)',
+      'keystone species (핵심종)',
+      'widespread cascade (광범위한 연쇄 반응)',
+    ],
+  },
+  {
+    id: 'topic-soc',
+    category: '🏛️ 사회학·미디어 (주제·제목 핵심 주제)',
+    title: '알고리즘 필터 버블(Filter Bubble)과 정보 편식',
+    passageEn:
+      'Personalized recommendation algorithms often surround users with opinions that mirror their own preferences. Stepping outside this digital echo chamber requires deliberate effort to seek out contrasting viewpoints.',
+    passagePron:
+      '[퍼스널라이즈드 레커멘데이션 알고리즘즈 / 오픈 서라운드 유저즈 위드 오피니언즈 댓 미러 데어 오운 프레퍼런시즈. 스테핑 아웃사이드 디스 디지털 에코 체임버 / 리콰이어즈 딜리버릿 에포트 투 식 아웃 컨트래스팅 뷰포인츠.]',
+    passageKo:
+      '개인 맞춤형 추천 알고리즘은 종종 사용자들을 자신의 선호를 그대로 비추는 의견들로 둘러싼다. 이러한 디지털 반향실(에코 체임버) 밖으로 나오는 것은 대조적인 관점을 찾으려는 의도적인 노력을 필요로 한다.',
+    paraphraseSummary:
+      'Overcoming algorithmic echo chambers demands active effort to explore contrasting viewpoints.',
+    keywords: [
+      'recommendation algorithm (추천 알고리즘)',
+      'echo chamber (반향실/정보 편식 공간)',
+      'contrasting viewpoints (대조적인 관점)',
+    ],
+  },
+  {
+    id: 'topic-art',
+    category: '🎨 예술·디자인 미학 (함축 의미 핵심 주제)',
+    title: '기능주의 디자인과 절제된 미학(Minimalist Aesthetic)',
+    passageEn:
+      'Great industrial design does not rely on excessive ornament to capture attention. By eliminating unnecessary clutter, a designer allows the structural silhouette and natural texture to speak for themselves.',
+    passagePron:
+      '[그레이트 인더스트리얼 디자인 / 더즈 낫 릴라이 안 익세시브 오너먼트 투 캡처 어텐션. 바이 일리미네이팅 언네세서리 클러터 / 어 디자이너 얼라우즈 더 스트럭처럴 실루엣 앤 내추럴 텍스처 / 투 스픽 포 뎀셀브즈.]',
+    passageKo:
+      '훌륭한 산업 디자인은 시선을 끌기 위해 과도한 장식에 의존하지 않는다. 불필요한 군더더기를 제거함으로써, 디자이너는 구조적인 실루엣과 자연스러운 질감이 스스로 말하게 한다.',
+    paraphraseSummary:
+      'Removing unnecessary ornament highlights the intrinsic beauty of form and texture.',
+    keywords: [
+      'excessive ornament (과도한 장식)',
+      'structural silhouette (구조적 실루엣)',
+      'speak for themselves (그 자체로 가치를 증명하다)',
     ],
   },
 ];
@@ -1487,7 +1984,7 @@ export interface GrammarQuizBankItem {
 export const GRAMMAR_406_QUIZ_BANK: GrammarQuizBankItem[] = [
   {
     id: 1,
-    schoolTag: '고등 내신·수능 핵심 빈출 #1 (5형식 목적격보어 품사)',
+    schoolTag: '핵심 빈출 어법 #1 (5형식 목적격보어 품사)',
     sentenceBefore: 'Streamlining the approval process makes the entire project',
     choiceA: 'feasible',
     choiceB: 'feasibly',
@@ -1499,7 +1996,7 @@ export const GRAMMAR_406_QUIZ_BANK: GrammarQuizBankItem[] = [
   },
   {
     id: 2,
-    schoolTag: '고등 내신·서술형 핵심 빈출 #2 (부정어 문두 도치)',
+    schoolTag: '핵심 빈출 어법 #2 (부정어 문두 도치)',
     sentenceBefore: 'Not until we step out of our comfort zone',
     choiceA: 'we can',
     choiceB: 'can we',
@@ -1511,7 +2008,7 @@ export const GRAMMAR_406_QUIZ_BANK: GrammarQuizBankItem[] = [
   },
   {
     id: 3,
-    schoolTag: '고등 내신·수능 핵심 빈출 #3 (명사절 관계대명사 What vs 접속사 That)',
+    schoolTag: '핵심 빈출 어법 #3 (관계대명사 What vs 접속사 That)',
     sentenceBefore: '',
     choiceA: 'What',
     choiceB: 'That',
@@ -1523,7 +2020,7 @@ export const GRAMMAR_406_QUIZ_BANK: GrammarQuizBankItem[] = [
   },
   {
     id: 4,
-    schoolTag: '고등 내신·수능 핵심 빈출 #4 (수식어 거품 제거와 주어-동사 수일치)',
+    schoolTag: '핵심 빈출 어법 #4 (수식어구 제거와 주어-동사 수일치)',
     sentenceBefore: 'Consistent exposure to diverse viewpoints and cultures',
     choiceA: 'prevent',
     choiceB: 'prevents',
@@ -1535,7 +2032,7 @@ export const GRAMMAR_406_QUIZ_BANK: GrammarQuizBankItem[] = [
   },
   {
     id: 5,
-    schoolTag: '고등 내신·수능 핵심 빈출 #5 (계속적 용법의 관계대명사)',
+    schoolTag: '핵심 빈출 어법 #5 (계속적 용법의 관계대명사)',
     sentenceBefore: 'The concierge kindly accommodated our request,',
     choiceA: 'which',
     choiceB: 'that',
@@ -1547,7 +2044,7 @@ export const GRAMMAR_406_QUIZ_BANK: GrammarQuizBankItem[] = [
   },
   {
     id: 6,
-    schoolTag: '고등 내신·수능 핵심 빈출 #6 (능동 분사구문 vs 수동 분사구문)',
+    schoolTag: '핵심 빈출 어법 #6 (능동 분사구문 vs 수동 분사구문)',
     sentenceBefore: '',
     choiceA: 'Supporting',
     choiceB: 'Supported',
@@ -1557,12 +2054,65 @@ export const GRAMMAR_406_QUIZ_BANK: GrammarQuizBankItem[] = [
     explanation:
       '주절의 주어(the new theory)가 실증적 증거에 의해 "뒷받침되는(be supported by)" 수동 관계이므로 과거분사 Supported가 정답입니다.',
   },
+  {
+    id: 7,
+    schoolTag: '핵심 빈출 어법 #7 (전치사 to vs to부정사)',
+    sentenceBefore: 'Our team is fully committed to',
+    choiceA: 'streamline',
+    choiceB: 'streamlining',
+    sentenceAfter: 'the entire workflow this quarter.',
+    correct: 'B',
+    grammarCategory: '전치사 to + 동명사(V-ing) 구문 (be committed/dedicated/used to V-ing)',
+    explanation:
+      'be committed to(~에 전념하다), look forward to, object to에서의 to는 전치사이므로 뒤에 동사원형이 아니라 동명사(streamlining)가 와야 합니다.',
+  },
+  {
+    id: 8,
+    schoolTag: '핵심 빈출 어법 #8 (2형식 감각/상태유지동사 보어)',
+    sentenceBefore: 'The wording of the initial contract remained somewhat',
+    choiceA: 'ambiguous',
+    choiceB: 'ambiguously',
+    sentenceAfter: 'until the final revision.',
+    correct: 'A',
+    grammarCategory: '2형식 동사(remain, seem, feel, become) + 주격보어(SC: 형용사)',
+    explanation:
+      'remain은 2형식 연결동사로 뒤에 주어(The wording)의 상태를 설명하는 주격보어(SC)가 필요하므로 형용사 ambiguous가 정답입니다.',
+  },
+  {
+    id: 9,
+    schoolTag: '핵심 빈출 어법 #9 (Only 부사구 문두 도치)',
+    sentenceBefore: 'Only by collaborating closely across departments',
+    choiceA: 'we can meet',
+    choiceB: 'can we meet',
+    sentenceAfter: 'the tentative launch schedule.',
+    correct: 'B',
+    grammarCategory: 'Only + 부사구(절) 문두 이동 시 주절 조동사 도치',
+    explanation:
+      'Only가 이끄는 부사구(Only by collaborating...)가 문장 맨 앞에 오면 주절은 [조동사(can) + 주어(we) + 동사원형(meet)] 어순으로 도치됩니다.',
+  },
+  {
+    id: 10,
+    schoolTag: '핵심 빈출 어법 #10 (관계대명사 vs 전치사 + 관계대명사)',
+    sentenceBefore: 'Every species exists within a delicate web',
+    choiceA: 'which',
+    choiceB: 'in which',
+    sentenceAfter: 'organisms depend on reciprocal relationships.',
+    correct: 'B',
+    grammarCategory: '관계대명사 뒤 완전절 vs 불완전절 구별 (전치사 + 관계대명사 = 관계부사)',
+    explanation:
+      '뒤에 이어지는 절(organisms depend on reciprocal relationships)이 빠진 명사 성분이 없는 완전한 절이므로, 선행사(a delicate web)와 결합해 부사구 역할을 하는 in which(= where)가 정답입니다.',
+  },
 ];
 
 // ----------------------------------------------------------------------------
-// 4. [내 학교 교과서 / 모의고사 지문 직접 붙여넣기] 분석 보조기
+// 4. [내 학교 교과서 / 모의고사 지문 분석기]
+//    - iPadOS Safari 하위 버전 호환 문장 분리 (lookbehind 정규식 미사용)
+//    - 빈 입력 / 짧은 입력 시 샘플로 덮어쓰지 않고 명시적 상태 반환
+//    - 관사+명사를 쪼개지 않는 문법 구(Phrase) 경계 기반 의미 청크 분할
 // ----------------------------------------------------------------------------
 export interface CustomPassageAnalysisResult {
+  isEmpty: boolean;
+  statusMessage: string;
   sentences: {
     idx: number;
     rawEn: string;
@@ -1574,48 +2124,245 @@ export interface CustomPassageAnalysisResult {
   }[];
 }
 
-export function analyzeCustomSchoolPassage(rawText: string): CustomPassageAnalysisResult {
-  const splitSents = rawText
-    .split(/(?<=[.!?])\s+/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 8);
+const STOP_WORDS_SET = new Set([
+  'the',
+  'and',
+  'for',
+  'with',
+  'that',
+  'this',
+  'from',
+  'have',
+  'has',
+  'had',
+  'will',
+  'would',
+  'could',
+  'should',
+  'into',
+  'your',
+  'their',
+  'our',
+  'what',
+  'when',
+  'where',
+  'which',
+  'while',
+  'about',
+  'after',
+  'before',
+  'under',
+  'over',
+  'between',
+  'through',
+  'during',
+  'without',
+  'within',
+  'because',
+  'although',
+  'however',
+  'therefore',
+  'not',
+  'until',
+  'only',
+  'very',
+  'much',
+  'more',
+  'most',
+  'some',
+  'many',
+  'such',
+  'than',
+  'then',
+  'they',
+  'them',
+  'were',
+  'been',
+  'being',
+]);
 
-  const targetList =
-    splitSents.length > 0
-      ? splitSents
-      : [
-          'Not until we step out of our comfort zone can we genuinely broaden our perspective.',
-          'Streamlining the approval process makes the entire project feasible within the deadline.',
-        ];
+const CHUNK_BOUNDARY_BEFORE = new Set([
+  'in',
+  'on',
+  'at',
+  'for',
+  'with',
+  'by',
+  'from',
+  'through',
+  'during',
+  'without',
+  'within',
+  'between',
+  'among',
+  'under',
+  'over',
+  'before',
+  'after',
+  'because',
+  'although',
+  'though',
+  'while',
+  'whereas',
+  'if',
+  'unless',
+  'until',
+  'since',
+  'that',
+  'which',
+  'who',
+  'whom',
+  'whose',
+  'where',
+  'when',
+  'whether',
+  'and',
+  'but',
+  'or',
+  'so',
+]);
+
+const DETERMINERS_AND_AUX = new Set([
+  'a',
+  'an',
+  'the',
+  'my',
+  'your',
+  'his',
+  'her',
+  'its',
+  'our',
+  'their',
+  'this',
+  'that',
+  'these',
+  'those',
+  'every',
+  'each',
+  'some',
+  'any',
+  'no',
+  'can',
+  'could',
+  'will',
+  'would',
+  'shall',
+  'should',
+  'may',
+  'might',
+  'must',
+  'do',
+  'does',
+  'did',
+  'have',
+  'has',
+  'had',
+  'am',
+  'is',
+  'are',
+  'was',
+  'were',
+  'to',
+]);
+
+export function chunkSentenceByMeaning(sentence: string): string {
+  const words = sentence.trim().split(/\s+/);
+  if (words.length <= 4) return sentence.trim();
+
+  const result: string[] = [];
+  let wordsSinceLastSlash = 0;
+
+  for (let i = 0; i < words.length; i++) {
+    const current = words[i];
+    const cleanCurr = current.toLowerCase().replace(/[^a-z]/g, '');
+    const prevWord = i > 0 ? words[i - 1] : '';
+    const cleanPrev = prevWord.toLowerCase().replace(/[^a-z]/g, '');
+
+    // 이전 단어가 콤마/세미콜론으로 끝났고, 뒤에 최소 2단어가 남아있다면 끊어 읽기
+    if (
+      i > 0 &&
+      /[,;:]$/.test(prevWord) &&
+      wordsSinceLastSlash >= 2 &&
+      i < words.length - 1
+    ) {
+      result.push('/');
+      wordsSinceLastSlash = 0;
+    } else if (
+      i >= 2 &&
+      i < words.length - 2 &&
+      wordsSinceLastSlash >= 3 &&
+      CHUNK_BOUNDARY_BEFORE.has(cleanCurr) &&
+      !DETERMINERS_AND_AUX.has(cleanPrev)
+    ) {
+      // 전치사·접속사·관계사 앞에서 의미 단위로 끊기 (단, 앞 단어가 관사/조동사가 아닐 때)
+      result.push('/');
+      wordsSinceLastSlash = 0;
+    }
+
+    result.push(current);
+    wordsSinceLastSlash++;
+  }
+
+  return result.join(' ');
+}
+
+export function analyzeCustomSchoolPassage(rawText: string): CustomPassageAnalysisResult {
+  const trimmed = (rawText || '').trim();
+  if (!trimmed) {
+    return {
+      isEmpty: true,
+      statusMessage: '⚠️ 분석할 영어 지문을 입력창에 붙여넣어 주세요. (최소 1문장 이상)',
+      sentences: [],
+    };
+  }
+
+  // Safari < 16.4 호환을 위해 후방 탐색(?<=) 없이 문장 단위로 분리
+  const rawMatches = trimmed.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [];
+  const validSents = rawMatches
+    .map((s) => s.trim())
+    .filter((s) => s.split(/\s+/).length >= 4);
+
+  if (validSents.length === 0) {
+    return {
+      isEmpty: true,
+      statusMessage:
+        '⚠️ 4단어 이상으로 이루어진 완전한 영어 문장을 입력해 주세요.',
+      sentences: [],
+    };
+  }
 
   return {
-    sentences: targetList.map((sent, idx) => {
+    isEmpty: false,
+    statusMessage: `✅ 총 ${validSents.length}개의 문장에서 의미 단위 소리블록·빈칸 추론·어순 배열 문제를 생성했습니다.`,
+    sentences: validSents.map((sent, idx) => {
       const words = sent.split(/\s+/);
-      const longWords = words
+      const contentWords = words
         .map((w) => w.replace(/[^a-zA-Z-]/g, ''))
-        .filter((w) => w.length >= 6);
-      const answerWord =
-        longWords[0] || words[Math.min(2, words.length - 1)].replace(/[^a-zA-Z]/g, '');
+        .filter(
+          (w) => w.length >= 5 && !STOP_WORDS_SET.has(w.toLowerCase())
+        );
 
-      const blankQuizSentence = sent.replace(
-        new RegExp(`\\b${answerWord}\\b`),
-        '____________'
-      );
+      const fallbackWord =
+        words
+          .map((w) => w.replace(/[^a-zA-Z-]/g, ''))
+          .find((w) => w.length >= 4 && !STOP_WORDS_SET.has(w.toLowerCase())) ||
+        words[Math.min(1, words.length - 1)].replace(/[^a-zA-Z-]/g, '') ||
+        'word';
 
-      const soundBlockEn = words
-        .map((w, i) => ((i + 1) % 3 === 0 && i !== words.length - 1 ? `${w} /` : w))
-        .join(' ');
-
-      const scrambledWords = [...words].sort((a, b) => a.localeCompare(b));
+      const answerWord = contentWords[0] || fallbackWord;
+      const safePattern = new RegExp(`\\b${escapeRegExp(answerWord)}\\b`);
+      const blankQuizSentence = safePattern.test(sent)
+        ? sent.replace(safePattern, '____________')
+        : sent.replace(answerWord, '____________');
 
       return {
         idx: idx + 1,
         rawEn: sent,
-        soundBlockEn,
-        extractedKeywords: longWords.slice(0, 4),
+        soundBlockEn: chunkSentenceByMeaning(sent),
+        extractedKeywords: contentWords.slice(0, 4),
         blankQuizSentence,
         answerWord,
-        scrambledWords,
+        scrambledWords: deterministicShuffle(words, idx + 101),
       };
     }),
   };
