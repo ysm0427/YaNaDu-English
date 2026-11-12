@@ -1,8 +1,9 @@
 // ============================================================================
 // src/App.tsx — [파트 1/4]
 // - 최상단 모듈 Import 통합 (React Hooks & studyData.ts 단방향 참조)
-// - 문장 성분 7개 + 9품사(한정사 포함) 총 16개 문법 노드 및 대표 결합선 사전
-// - STEP 3 기준점 예문(DIAGRAM_EXAMPLES 3선) & 9대 분야 큐레이션 트렌드 90선
+// - 문장 성분 7개(구·절 역할) + 9품사(단어 정체, 한정사 포함) = 총 16개 문법 노드 및 21개 결합선 사전
+// - 명사 수식어(M-N) 매핑 반영, 감탄사(Interj) 예시 정정, IO 전치사구 보충어 설명 엄밀화
+// - STEP 3 기준점 예문(DIAGRAM_EXAMPLES 3선) & 9대 분야 큐레이션 토픽 90선
 // ============================================================================
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
@@ -179,7 +180,7 @@ export interface ThemeData {
 
 export interface DiagramToken {
   word: string;
-  comp: CompId | '독립어';
+  comp: CompId;
   compLabel: string;
   pos: PosId;
   posLabel: string;
@@ -304,7 +305,9 @@ export interface CanvasStroke {
 
 // ============================================================================
 // 1. 문장 성분 7개(구·절 역할) + 9품사(단어 정체, 한정사 포함) = 총 16개 문법 노드 사전
-//    ※ 단어 단위의 품사(Pos)와 구·절 단위의 문장 성분(Comp)을 명확히 구분하여 서술
+//    ※ 연결선은 "품사 자체가 곧바로 문장 성분이 된다"는 뜻이 아니라,
+//       "해당 품사 단어가 단독으로 쓰이거나 구(전치사구·부정사구·동명사구·명사구)·절을 구성하여
+//        문장 성분 역할을 수행할 수 있음"을 나타냅니다.
 // ============================================================================
 export const SENTENCE_COMPONENTS: SentenceComponentInfo[] = [
   {
@@ -313,11 +316,12 @@ export const SENTENCE_COMPONENTS: SentenceComponentInfo[] = [
     engName: 'Subject (S)',
     roleTitle: '문장의 주체 (~은/는/이/가)',
     easyMeaning:
-      '문장에서 동작을 행하거나 상태의 주체가 되는 자리입니다. 기본적으로 명사(구)·대명사가 오며, 구·절 단위에서는 동명사구(V-ing), to부정사구, 명사절(that절·what절·의문사절)도 주어 역할을 합니다.',
+      '문장에서 동작을 행하거나 상태의 주체가 되는 자리입니다. 기본적으로 명사(구)·대명사가 오며, 구·절 단위에서는 동명사구(V-ing), to부정사구, 명사절(that절·what절·의문사절)도 주어 역할을 수행합니다.',
     wordOrderRule:
-      '평서문에서는 원칙적으로 본동사(V) 앞에 위치합니다. (단, 부정어구·Only 부사구 문두 도치나 유도부사 There 구문에서는 동사/조동사 뒤로 도치됨)',
+      '평서문에서는 원칙적으로 본동사(V) 앞에 위치합니다. (단, 부정어구·Only 부사구 문두 도치나 유도부사 There 구문에서는 조동사/동사 뒤로 위치가 바뀜)',
     allowedPos: ['N', 'Pron'],
-    exampleHighlight: '[Our team (S)] streamlined the workflow. / [Streamlining the process (S:동명사구)] makes it feasible.',
+    exampleHighlight:
+      '[Our team (S)] streamlined the workflow. / [Streamlining the process (S:동명사구)] makes it feasible.',
   },
   {
     id: 'V',
@@ -327,9 +331,10 @@ export const SENTENCE_COMPONENTS: SentenceComponentInfo[] = [
     easyMeaning:
       '주어가 어떤 동작을 하는지 또는 어떤 상태인지를 서술하는 문장의 핵심 동사(구) 자리입니다. 조동사(will, can, should 등)나 완료형(have p.p.)과 결합하여 하나의 서술어 블록을 이룹니다.',
     wordOrderRule:
-      '주어(S) 바로 뒤에 위치하며, 동사의 성질(자동사·타동사·연결동사·수여동사)에 따라 뒤에 올 목적어(O)나 보어(C)의 구조가 결정됩니다.',
+      '주어(S) 바로 뒤에 위치하며, 동사의 성질(자동사·타동사·연결동사·수여동사)에 따라 뒤에 올 목적어(O)나 보어(C), 전치사구 보충어의 구조가 결정됩니다.',
     allowedPos: ['V'],
-    exampleHighlight: 'Our team [streamlined (V)] the workflow. / We [will touch base (V)] tomorrow.',
+    exampleHighlight:
+      'Our team [streamlined (V)] the workflow. / We [will touch base (V)] tomorrow.',
   },
   {
     id: 'IO',
@@ -337,9 +342,9 @@ export const SENTENCE_COMPONENTS: SentenceComponentInfo[] = [
     engName: 'Indirect Object (IO)',
     roleTitle: '4형식 수여동사의 받는 대상 (~에게)',
     easyMeaning:
-      '4형식 수여동사(give, send, offer, grant, show 등) 뒤에서 직접목적어(DO)를 전달받는 대상(~에게)입니다.',
+      '4형식 수여동사(give, send, offer, grant, show 등) 뒤에서 직접목적어(DO)를 전달받는 수혜 대상(~에게)입니다.',
     wordOrderRule:
-      '[수여동사(V) + 간접목적어(IO: ~에게) + 직접목적어(DO: ~을/를)] 어순으로 놓입니다. IO를 뒤로 보내면 전치사(to/for/of)가 붙어 수식어구(M)로 전환됩니다.',
+      '4형식에서는 [수여동사(V) + 간접목적어(IO: ~에게) + 직접목적어(DO: ~을/를)] 어순으로 놓입니다. 3형식으로 전환하면 직접목적어(DO) 뒤로 이동하여 전치사(to/for/of)와 결합한 전치사구(동사가 요구하는 수혜자·도착점 보충어/부가어 기능) 형태가 됩니다.',
     allowedPos: ['N', 'Pron'],
     exampleHighlight: 'Thanks for giving [me (IO)] a quick heads-up(DO).',
   },
@@ -361,11 +366,12 @@ export const SENTENCE_COMPONENTS: SentenceComponentInfo[] = [
     engName: 'Subject Complement (SC)',
     roleTitle: '주어(S)의 정체·상태 보충 설명',
     easyMeaning:
-      '2형식 연결동사(be, become, remain, seem, feel, look 등) 뒤에서 주어가 무엇인지(명사구) 또는 어떤 상태인지(형용사구) 보충합니다. to부정사구·동명사구·명사절 및 상태를 나타내는 전치사구(예: on the same page)도 보어로 쓰입니다.',
+      '2형식 연결동사(be, become, remain, seem, feel, look 등) 뒤에서 주어가 무엇인지(명사구) 또는 어떤 상태인지(형용사구) 보충합니다. 구·절 단위에서는 to부정사구·동명사구·명사절 및 상태를 나타내는 전치사구(예: on the same page, in good shape)도 보어 역할을 수행합니다.',
     wordOrderRule:
-      '2형식 연결동사 바로 뒤에 위치합니다. 해석이 "~하게"로 되더라도 주어의 상태를 설명하므로 부사(-ly)가 아닌 형용사를 써야 합니다.',
+      '2형식 연결동사 바로 뒤에 위치합니다. 우리말 해석이 "~하게"로 되더라도 주어의 상태를 설명하므로 부사(-ly)가 아닌 형용사를 써야 합니다.',
     allowedPos: ['N', 'Pron', 'Adj', 'Prep'],
-    exampleHighlight: 'The wording remained [ambiguous (SC:형용사)]. / Everyone is [on the same page (SC:전치사구)].',
+    exampleHighlight:
+      'The wording remained [ambiguous (SC:형용사)]. / Everyone is [on the same page (SC:전치사구)].',
   },
   {
     id: 'OC',
@@ -373,23 +379,25 @@ export const SENTENCE_COMPONENTS: SentenceComponentInfo[] = [
     engName: 'Object Complement (OC)',
     roleTitle: '목적어(DO)의 정체·상태·동작 보충 설명',
     easyMeaning:
-      '5형식 동사(make, keep, find, consider, help, encourage 등) 뒤에서 목적어(DO)가 어떤 상태인지(형용사·명사) 또는 어떤 동작을 하는지(to부정사·원형부정사·분사)를 보충 설명합니다.',
+      '5형식 동사(make, keep, find, consider, help, encourage 등) 뒤에서 목적어(DO)가 어떤 상태인지(형용사구·명사구) 또는 어떤 동작을 하는지(to부정사구·원형부정사구·분사구)를 보충 설명합니다.',
     wordOrderRule:
-      '[5형식 동사(V) + 목적어(DO) + 목적격보어(OC)] 어순입니다. 상태 보어 자리에는 부사(-ly)를 쓸 수 없으며, 목적어와의 능동(V-ing/to V)·수동(p.p.) 관계를 구별해야 합니다.',
+      '[5형식 동사(V) + 목적어(DO) + 목적격보어(OC)] 어순입니다. 뒤에 부사구(전치사구)가 이어지더라도 목적어 바로 뒤 상태 보어 자리에는 부사(-ly)를 쓸 수 없습니다.',
     allowedPos: ['N', 'Adj', 'V'],
-    exampleHighlight: 'Streamlining the process makes the project [feasible (OC:형용사)].',
+    exampleHighlight:
+      'Streamlining the process makes the project [feasible (OC:형용사)] within the deadline.',
   },
   {
     id: 'M',
-    name: '수식어(및 부가어)',
+    name: '수식어(및 부가어·독립요소)',
     engName: 'Modifier / Adjunct (M)',
-    roleTitle: '명사·동사·문장 수식 및 명사구 내부 한정',
+    roleTitle: '명사·동사·문장 수식, 명사구 한정 및 전치사구·독립부가어',
     easyMeaning:
-      '문장의 필수 뼈대(S·V·O·C)를 꾸며주거나 시간·장소·이유·조건 등의 부가 정보를 더합니다. 단어 단위에서는 형용사·부사·한정사(명사구 내부 한정)가, 구·절 단위에서는 전치사구·부사절·분사구문이 수식어 역할을 수행합니다.',
+      '문장의 필수 뼈대(S·V·O·C)를 꾸며주거나 시간·장소·이유·조건 등의 부가 정보를 더합니다. 단어 단위에서는 형용사·부사·한정사(명사구 내부 한정)·복합명사 앞 명사 수식어(예: approval process의 approval)·감탄사가, 구·절 단위에서는 전치사구(전치사+명사 목적어)·부사절·분사구문이 이 역할을 수행합니다.',
     wordOrderRule:
-      '한정사(Det)와 단일 형용사(Adj)는 명사 앞에서, 전치사구·관계사절·부사절은 주로 명사 뒤나 문장 앞뒤에서 수식합니다.',
-    allowedPos: ['Adj', 'Adv', 'Prep', 'Conj', 'Det', 'Interj'],
-    exampleHighlight: '[The (M:한정사)] [short (M:형용사)] video went viral [overnight (M:부사)].',
+      '한정사(Det)·형용사(Adj)·명사수식어(N)는 주로 명사 앞에서, 전치사구·관계사절·부사절은 명사 뒤나 문장 앞뒤에서 수식·보충합니다.',
+    allowedPos: ['N', 'Adj', 'Adv', 'Prep', 'Conj', 'Det', 'Interj'],
+    exampleHighlight:
+      '[The (M:한정사)] [approval (M:명사수식어)] process / [on the schedule (M:전치사구)]',
   },
 ];
 
@@ -400,8 +408,8 @@ export const PARTS_OF_SPEECH: PartOfSpeechInfo[] = [
     engName: 'Noun (N)',
     identityTitle: '사람·사물·추상 개념의 이름',
     easyMeaning:
-      '구체적인 사물부터 추상적 개념(perspective, autonomy, feasibility 등)까지 이름을 나타내는 품사입니다. 명사구의 중심(핵)이 되어 주어·목적어·보어 자리에 들어갑니다.',
-    allowedComp: ['S', 'IO', 'DO', 'SC', 'OC'],
+      '구체적인 사물부터 추상적 개념(perspective, autonomy, feasibility 등)까지 이름을 나타내는 품사입니다. 명사구의 중심(핵)이 되어 주어·목적어·보어 자리에 들어가며, 다른 명사 앞에서 복합명사 수식어(M)가 되거나 전치사의 목적어로서 전치사구(M)를 구성하기도 합니다.',
+    allowedComp: ['S', 'IO', 'DO', 'SC', 'OC', 'M'],
     exampleWords: 'schedule, perspective, itinerary, silhouette, milestone, bias',
   },
   {
@@ -420,7 +428,7 @@ export const PARTS_OF_SPEECH: PartOfSpeechInfo[] = [
     engName: 'Verb (V)',
     identityTitle: '동작이나 상태를 나타내는 말',
     easyMeaning:
-      '시제와 수일치를 가지며 문장의 서술어(V)가 됩니다. 또한 to부정사·원형부정사·분사(준동사) 형태로 변환되면 5형식의 목적격보어(OC) 등 다양한 구문 역할을 수행합니다.',
+      '시제와 수일치를 가지며 문장의 서술어(V)가 됩니다. 또한 to부정사·원형부정사·분사(준동사구) 형태로 쓰일 때는 5형식 목적격보어(OC) 구문을 이끌기도 합니다.',
     allowedComp: ['V', 'OC'],
     exampleWords: 'streamline, expedite, accommodate, unwind, foster, consolidate',
   },
@@ -432,7 +440,8 @@ export const PARTS_OF_SPEECH: PartOfSpeechInfo[] = [
     easyMeaning:
       '명사 앞뒤에서 명사를 꾸미는 수식어(M)가 되거나, 2형식 주격보어(SC) 및 5형식 목적격보어(OC) 자리에서 주어·목적어의 상태를 설명합니다.',
     allowedComp: ['SC', 'OC', 'M'],
-    exampleWords: 'feasible, available, comfortable, ambiguous, tentative, sustainable',
+    exampleWords:
+      'feasible, available, comfortable, ambiguous, tentative, sustainable',
   },
   {
     id: 'Adv',
@@ -440,19 +449,21 @@ export const PARTS_OF_SPEECH: PartOfSpeechInfo[] = [
     engName: 'Adverb (Adv)',
     identityTitle: '동사·형용사·다른 부사·문장 전체를 수식하는 말',
     easyMeaning:
-      '시간, 장소, 빈도, 방식, 정도를 나타내며 문장에서 수식어(M)로 기능합니다. (주의: 보어 자리인 SC·OC에는 부사가 들어갈 수 없습니다.)',
+      '시간, 장소, 빈도, 방식, 정도 및 화자의 태도(honestly, thankfully 등)를 나타내며 문장에서 수식어(M)로 기능합니다. (주의: 보어 자리인 SC·OC에는 부사가 들어갈 수 없습니다.)',
     allowedComp: ['M'],
-    exampleWords: 'meticulously, simultaneously, seamlessly, overnight, genuinely, today',
+    exampleWords:
+      'meticulously, simultaneously, seamlessly, overnight, genuinely, honestly',
   },
   {
     id: 'Prep',
     name: '전치사',
     engName: 'Preposition (Prep)',
-    identityTitle: '명사구(동명사구) 앞에 놓여 관계를 나타내는 말',
+    identityTitle: '명사구(동명사구) 앞에 놓여 시간·장소·대상 관계를 나타내는 말',
     easyMeaning:
-      '단독으로 쓰이지 않고 뒤에 목적어(명사구·동명사구)를 이끌어 [전치사구]를 형성합니다. 형성된 전치사구는 문장에서 부사적/형용사적 수식어(M)가 되거나 상태를 나타내는 주격보어(SC)로 쓰입니다.',
+      '단독으로 성분이 되지 않고 뒤에 목적어(명사구·동명사구)를 이끌어 [전치사구]를 형성합니다. 형성된 전치사구 전체가 문장에서 부사적/형용사적 수식어·보충어(M)가 되거나 상태를 나타내는 주격보어(SC)로 쓰입니다.',
     allowedComp: ['SC', 'M'],
-    exampleWords: 'in, on, at, for, with, by, before, during, without, within, upon',
+    exampleWords:
+      'in, on, at, for, with, by, before, during, without, within, upon',
   },
   {
     id: 'Conj',
@@ -460,7 +471,7 @@ export const PARTS_OF_SPEECH: PartOfSpeechInfo[] = [
     engName: 'Conjunction (Conj)',
     identityTitle: '단어·구·절을 이어주는 연결어',
     easyMeaning:
-      '대등한 요소를 잇는 등위접속사(and, but, or, so)와 부사절·명사절을 이끄는 종속접속사(because, although, if, until, that, whether)가 있으며 절 단위의 연결 및 수식(M)을 담당합니다.',
+      '대등한 요소를 잇는 등위접속사(and, but, or, so)와 부사절·명사절을 이끄는 종속접속사(because, although, if, until, that, whether)가 있으며 절 단위의 연결 및 부사절 수식(M)을 담당합니다.',
     allowedComp: ['M'],
     exampleWords: 'and, but, so, because, although, if, until, whether, while',
   },
@@ -478,15 +489,15 @@ export const PARTS_OF_SPEECH: PartOfSpeechInfo[] = [
     id: 'Interj',
     name: '감탄사(담화표지)',
     engName: 'Interjection (Interj)',
-    identityTitle: '느낌·부름·응답·화제 전환을 나타내는 독립 요소',
+    identityTitle: '놀람·느낌·부름·응답을 나타내는 독립 단어',
     easyMeaning:
-      '문장의 필수 성분 밖에서 독립적으로 쓰여 화자의 감정이나 담화 분위기를 전달하는 요소(M/독립어)입니다.',
+      '문장의 필수 뼈대 밖에서 독립적으로 감정을 표현하거나 말을 꺼내는 담화 표지입니다. 공식 7성분 다이어그램에서는 부가·독립 요소(M)에 연결됩니다.',
     allowedComp: ['M'],
-    exampleWords: 'Well, Oh, Wow, Hey, Honestly, Thankfully',
+    exampleWords: 'Oh, Wow, Hey, Well, Oops, Bravo, Ah, Hurray',
   },
 ];
 
-// SENTENCE_COMPONENTS.allowedPos 및 PARTS_OF_SPEECH.allowedComp와 1:1로 일치하는 20개 결합 관계선
+// SENTENCE_COMPONENTS.allowedPos 및 PARTS_OF_SPEECH.allowedComp와 1:1로 일치하는 21개 결합 관계선
 export const MAPPING_EDGES: { comp: CompId; pos: PosId }[] = [
   { comp: 'S', pos: 'N' },
   { comp: 'S', pos: 'Pron' },
@@ -502,6 +513,7 @@ export const MAPPING_EDGES: { comp: CompId; pos: PosId }[] = [
   { comp: 'OC', pos: 'N' },
   { comp: 'OC', pos: 'Adj' },
   { comp: 'OC', pos: 'V' },
+  { comp: 'M', pos: 'N' },
   { comp: 'M', pos: 'Adj' },
   { comp: 'M', pos: 'Adv' },
   { comp: 'M', pos: 'Prep' },
@@ -510,16 +522,17 @@ export const MAPPING_EDGES: { comp: CompId; pos: PosId }[] = [
   { comp: 'M', pos: 'Interj' },
 ];
 
-// STEP 3에서 언제든 선택해 확인할 수 있는 정밀 수작업 주석 대표 예문 3선 (3형식 · 4형식 · 5형식)
+// STEP 3에서 언제든 선택해 확인할 수 있는 정밀 수작업 주석 대표 예문 3선 (5형식 · 4형식 · 2형식)
 export const DIAGRAM_EXAMPLES: DiagramSentence[] = [
   {
     title: '대표 표준 예문 1 (5형식: 동명사구 주어 + make + 목적어 + 형용사 보어)',
     rawEn: 'Streamlining the process makes the schedule feasible.',
     naturalKo: '절차를 간소화하는 것은 그 일정을 실현 가능하게 만든다.',
-    skeleton: 'Streamlining the process[S] + makes[V] + the schedule[DO] + feasible[OC]',
+    skeleton:
+      'Streamlining the process[S] + makes[V] + the schedule[DO] + feasible[OC]',
     patternType: '5형식 (S + V + DO + OC) — 목적격보어 형용사 주의 구문',
     wordOrderTip:
-      '문장 맨 앞의 Streamlining은 콤마 없이 동사 makes와 결합하므로 분사구문이 아니라 동명사구 주어(S)이며, 단수 동사 makes와 수일치합니다. 맨 끝 feasible은 목적어(the schedule)의 상태를 보충하는 목적격보어(OC)이므로 부사(feasibly)를 쓰지 않습니다.',
+      '문장 맨 앞의 Streamlining은 뒤에 콤마(,) 없이 곧바로 단수 본동사 makes와 결합하므로 분사구문이 아니라 동명사구 주어(S)입니다. 맨 끝 feasible은 목적어(the schedule)의 상태를 보충하는 목적격보어(OC)이므로 부사(feasibly)를 쓰지 않습니다.',
     isHeuristic: false,
     tokens: [
       {
@@ -529,7 +542,8 @@ export const DIAGRAM_EXAMPLES: DiagramSentence[] = [
         pos: 'N',
         posLabel: '동명사 (N역할)',
         meaning: '간소화하는 것',
-        roleExplanation: '동사 streamline에 -ing가 붙어 명사구 역할을 하는 동명사구 주어(S)의 핵심어입니다.',
+        roleExplanation:
+          '동사 streamline에 -ing가 붙어 명사구 역할을 하는 동명사구 주어(S)의 핵심어입니다.',
         colorClass: 'border-blue-500 text-blue-700',
       },
       {
@@ -539,7 +553,8 @@ export const DIAGRAM_EXAMPLES: DiagramSentence[] = [
         pos: 'Det',
         posLabel: '한정사 (Det)',
         meaning: '그',
-        roleExplanation: '명사 process 앞에서 특정 대상을 한정하는 정관사(한정사)입니다.',
+        roleExplanation:
+          '명사 process 앞에서 특정 대상을 한정하는 정관사(한정사)입니다.',
         colorClass: 'border-slate-300 text-slate-600',
       },
       {
@@ -549,7 +564,8 @@ export const DIAGRAM_EXAMPLES: DiagramSentence[] = [
         pos: 'N',
         posLabel: '명사 (N)',
         meaning: '절차를',
-        roleExplanation: '앞의 동명사 Streamlining의 의미상 목적어로 결합되어 전체 주어구(Streamlining the process)를 완성합니다.',
+        roleExplanation:
+          '앞의 동명사 Streamlining의 의미상 목적어로 결합되어 전체 주어구(Streamlining the process)를 완성합니다.',
         colorClass: 'border-indigo-400 text-indigo-700',
       },
       {
@@ -559,7 +575,8 @@ export const DIAGRAM_EXAMPLES: DiagramSentence[] = [
         pos: 'V',
         posLabel: '동사 (V)',
         meaning: '만든다',
-        roleExplanation: '동명사구 주어(단수 취급)에 수일치된 5형식 본동사(V)입니다.',
+        roleExplanation:
+          '동명사구 주어(단수 취급)에 수일치된 5형식 본동사(V)입니다.',
         colorClass: 'border-rose-500 text-rose-700',
       },
       {
@@ -589,7 +606,8 @@ export const DIAGRAM_EXAMPLES: DiagramSentence[] = [
         pos: 'Adj',
         posLabel: '형용사 (Adj)',
         meaning: '실현 가능한(가능하게)',
-        roleExplanation: '목적어(the schedule)가 어떤 상태가 되는지 설명하는 목적격보어(OC)이므로 형용사 형태를 씁니다.',
+        roleExplanation:
+          '목적어(the schedule)가 어떤 상태가 되는지 설명하는 목적격보어(OC)이므로 형용사 형태를 씁니다.',
         colorClass: 'border-amber-500 text-amber-700',
       },
     ],
@@ -598,7 +616,8 @@ export const DIAGRAM_EXAMPLES: DiagramSentence[] = [
     title: '대표 표준 예문 2 (4형식: 수여동사 give + 간접목적어 IO + 직접목적어 DO)',
     rawEn: 'Traveling abroad gives us valuable experience.',
     naturalKo: '해외여행을 하는 것은 우리에게 귀중한 경험을 준다.',
-    skeleton: 'Traveling abroad[S] + gives[V] + us[IO] + valuable experience[DO]',
+    skeleton:
+      'Traveling abroad[S] + gives[V] + us[IO] + valuable experience[DO]',
     patternType: '4형식 수여동사 구문 (S + V + IO + DO)',
     wordOrderTip:
       '4형식 동사 gives 뒤에 받는 사람(us: 우리에게, IO)이 먼저 오고, 주는 대상(valuable experience: 귀중한 경험을, DO)이 바로 이어집니다.',
@@ -621,7 +640,8 @@ export const DIAGRAM_EXAMPLES: DiagramSentence[] = [
         pos: 'Adv',
         posLabel: '부사 (Adv)',
         meaning: '해외로',
-        roleExplanation: '앞의 동명사 Traveling을 수식하는 장소·방향 부사(M)입니다.',
+        roleExplanation:
+          '앞의 동명사 Traveling을 수식하는 장소·방향 부사(M)입니다.',
         colorClass: 'border-slate-400 text-slate-600',
       },
       {
@@ -631,7 +651,8 @@ export const DIAGRAM_EXAMPLES: DiagramSentence[] = [
         pos: 'V',
         posLabel: '동사 (V)',
         meaning: '준다',
-        roleExplanation: '간접목적어와 직접목적어 두 개를 취하는 4형식 수여동사(V)입니다.',
+        roleExplanation:
+          '간접목적어와 직접목적어 두 개를 취하는 4형식 수여동사(V)입니다.',
         colorClass: 'border-rose-500 text-rose-700',
       },
       {
@@ -641,7 +662,8 @@ export const DIAGRAM_EXAMPLES: DiagramSentence[] = [
         pos: 'Pron',
         posLabel: '대명사 (Pron)',
         meaning: '우리에게',
-        roleExplanation: '경험을 받는 대상인 간접목적어(IO) 자리에 목적격 대명사가 쓰였습니다.',
+        roleExplanation:
+          '경험을 받는 대상인 간접목적어(IO) 자리에 목적격 대명사가 쓰였습니다.',
         colorClass: 'border-purple-500 text-purple-700',
       },
       {
@@ -651,7 +673,8 @@ export const DIAGRAM_EXAMPLES: DiagramSentence[] = [
         pos: 'Adj',
         posLabel: '형용사 (Adj)',
         meaning: '귀중한',
-        roleExplanation: '뒤의 명사 experience를 꾸며주는 형용사 수식어(M)입니다.',
+        roleExplanation:
+          '뒤의 명사 experience를 꾸며주는 형용사 수식어(M)입니다.',
         colorClass: 'border-amber-500 text-amber-700',
       },
       {
@@ -661,7 +684,8 @@ export const DIAGRAM_EXAMPLES: DiagramSentence[] = [
         pos: 'N',
         posLabel: '명사 (N)',
         meaning: '경험을',
-        roleExplanation: '수여동사 gives가 전달하는 실제 내용물인 직접목적어(DO)입니다.',
+        roleExplanation:
+          '수여동사 gives가 전달하는 실제 내용물인 직접목적어(DO)입니다.',
         colorClass: 'border-emerald-500 text-emerald-700',
       },
     ],
@@ -713,7 +737,8 @@ export const DIAGRAM_EXAMPLES: DiagramSentence[] = [
         pos: 'Adv',
         posLabel: '부사 (Adv)',
         meaning: '다소, 어느 정도',
-        roleExplanation: '뒤에 오는 형용사 보어 ambiguous의 정도를 꾸며주는 부사(M)입니다.',
+        roleExplanation:
+          '뒤에 오는 형용사 보어 ambiguous의 정도를 꾸며주는 부사(M)입니다.',
         colorClass: 'border-slate-400 text-slate-600',
       },
       {
@@ -723,7 +748,8 @@ export const DIAGRAM_EXAMPLES: DiagramSentence[] = [
         pos: 'Adj',
         posLabel: '형용사 (Adj)',
         meaning: '모호한 (상태로)',
-        roleExplanation: '주어(The wording)의 상태를 보충 설명하는 주격보어(SC)입니다.',
+        roleExplanation:
+          '주어(The wording)의 상태를 보충 설명하는 주격보어(SC)입니다.',
         colorClass: 'border-amber-500 text-amber-700',
       },
     ],
@@ -733,7 +759,7 @@ export const DIAGRAM_EXAMPLES: DiagramSentence[] = [
 // ============================================================================
 // 2. 9대 분야 에디터 큐레이션 & 구글 뉴스 RSS 연동 토픽 90선
 //    - 모든 키워드에 dictTargetWord(사전 검색용 단일 표제어), ipa(미국식), pron(한글발음) 완비
-//    - 2025년 7월 유튜브 급상승 폐지 및 2021년 네이버 실검 종료 등 실제 서비스 현황 반영
+//    - 실제 서비스 현황(유튜브 크리에이터·쇼츠, 네이버 뉴스 큐레이션 등) 반영
 // ============================================================================
 export const INITIAL_MEDIA_PLATFORMS: MediaTrendPlatform[] = [
   {
@@ -958,11 +984,11 @@ export const INITIAL_MEDIA_PLATFORMS: MediaTrendPlatform[] = [
   },
   {
     id: 'GOOGLE_TRENDS',
-    name: '구글 뉴스 RSS & 글로벌 테크 토픽 (실시간 연동)',
+    name: '구글 뉴스 RSS & 글로벌 테크 토픽 (RSS 연동)',
     shortName: '🔵 구글트렌드',
     badgeColor: 'bg-blue-600 text-white',
     liveUrl: 'https://trends.google.co.kr/trending?geo=KR',
-    sourceNote: '구글 뉴스 RSS 실시간 헤드라인 연동 지원 플랫폼',
+    sourceNote: '구글 뉴스 RSS 헤드라인 연동 지원 플랫폼',
     keywords: [
       {
         rank: 1,
@@ -1729,8 +1755,9 @@ export const INITIAL_MEDIA_PLATFORMS: MediaTrendPlatform[] = [
 ];
 // ============================================================================
 // src/App.tsx — [파트 2/4]
-// - 필수 어휘 10선 챌린지 (미국식 IPA · 한글발음 · 영영정의 검증 완료)
+// - 필수 어휘 챌린지 (미국식 IPA · 한글발음 · 영영정의 검증 완료)
 // - 테마 1 (비즈니스 회의) · 테마 2 (OPIc 일상 루틴) · 테마 3 (여행·호텔·공항)
+// - 퀴즈 정답 인덱스(0, 1, 2, 3) 분산 배치 & stick to 전치사구 분석 기준 통일
 // ============================================================================
 
 export const NAVER_OFFICIAL_WORD_CHALLENGE = [
@@ -1843,7 +1870,7 @@ export const THEME_BIZ_MEETING: ThemeData = {
         {
           speaker: 'B',
           roleName: '팀원 (Member)',
-          en: "Sure, I will share a quick heads-up with the team.",
+          en: 'Sure, I will share a quick heads-up with the team.',
           soundBlock: 'Sure, / I will share / a quick heads-up / with the team.',
           pron: '[슈어, 아이 윌 쉐어 / 어 퀵 헤즈업 / 위드 더 팀]',
           ko: '네, 팀원들에게 미리 간단한 귀띔(사전 안내)을 공유하겠습니다.',
@@ -2150,7 +2177,7 @@ export const THEME_BIZ_MEETING: ThemeData = {
       levelTag: 'beginner',
       tag: '초급 필수 · 4형식 사전 공유',
       targetWord: 'heads-up',
-      wordOrderFormula: 'Thanks for[M] + giving + me[IO] + a quick heads-up[DO] + on the schedule[M]',
+      wordOrderFormula: 'Thanks[M] + for giving[M] + me[IO] + a quick heads-up[DO] + on the schedule[M]',
       structure: '전치사구 + 4형식 동명사구(giving + IO + DO)',
       soundBlockEn: 'Thanks for giving me / a quick heads-up / on the schedule.',
       soundMethodGuide: 'giving me[기빙 미] 뒤에 a quick heads-up[어 퀵 헤즈업]을 한 덩어리로 경쾌하게 붙여 읽습니다.',
@@ -2169,8 +2196,8 @@ export const THEME_BIZ_MEETING: ThemeData = {
       levelTag: 'intermediate',
       tag: '중급 핵심 · 절차 신속 처리 요청',
       targetWord: 'expedite',
-      wordOrderFormula: 'Could you please[조동사] + expedite[V] + the approval process[DO] + before Friday[M]?',
-      structure: '3형식 정중한 의문문 (Could you please + V + DO + M)',
+      wordOrderFormula: 'Could you please[조동사+S+M] + expedite[V] + the approval process[DO] + before Friday[M]?',
+      structure: '3형식 정중한 의문문 (Could + S + V + DO + M)',
       soundBlockEn: 'Could you please expedite / the approval process / before Friday?',
       soundMethodGuide: 'Could you는 [쿠쥬]로 연음하고 expedite[엑스퍼다이트]에 강세를 실어 정중하게 올림조로 발음합니다.',
       ipaLine: '/kʊd ju pliːz ˈek.spə.daɪt ðə əˈpruː.vəl ˈprɑː.ses bɪˈfɔːr ˈfraɪ.deɪ/',
@@ -2180,7 +2207,7 @@ export const THEME_BIZ_MEETING: ThemeData = {
       pronLine: '[쿠쥬 플리즈 엑스퍼다이트 / 디 어프루벌 프로세스 / 비포 프라이데이]',
       naturalKo: '금요일 전까지 승인 절차를 좀 더 신속히 진행해 주실 수 있을까요?',
       paraphraseVersion: 'Would it be possible to speed up the approval process before Friday?',
-      grammarPoint: 'hurry up은 상대방을 재촉하는 무례한 어감을 줄 수 있으므로, 비즈니스에서는 타동사 expedite를 사용해 정중하게 요청합니다.',
+      grammarPoint: 'approval process에서 approval은 명사(N)이지만 뒤 명사 process를 앞에서 꾸미는 복합명사 수식어(M) 역할을 수행합니다.',
       contextNuance: '타 부서나 상사에게 결재·검토를 빠르게 부탁할 때 가장 격식 있고 효과적인 문장입니다.',
     },
     {
@@ -2209,19 +2236,19 @@ export const THEME_BIZ_MEETING: ThemeData = {
       ipa: '/ræp ʌp/',
       options: [
         '새 프로젝트를 기획하다',
-        '(회의·업무 등을) 마무리하다, 끝내다',
         '예산을 추가로 배정하다',
+        '(회의·업무 등을) 마무리하다, 끝내다',
         '출장 일정을 연기하다',
       ],
-      answerIdx: 1,
+      answerIdx: 2,
       explanation: 'wrap up은 회의나 업무를 깔끔하게 마무리하다(bring to a close)라는 뜻의 필수 구동사입니다.',
     },
     intermediate: {
       sentenceBefore: 'We need to',
       sentenceAfter: 'the entire workflow to save time this quarter.',
       hint: '(업무 공정을) 간소화하다, 효율화하다',
-      options: ['hesitate', 'complicate', 'streamline', 'postpone'],
-      answerIdx: 2,
+      options: ['hesitate', 'streamline', 'complicate', 'postpone'],
+      answerIdx: 1,
       explanation: '시간을 절약하기 위해 전체 업무 공정(workflow)의 불필요한 단계를 줄여 효율화한다는 맥락이므로 streamline이 정답입니다.',
     },
     advanced: {
@@ -2298,8 +2325,8 @@ export const THEME_OPIC_ROUTINE: ThemeData = {
       ],
     },
     intermediate: {
-      levelName: '🌿 중급 (목적 to부정사 & 습관 고수 표현)',
-      focusBadge: 'stick to + 명사구 & 목적의 to부정사',
+      levelName: '🌿 중급 (전치사구 결합 구동사 & 목적 to부정사)',
+      focusBadge: 'stick + 전치사구(to + 명사구) & 목적의 to부정사',
       speedGuide: '권장 리딩 속도: 0.75x(연음·중저속) ~ 1.0x(원어민 정속)',
       levelGuide: '내가 왜 그 루틴을 하는지(to clear my head) 이유와 꾸준함(stick to)을 자연스럽게 덧붙입니다.',
       patternEn: 'I always stick to my daily workout routine to clear my head.',
@@ -2307,8 +2334,8 @@ export const THEME_OPIC_ROUTINE: ThemeData = {
       patternPron: '[아이 올웨이즈 스틱 투 / 마이 데일리 워크아웃 루틴 / 투 클리어 마이 헤드]',
       patternSoundBlock: 'I always stick to / my daily workout routine / to clear my head.',
       patternSoundRule: 'stick to는 전치사구와 연결해 끊지 않고 읽으며, 뒤의 to clear my head에서 목적 의미를 살려줍니다.',
-      patternMeaningKo: '나는 복잡한 머리를 식히기 위해 매일 운동 루틴을 꾸준히 지킵니다.',
-      grammarSummary: 'stick to의 to는 전치사이므로 뒤에 명사구(my daily workout routine)가 오고, 뒤의 to clear는 목적(~하기 위해)을 나타내는 부사적 용법의 to부정사입니다.',
+      patternMeaningKo: '나는 복잡한 머리를 식히기 위해 항상 매일의 운동 루틴을 지킵니다.',
+      grammarSummary: 'stick(자동사 V) 뒤에 전치사 to가 이끄는 전치사구(to my daily workout routine: 전치사 목적어 구문 M)가 결합하고, 뒤의 to clear는 목적(~하기 위해)을 나타내는 부사적 to부정사구(M)입니다.',
       paraphraseDrill: [
         {
           basicExpr: 'keep my exercise plan (운동 계획을 지키다)',
@@ -2489,17 +2516,17 @@ export const THEME_OPIC_ROUTINE: ThemeData = {
       pron: '[스틱 투]',
       soundMethod: 'stick과 전치사 to를 끊지 않고 [스틱투]로 이어 발음합니다.',
       soundBlock: 'stick to / my routine',
-      meaning: '(계획·원칙·루틴을) 바꾸지 않고 꾸준히 지키다',
+      meaning: '(계획·원칙·루틴을) 바꾸지 않고 지키다, 고수하다',
       enDef: 'to continue doing or using something and not change to anything else',
       exampleBlank: 'I always _____ my daily workout routine.',
       pos: 'V',
       posLabel: '동사구 (V)',
       comp: 'V',
       compLabel: '동사 (V)',
-      roleDesc: '목적어(my daily workout routine)를 취해 습관 유지를 나타내는 타동사구(V)입니다.',
+      roleDesc: '자동사 stick(V)과 전치사 to가 결합해 뒤에 전치사의 목적어(명사구·동명사구, M)를 이끕니다.',
       collocation: 'stick to a routine',
       collocationKo: '루틴을 꾸준히 지키다',
-      paraphraseTip: 'keep이나 follow보다 유혹에 흔들리지 않고 끝까지 고수한다는 뜻이 강합니다.',
+      paraphraseTip: '전치사 to가 반드시 필요하며(stick my routine [X]), 유혹에 흔들리지 않고 끝까지 고수한다는 뜻이 강합니다.',
     },
     {
       id: 204,
@@ -2615,18 +2642,18 @@ export const THEME_OPIC_ROUTINE: ThemeData = {
       levelTag: 'intermediate',
       tag: '중급 핵심 · 루틴 유지와 목적',
       targetWord: 'stick to',
-      wordOrderFormula: 'I[S] + always[M] + stick to[V] + my daily workout routine[DO] + to clear my head[M].',
-      structure: '3형식 구동사 (S + V + DO) + 목적의 to부정사구(M)',
+      wordOrderFormula: 'I[S] + always[M] + stick[V] + to my daily workout routine[M:전치사구] + to clear my head[M:목적].',
+      structure: '자동사(stick) + 전치사구(to + 전치사 목적어 M) + 목적의 to부정사구(M)',
       soundBlockEn: 'I always stick to / my daily workout routine / to clear my head.',
       soundMethodGuide: 'stick to[스틱투] 뒤에 명사구를 자연스럽게 연결하고, to clear my head 앞에서 살짝 끊어 읽습니다.',
       ipaLine: '/aɪ ˈɔːl.weɪz stɪk tə maɪ ˈdeɪ.li ˈwɝːk.aʊt ruːˈtiːn tə klɪr maɪ hed/',
-      koLine: '나는 항상 꾸준히 지킨다 / 매일의 운동 루틴을 / 복잡한 머리를 식히기 위해.',
+      koLine: '나는 항상 지킨다 / 매일의 운동 루틴을 / 복잡한 머리를 식히기 위해.',
       enLine: 'I always stick to / my daily workout routine / to clear my head.',
       rawEn: 'I always stick to my daily workout routine to clear my head.',
       pronLine: '[아이 올웨이즈 스틱 투 / 마이 데일리 워크아웃 루틴 / 투 클리어 마이 헤드]',
-      naturalKo: '나는 복잡한 머리를 식히기 위해 항상 매일 운동하는 루틴을 꾸준히 지킨다.',
+      naturalKo: '나는 복잡한 머리를 식히기 위해 항상 매일의 운동 루틴을 지킨다.',
       paraphraseVersion: 'I consistently follow my daily exercise schedule in order to refresh my mind.',
-      grammarPoint: 'stick to의 to는 전치사(+명사구)이고, to clear의 to는 목적(~하기 위해)을 나타내는 to부정사(+동사원형)입니다.',
+      grammarPoint: '앞의 to는 자동사 stick과 결합해 명사구(my daily workout routine: 전치사의 목적어 M)를 이끄는 전치사이고, 뒤의 to는 동사원형 clear를 이끌어 목적(~하기 위해)을 나타내는 to부정사 표지입니다.',
       contextNuance: '건강 관리나 자기계발 습관을 설명할 때 의지력과 목적을 동시에 보여줄 수 있는 문장입니다.',
     },
     {
@@ -2654,12 +2681,12 @@ export const THEME_OPIC_ROUTINE: ThemeData = {
       word: 'unwind',
       ipa: '/ʌnˈwaɪnd/',
       options: [
-        '일정을 앞당기다',
         '긴장을 풀다, 휴식을 취하다',
-        '서류를철저히 검토하다',
+        '일정을 앞당기다',
+        '서류를 철저히 검토하다',
         '회의록을 작성하다',
       ],
-      answerIdx: 1,
+      answerIdx: 0,
       explanation: 'unwind(/ʌnˈwaɪnd/, [언와인드])는 감겨 있던 태엽을 풀듯 긴장과 피로를 풀며 쉬다라는 뜻입니다.',
     },
     intermediate: {
@@ -2673,16 +2700,16 @@ export const THEME_OPIC_ROUTINE: ThemeData = {
     advanced: {
       questionPrompt:
         '다음 중 문법적으로 올바르고 자연스러운 문장을 2개 고르세요.',
-      highlightWord: '동명사구 주어 수일치 & 전치사 to vs to부정사 구별',
+      highlightWord: '동명사구 주어 단수 수일치 & 자동사 stick + 전치사 to 결합 규칙',
       options: [
-        'Reading diverse books broadens our perspective on life.',
         'Reading diverse books broaden our perspective on life.',
+        'Reading diverse books broadens our perspective on life.',
+        'I always stick my daily workout routine every morning.',
         'I take an evening walk to clear my head and recharge my batteries.',
-        'I always stick to exercise every morning.',
       ],
-      answerIndices: [0, 2],
+      answerIndices: [1, 3],
       explanation:
-        '첫 번째 문장은 동명사구 주어(Reading ~)에 단수 동사 broadens를 정확히 수일치시켰고, 세 번째 문장은 to부정사(to clear ~ and recharge ~) 병렬 구조가 완벽합니다. (네 번째 문장에서 stick to의 to는 전치사이므로 동사원형 exercise가 아닌 명사구/동명사가 와야 합니다.)',
+        '두 번째 문장은 동명사구 주어(Reading ~)에 단수 동사 broadens를 정확히 수일치시켰고, 네 번째 문장은 목적의 to부정사(to clear ~ and recharge ~) 병렬 구조가 완벽합니다. (세 번째 문장에서 stick은 "~을 고수하다/지키다"라는 뜻일 때 반드시 전치사 to와 결합해 stick to my daily workout routine으로 써야 합니다.)',
     },
     writingMission: {
       koPrompt: '다양한 글을 읽는 것은 삶에 대한 우리의 시야(관점)를 넓혀준다.',
@@ -3101,19 +3128,19 @@ export const THEME_TRAVEL_HOTEL: ThemeData = {
       ipa: '/drɑːp ɔːf/',
       options: [
         '비행기 좌석을 변경하다',
-        '(짐·세탁물 등을) 맡기다, 내려놓다',
         '호텔 예약을 취소하다',
         '여권 유효기간을 갱신하다',
+        '(짐·세탁물 등을) 맡기다, 내려놓다',
       ],
-      answerIdx: 1,
+      answerIdx: 3,
       explanation: 'drop off는 체크인 전에 가방·수하물을 프런트에 맡기거나 사람을 특정 장소에 내려줄 때 쓰는 구동사입니다.',
     },
     intermediate: {
       sentenceBefore: 'Our hotel reservation includes',
       sentenceAfter: 'breakfast and airport shuttle service.',
       hint: '(고객 우대 혜택으로) 무료로 제공되는 (철자 i 주의)',
-      options: ['temporary', 'complimentary', 'mandatory', 'fragmentary'],
-      answerIdx: 1,
+      options: ['complimentary', 'temporary', 'mandatory', 'fragmentary'],
+      answerIdx: 0,
       explanation: '호텔이나 항공사에서 우대 혜택으로 무료 제공하는 서비스는 complimentary(무료의)라고 표현합니다.',
     },
     advanced: {
@@ -3141,7 +3168,7 @@ export const THEME_TRAVEL_HOTEL: ThemeData = {
 // src/App.tsx — [파트 3/4]
 // - 테마 4 (유튜브·바이럴·미디어) & 테마 5 (패션 에디토리얼·스타일링)
 // - 수능·서술형·내신 3대 집중 코스 (보기 단어 givenWords 100% 일치 검증)
-// - 정밀 토큰 주석 맵(VERIFIED_SENTENCE_TOKEN_MAP) 기반 16요소 구문 해부 엔진
+// - 정밀 토큰 주석 맵(VERIFIED_SENTENCE_TOKEN_MAP) 및 고도화된 추정 분류 구문 분석기
 // ============================================================================
 
 export const THEME_YOUTUBE_VIRAL: ThemeData = {
@@ -3580,12 +3607,12 @@ export const THEME_YOUTUBE_VIRAL: ThemeData = {
       options: [
         '(A) informative (형용사 주격보어)',
         '(A) informatively (부사 — 보어 불가)',
-        '(B) with (자동사 resonate와 결합하는 전치사)',
         '(B) 전치사 필요 없음',
+        '(B) with (자동사 resonate와 결합하는 전치사)',
       ],
-      answerIndices: [0, 2],
+      answerIndices: [0, 3],
       explanation:
-        '(A) be동사(was)의 주격보어(SC) 자리이므로 부사(had/informatively)가 아닌 형용사 informative가 와야 하며, (B) 자동사 resonate는 대상 앞에 전치사 with를 취합니다.',
+        '(A) be동사(was)의 주격보어(SC) 자리이므로 부사(informatively)가 아닌 형용사 informative가 와야 하며, (B) 자동사 resonate는 대상 앞에 전치사 with를 취합니다.',
     },
     writingMission: {
       koPrompt: '그 새로운 플래그십 태블릿은 확실히 소문(기대)만큼 훌륭했다.',
@@ -4004,19 +4031,19 @@ export const THEME_FASHION_EDITORIAL: ThemeData = {
       ipa: '/traɪ ɑːn/',
       options: [
         '세탁소에 옷을 맡기다',
-        '(옷·신발 등을) 입어보다, 신어보다',
         '환불 영수증을 요청하다',
+        '(옷·신발 등을) 입어보다, 신어보다',
         '선물 포장을 부탁하다',
       ],
-      answerIdx: 1,
+      answerIdx: 2,
       explanation: 'try on은 매장에서 사이즈나 핏을 확인하기 위해 옷·신발을 시험 삼아 입어보다/신어보다라는 뜻입니다.',
     },
     intermediate: {
       sentenceBefore: 'Not everyone can wear neon colors, but you really',
       sentenceAfter: 'that bold statement look!',
       hint: '(소화하기 어려운 스타일·과제를) 멋지게 소화해 내다',
-      options: ['called off', 'put off', 'turned off', 'pulled off'],
-      answerIdx: 3,
+      options: ['pulled off', 'called off', 'put off', 'turned off'],
+      answerIdx: 0,
       explanation: '아무나 소화하기 힘든 과감한 룩(bold statement look)을 성공적으로 멋지게 소화해 냈다는 뜻이므로 pulled off가 정답입니다.',
     },
     advanced: {
@@ -4024,12 +4051,12 @@ export const THEME_FASHION_EDITORIAL: ThemeData = {
         '다음 문장의 빈칸 (A)와 (B)에 들어갈 어법·어휘상 올바른 단어를 2개 고르세요: "The tailored coat [ (A) ] the silhouette and blends heritage [ (B) ] a modern aesthetic."',
       highlightWord: '보완하다(complement vs compliment) & blend A with B 연어',
       options: [
-        '(A) complements (보완하다, 돋보이게 하다)',
         '(A) compliments (칭찬하다 — 문맥 부적절)',
+        '(A) complements (보완하다, 돋보이게 하다)',
         '(B) with (blend A with B)',
         '(B) at (결합 전치사 부적절)',
       ],
-      answerIndices: [0, 2],
+      answerIndices: [1, 2],
       explanation:
         '(A) 실루엣을 보완해 돋보이게 한다는 뜻이므로 철자 e를 쓰는 complements가 맞으며, (B) blend A with B(A와 B를 결합하다)에서는 전치사 with를 씁니다.',
     },
@@ -4051,7 +4078,6 @@ export const THEMES: ThemeData[] = [
 
 // ============================================================================
 // 4. 수능 독해 · 서술형 어법 · 고교 내신 3대 집중 마스터 코스
-//    - 허위 통계("406개교 1위", "99%", "EBS 연계") 전면 제거 및 객관화
 //    - 서술형 미션의 givenWords(보기 단어)와 modelAnswerEn(모범 답안) 1:1 완전 일치
 // ============================================================================
 export const EXAM_COURSES: ExamMasterCourse[] = [
@@ -4291,12 +4317,14 @@ export const EXAM_COURSES: ExamMasterCourse[] = [
 ];
 
 // ============================================================================
-// 5. 정밀 토큰 주석 맵(VERIFIED_SENTENCE_TOKEN_MAP) & 동적 16요소 구문 해부 엔진
-//    - 핵심 대표 문장들은 수작업 검증된 정밀 토큰 데이터를 즉시 반환 (오분류 0%)
-//    - 사용자 입력 문장 등 미등록 문장은 문두 동명사(S)·5형식 보어(OC)·2형식 보어(SC)·to부정사를
-//      문맥 규칙으로 판별하며 isHeuristic 플래그로 투명하게 안내
+// 5. 정밀 토큰 주석 맵(VERIFIED_SENTENCE_TOKEN_MAP) & 추정 분류 구문 분석기
+//    - 공식 7개 문장 성분(CompId)과 9품사(PosId) 체계를 100% 일관되게 준수
+//    - 사전 등록 문장 반환 시에도 전달받은 naturalKo 및 tagLabel 보존 (#40)
+//    - 미등록 일반 문장 분석 시:
+//      ① 문두 -ing 뒤에 콤마(,)가 존재하면 분사구문(M), 콤마 없이 본동사와 직결되면 동명사구 주어(S)
+//      ② 5형식 동사 + 목적어 뒤에서 전치사구 앞에 위치한 형용사도 목적격보어(OC)로 정확히 인식
 // ============================================================================
-const COLOR_BY_COMP: Record<CompId | '독립어', string> = {
+const COLOR_BY_COMP: Record<CompId, string> = {
   S: 'border-blue-500 text-blue-700',
   V: 'border-rose-500 text-rose-700',
   IO: 'border-purple-500 text-purple-700',
@@ -4304,12 +4332,11 @@ const COLOR_BY_COMP: Record<CompId | '독립어', string> = {
   SC: 'border-amber-500 text-amber-700',
   OC: 'border-amber-600 text-amber-800',
   M: 'border-slate-300 text-slate-600',
-  독립어: 'border-teal-400 text-teal-700',
 };
 
 function makeToken(
   word: string,
-  comp: CompId | '독립어',
+  comp: CompId,
   compLabel: string,
   pos: PosId,
   posLabel: string,
@@ -4333,13 +4360,13 @@ const VERIFIED_SENTENCE_TOKEN_MAP: Record<string, DiagramSentence> = {
     title: '테마 1 초급 · 4형식 동명사구(giving + IO + DO)',
     rawEn: 'Thanks for giving me a quick heads-up on the schedule.',
     naturalKo: '일정에 대해 미리 귀띔해 주셔서 감사합니다.',
-    skeleton: 'Thanks for[감사표현] + giving[준동사] + me[IO] + a quick heads-up[DO] + on the schedule[M]',
+    skeleton: 'Thanks[M:독립부가어] + for giving[M] + me[IO] + a quick heads-up[DO] + on the schedule[M]',
     patternType: '4형식 수여동사 기반 동명사구 (giving + IO + DO)',
     wordOrderTip:
       '전치사 for의 목적어로 쓰인 동명사 giving이 4형식 성질을 그대로 유지하여 간접목적어(me: 나에게)와 직접목적어(a quick heads-up: 빠른 사전 귀띔을)를 차례로 이끕니다.',
     isHeuristic: false,
     tokens: [
-      makeToken('Thanks', '독립어', '감사표현', 'N', '명사 (N)', '감사합니다', 'Thank you를 간결하게 줄인 감사 명사 표현입니다.'),
+      makeToken('Thanks', 'M', '독립부가어 (M)', 'N', '명사 (N)', '감사합니다', 'Thank you를 간결하게 줄여 감사를 표하는 명사 표현(부가 요소 M)입니다.'),
       makeToken('for', 'M', '전치사 (M)', 'Prep', '전치사 (Prep)', '~에 대해', '뒤에 동명사구(giving ~)를 이끌어 감사 이유를 나타내는 전치사입니다.'),
       makeToken('giving', 'V', '동명사(동사성질)', 'V', '동사/동명사 (V)', '주신 것', '전치사 for의 목적어로 쓰인 동명사이며, 뒤의 me(IO)와 heads-up(DO)을 거느립니다.'),
       makeToken('me', 'IO', '간접목적어 (IO)', 'Pron', '대명사 (Pron)', '나에게', 'giving의 받는 대상인 간접목적어(IO)입니다.'),
@@ -4348,7 +4375,7 @@ const VERIFIED_SENTENCE_TOKEN_MAP: Record<string, DiagramSentence> = {
       makeToken('heads-up', 'DO', '직접목적어 (DO)', 'N', '명사 (N)', '사전 귀띔을', 'giving의 직접목적어(DO) 역할을 하는 핵심 명사입니다.'),
       makeToken('on', 'M', '전치사구 (M)', 'Prep', '전치사 (Prep)', '~에 관한', '뒤의 the schedule과 결합해 heads-up의 주제를 설명하는 전치사입니다.'),
       makeToken('the', 'M', '한정수식 (M)', 'Det', '한정사 (Det)', '그', '명사 schedule을 한정하는 정관사입니다.'),
-      makeToken('schedule.', 'M', '전치사 목적어 (M)', 'N', '명사 (N)', '일정', '전치사 on의 목적어로 결합되어 수식어구(on the schedule)를 완성합니다.'),
+      makeToken('schedule.', 'M', '전치사 목적어 (M)', 'N', '명사 (N)', '일정', '전치사 on의 목적어로 결합되어 수식어구(on the schedule, M)를 완성합니다.'),
     ],
   },
   'could you please expedite the approval process before friday?': {
@@ -4358,7 +4385,7 @@ const VERIFIED_SENTENCE_TOKEN_MAP: Record<string, DiagramSentence> = {
     skeleton: 'Could[조동사] + you[S] + please[M] + expedite[V] + the approval process[DO] + before Friday[M]?',
     patternType: '3형식 의문문 (Could + S + V + DO + M)',
     wordOrderTip:
-      '정중한 요청을 나타내는 Could you please 뒤에 타동사 원형 expedite와 목적어(the approval process)가 바로 이어집니다.',
+      '정중한 요청을 나타내는 Could you please 뒤에 타동사 원형 expedite와 목적어(the approval process)가 바로 이어지며, approval은 뒤 명사 process를 꾸미는 명사 수식어(M-N)입니다.',
     isHeuristic: false,
     tokens: [
       makeToken('Could', 'V', '조동사 (V)', 'V', '조동사 (V)', '~해주실 수 있나요', '정중한 요청 의문문을 만드는 조동사입니다.'),
@@ -4366,7 +4393,7 @@ const VERIFIED_SENTENCE_TOKEN_MAP: Record<string, DiagramSentence> = {
       makeToken('please', 'M', '수식어 (M)', 'Adv', '부사 (Adv)', '부디, 제발', '요청의 정중함을 높여주는 부사입니다.'),
       makeToken('expedite', 'V', '본동사 (V)', 'V', '동사 (V)', '신속히 처리하다', '조동사 Could와 결합하는 문장의 3형식 본동사(V)입니다.'),
       makeToken('the', 'M', '한정수식 (M)', 'Det', '한정사 (Det)', '그', '목적어 명사구를 한정하는 정관사입니다.'),
-      makeToken('approval', 'M', '명사수식 (M)', 'N', '명사 (N)', '승인, 결재', '뒤 명사 process를 수식하는 복합명사 앞 요소입니다.'),
+      makeToken('approval', 'M', '명사수식어 (M)', 'N', '명사 (N)', '승인, 결재', '뒤 명사 process를 앞에서 수식하는 복합명사 수식어(M-N)입니다.'),
       makeToken('process', 'DO', '직접목적어 (DO)', 'N', '명사 (N)', '절차를', '타동사 expedite의 직접목적어(DO) 핵심 명사입니다.'),
       makeToken('before', 'M', '전치사구 (M)', 'Prep', '전치사 (Prep)', '~전에', '기한을 나타내는 시간 전치사입니다.'),
       makeToken('Friday?', 'M', '전치사 목적어 (M)', 'N', '명사 (N)', '금요일', '전치사 before와 결합해 시간 부사구(M)를 이룹니다.'),
@@ -4379,7 +4406,7 @@ const VERIFIED_SENTENCE_TOKEN_MAP: Record<string, DiagramSentence> = {
     skeleton: 'Streamlining the workflow[S:동명사구] + makes[V] + the tentative schedule[DO] + feasible[OC].',
     patternType: '5형식 (동명사구 S + 단수 V + DO + 형용사 OC)',
     wordOrderTip:
-      '문두의 Streamlining은 동명사구 주어(S)이므로 단수 동사 makes를 쓰며, 목적어(the tentative schedule) 뒤의 feasible은 상태를 설명하는 목적격보어(OC)입니다.',
+      '문두의 Streamlining은 콤마 없이 동사 makes로 이어지므로 동명사구 주어(S)이며, 목적어(the tentative schedule) 뒤의 feasible은 상태를 설명하는 목적격보어(OC)입니다.',
     isHeuristic: false,
     tokens: [
       makeToken('Streamlining', 'S', '주어 (S)', 'N', '동명사 (N역할)', '간소화하는 것은', '뒤의 the workflow를 목적어로 취해 문장 전체의 주어(S) 역할을 하는 동명사입니다.'),
@@ -4390,6 +4417,30 @@ const VERIFIED_SENTENCE_TOKEN_MAP: Record<string, DiagramSentence> = {
       makeToken('tentative', 'M', '수식어 (M)', 'Adj', '형용사 (Adj)', '잠정적인', '명사 schedule을 앞에서 꾸며주는 형용사 수식어(M)입니다.'),
       makeToken('schedule', 'DO', '직접목적어 (DO)', 'N', '명사 (N)', '일정을', '5형식 동사 makes의 직접목적어(DO)입니다.'),
       makeToken('feasible.', 'OC', '목적격보어 (OC)', 'Adj', '형용사 (Adj)', '실현 가능한(가능하게)', '목적어(schedule)의 상태를 보충 설명하는 목적격보어(OC) 형용사입니다.'),
+    ],
+  },
+  'streamlining the approval process makes the entire project feasible within the deadline.': {
+    title: '5형식 대표 구문 · 전치사구 앞 목적격보어(OC) 판별',
+    rawEn: 'Streamlining the approval process makes the entire project feasible within the deadline.',
+    naturalKo: '승인 절차를 간소화하는 것은 마감일 내에 전체 프로젝트를 실현 가능하게 만든다.',
+    skeleton: 'Streamlining the approval process[S] + makes[V] + the entire project[DO] + feasible[OC] + within the deadline[M].',
+    patternType: '5형식 (S + V + DO + 형용사 OC + 전치사구 M)',
+    wordOrderTip:
+      'feasible 뒤에 전치사구(within the deadline)가 붙어 있더라도, 5형식 동사 makes와 목적어(the entire project) 바로 뒤에서 목적어의 상태를 설명하므로 feasible은 목적격보어(OC)입니다.',
+    isHeuristic: false,
+    tokens: [
+      makeToken('Streamlining', 'S', '주어 (S)', 'N', '동명사 (N역할)', '간소화하는 것은', '동명사구 주어(S)의 핵심어입니다.'),
+      makeToken('the', 'M', '한정수식 (M)', 'Det', '한정사 (Det)', '그', '정관사입니다.'),
+      makeToken('approval', 'M', '명사수식어 (M)', 'N', '명사 (N)', '승인', '뒤 명사 process를 꾸미는 명사 수식어(M-N)입니다.'),
+      makeToken('process', 'DO', '준동사의 목적어', 'N', '명사 (N)', '절차를', '동명사 Streamlining의 목적어입니다.'),
+      makeToken('makes', 'V', '동사 (V)', 'V', '동사 (V)', '만든다', '단수 수일치된 5형식 본동사(V)입니다.'),
+      makeToken('the', 'M', '한정수식 (M)', 'Det', '한정사 (Det)', '그', '정관사입니다.'),
+      makeToken('entire', 'M', '수식어 (M)', 'Adj', '형용사 (Adj)', '전체의', '명사 project를 꾸미는 형용사 수식어(M)입니다.'),
+      makeToken('project', 'DO', '직접목적어 (DO)', 'N', '명사 (N)', '프로젝트를', 'makes의 직접목적어(DO)입니다.'),
+      makeToken('feasible', 'OC', '목적격보어 (OC)', 'Adj', '형용사 (Adj)', '실현 가능한', '목적어(project)의 상태를 보충 설명하는 목적격보어(OC)입니다.'),
+      makeToken('within', 'M', '전치사구 (M)', 'Prep', '전치사 (Prep)', '~이내에', '기한을 나타내는 전치사입니다.'),
+      makeToken('the', 'M', '한정수식 (M)', 'Det', '한정사 (Det)', '그', '정관사입니다.'),
+      makeToken('deadline.', 'M', '전치사 목적어 (M)', 'N', '명사 (N)', '마감일', '전치사 within의 목적어로 부사구(M)를 완성합니다.'),
     ],
   },
   'this quiet cafe is my go-to spot on weekends.': {
@@ -4414,23 +4465,23 @@ const VERIFIED_SENTENCE_TOKEN_MAP: Record<string, DiagramSentence> = {
     ],
   },
   'i always stick to my daily workout routine to clear my head.': {
-    title: '테마 2 중급 · 구동사 stick to + 목적의 to부정사구',
+    title: '테마 2 중급 · 자동사 stick + 전치사구(to + 명사구) + 목적의 to부정사구',
     rawEn: 'I always stick to my daily workout routine to clear my head.',
-    naturalKo: '나는 복잡한 머리를 식히기 위해 항상 매일 운동하는 루틴을 꾸준히 지킨다.',
-    skeleton: 'I[S] + always[M] + stick to[V] + my daily workout routine[DO] + to clear my head[M:목적].',
-    patternType: '3형식 구동사 (S + V + DO) + 부사적 to부정사구(M)',
+    naturalKo: '나는 복잡한 머리를 식히기 위해 항상 매일의 운동 루틴을 지킨다.',
+    skeleton: 'I[S] + always[M] + stick[V] + to my daily workout routine[M:전치사구] + to clear my head[M:목적].',
+    patternType: '1형식 동사 + 전치사구 보충어(M) + 부사적 to부정사구(M)',
     wordOrderTip:
-      '앞의 to는 stick to(~을 고수하다)를 이루는 전치사이고, 뒤의 to는 to clear(~하기 위해)를 이끄는 to부정사 표지입니다.',
+      '앞의 to는 자동사 stick과 결합해 전치사의 목적어(my daily workout routine, M)를 이끄는 전치사이고, 뒤의 to는 동사원형 clear를 이끌어 목적(~하기 위해)을 나타내는 to부정사 표지입니다.',
     isHeuristic: false,
     tokens: [
       makeToken('I', 'S', '주어 (S)', 'Pron', '대명사 (Pron)', '나는', '문장의 주어(S)입니다.'),
       makeToken('always', 'M', '수식어 (M)', 'Adv', '부사 (Adv)', '항상', '일반동사 stick 앞에서 빈도를 나타내는 빈도부사(M)입니다.'),
-      makeToken('stick', 'V', '동사구 (V)', 'V', '동사 (V)', '꾸준히 지키다', '뒤의 전치사 to와 결합해 "~을 고수하다"를 뜻하는 구동사입니다.'),
-      makeToken('to', 'V', '동사구 결합전치사', 'Prep', '전치사 (Prep)', '~을(에)', 'stick과 결합해 뒤에 명사구 목적어를 연결하는 전치사입니다.'),
+      makeToken('stick', 'V', '동사 (V)', 'V', '동사 (V)', '지키다, 고수하다', '전치사 to와 결합해 "~을 고수하다"를 뜻하는 본동사(V)입니다.'),
+      makeToken('to', 'M', '전치사구 (M)', 'Prep', '전치사 (Prep)', '~을(에)', '뒤에 명사구 목적어(my daily workout routine)를 이끌어 전치사구(M)를 형성합니다.'),
       makeToken('my', 'M', '한정수식 (M)', 'Det', '한정사 (Det)', '나의', '소유격 한정사입니다.'),
       makeToken('daily', 'M', '수식어 (M)', 'Adj', '형용사 (Adj)', '매일의', '뒤 명사구를 꾸미는 형용사입니다.'),
-      makeToken('workout', 'M', '명사수식 (M)', 'N', '명사 (N)', '운동', '명사 routine을 수식하는 명사입니다.'),
-      makeToken('routine', 'DO', '직접목적어 (DO)', 'N', '명사 (N)', '루틴을', '구동사 stick to의 목적어(DO) 핵심 명사입니다.'),
+      makeToken('workout', 'M', '명사수식어 (M)', 'N', '명사 (N)', '운동', '명사 routine을 앞에서 수식하는 복합명사 수식어(M-N)입니다.'),
+      makeToken('routine', 'M', '전치사 목적어 (M)', 'N', '명사 (N)', '루틴을', '전치사 to의 목적어로 결합되어 전치사구(to my daily workout routine, M)를 완성합니다.'),
       makeToken('to', 'M', 'to부정사 표지 (M)', 'Prep', 'to부정사 표지', '~하기 위해', '뒤에 동사원형 clear를 이끌어 목적 부사구(M)를 만드는 to부정사입니다.'),
       makeToken('clear', 'M', '준동사 (목적)', 'V', '동사원형 (V)', '맑게 식히다', 'to부정사구를 이루는 동사원형입니다.'),
       makeToken('my', 'M', '한정수식 (M)', 'Det', '한정사 (Det)', '나의', '소유격 한정사입니다.'),
@@ -4518,10 +4569,15 @@ const KNOWN_AUX_AND_VERBS = new Set([
   'include', 'includes', 'spearhead', 'spearheaded', 'complement', 'complements',
   'praise', 'praised', 'showcase', 'showcases', 'negotiate', 'negotiated', 'collaborate',
   'collaborated', 'implement', 'prioritize', 'allocate', 'leverage', 'unwind', 'pulled',
-  'pull', 'wrap', 'touch', 'visit', 'drop', 'freshen', 'binge-watch', 'binge-watched',
-  'went', 'go', 'goes', 'live', 'lived', 'hit', 'clear', 'stick', 'recharge', 'try',
-  'keep', 'grab', 'blend', 'blends', 'capture', 'resonate', 'resonates', 'step',
-  'expose', 'exposing', 'matter', 'matters', 'seem', 'take', 'takes', 'taking', 'help', 'helps',
+  'pull', 'wrap', 'touch', 'visit', 'visits', 'visited', 'drop', 'freshen', 'binge-watch',
+  'binge-watched', 'went', 'go', 'goes', 'live', 'lived', 'hit', 'clear', 'stick',
+  'recharge', 'try', 'keep', 'keeps', 'kept', 'grab', 'blend', 'blends', 'capture',
+  'resonate', 'resonates', 'step', 'expose', 'exposing', 'matter', 'matters', 'seem',
+  'take', 'takes', 'taking', 'help', 'helps', 'helped', 'study', 'studies', 'studied',
+  'work', 'works', 'worked', 'read', 'reads', 'write', 'writes', 'speak', 'speaks',
+  'listen', 'listens', 'watch', 'watches', 'learn', 'learns', 'use', 'uses', 'used',
+  'create', 'creates', 'created', 'add', 'added', 'plan', 'plans', 'enjoy', 'enjoys',
+  'find', 'finds', 'found', 'consider', 'considers', 'know', 'knows', 'think', 'thinks',
 ]);
 
 const LINKING_VERBS = new Set([
@@ -4544,7 +4600,7 @@ const KNOWN_ADJECTIVES = new Set([
   'good', 'strong', 'diverse', 'major', 'new', 'entire', 'close', 'solid', 'scientific',
   'complex', 'systematic', 'consistent', 'daily', 'long-term', 'late', 'much', 'more',
   'intellectual', 'open-minded', 'updated', 'structured', 'mutually', 'beneficial',
-  'urgent', 'impactful', 'short', 'whole', 'calm', 'special', 'high', 'timeless',
+  'urgent', 'impactful', 'short', 'whole', 'calm', 'special', 'high', 'timeless', 'practical',
 ]);
 
 const KNOWN_ADVERBS = new Set([
@@ -4552,7 +4608,7 @@ const KNOWN_ADVERBS = new Set([
   'genuinely', 'effectively', 'efficiently', 'gladly', 'kindly', 'definitely',
   'really', 'always', 'usually', 'often', 'overnight', 'today', 'abroad', 'best',
   'again', 'somewhat', 'actually', 'heavily', 'closely', 'first', 'well', 'deeply',
-  'effortlessly', 'not', 'only', 'never', 'here', 'there',
+  'effortlessly', 'not', 'only', 'never', 'here', 'there', 'honestly', 'thankfully',
 ]);
 
 export function buildDynamicDiagramSentence(
@@ -4561,47 +4617,82 @@ export function buildDynamicDiagramSentence(
   tagLabel: string = '실전 구문 분석'
 ): DiagramSentence {
   const normalizedKey = (rawEn || '').trim().toLowerCase();
+
+  // 1. 사전 검증된 문장 맵에 일치할 경우: 토큰은 그대로 유지하되 전달받은 naturalKo와 tagLabel을 반영 (#40)
   const exactMatch = VERIFIED_SENTENCE_TOKEN_MAP[normalizedKey];
   if (exactMatch) {
-    return exactMatch;
+    return {
+      ...exactMatch,
+      naturalKo: naturalKo || exactMatch.naturalKo,
+      title: tagLabel ? `${tagLabel} · ${exactMatch.title}` : exactMatch.title,
+    };
   }
 
-  // DIAGRAM_EXAMPLES에 등록된 문장인지 확인
   const exampleMatch = DIAGRAM_EXAMPLES.find(
     (ex) => ex.rawEn.trim().toLowerCase() === normalizedKey
   );
   if (exampleMatch) {
-    return exampleMatch;
+    return {
+      ...exampleMatch,
+      naturalKo: naturalKo || exampleMatch.naturalKo,
+      title: tagLabel ? `${tagLabel} · ${exampleMatch.title}` : exampleMatch.title,
+    };
   }
 
+  // 2. 미등록 문장에 대한 문맥 기반 추정 분류기
   const words = (rawEn || 'We need to check the schedule today.')
     .trim()
     .split(/\s+/);
 
+  // 문두 -ing가 콤마(,)로 분리된 분사구문인지 아니면 본동사로 직결되는 동명사구 주어인지 사전 스캔
+  const firstCommaIdx = words.findIndex((w) => w.endsWith(','));
+  const firstVerbIdx = words.findIndex((w, i) =>
+    i > 0 && KNOWN_AUX_AND_VERBS.has(w.toLowerCase().replace(/[^a-z-]/g, ''))
+  );
+  const isIntroParticipleClause =
+    words[0]?.toLowerCase().replace(/[^a-z-]/g, '').endsWith('ing') &&
+    firstCommaIdx !== -1 &&
+    (firstVerbIdx === -1 || firstCommaIdx < firstVerbIdx);
+
   let mainVerbFound = false;
   let mainVerbWord = '';
+  let directObjectFound = false;
   let insidePrepositionPhrase = false;
 
   const tokens: DiagramToken[] = words.map((rawWord, idx) => {
     const clean = rawWord.toLowerCase().replace(/[^a-z-]/g, '');
-    const prevClean = idx > 0 ? words[idx - 1].toLowerCase().replace(/[^a-z-]/g, '') : '';
+    const prevClean =
+      idx > 0 ? words[idx - 1].toLowerCase().replace(/[^a-z-]/g, '') : '';
     const nextClean =
-      idx < words.length - 1 ? words[idx + 1].toLowerCase().replace(/[^a-z-]/g, '') : '';
+      idx < words.length - 1
+        ? words[idx + 1].toLowerCase().replace(/[^a-z-]/g, '')
+        : '';
 
-    // 1. 문두 동명사 주어 판별 (콤마 없이 -ing로 시작하고 뒤에 단수 본동사가 오는 경우)
-    if (idx === 0 && clean.endsWith('ing') && !rawWord.endsWith(',')) {
+    // 1) 문두 -ing 판별: 콤마로 분리된 분사구문(M) vs 동명사구 주어(S)
+    if (idx === 0 && clean.endsWith('ing')) {
+      if (isIntroParticipleClause) {
+        return makeToken(
+          rawWord,
+          'M',
+          '분사구문 수식 (M)',
+          'V',
+          '현재분사 (V-ing)',
+          '~하면서 / ~할 때',
+          '콤마(,) 앞까지 분사구문을 이끌며 주절 전체를 수식하는 부사구(M) 역할을 수행합니다.'
+        );
+      }
       return makeToken(
         rawWord,
         'S',
-        '주어 (S)',
+        '동명사구 주어 (S)',
         'N',
         '동명사 (N역할)',
         '~하는 것은',
-        '문장 맨 앞에서 동명사구 주어(S)를 이끄는 핵심 준동사입니다.'
+        '문장 맨 앞에서 동명사구 주어(S)를 이끄는 핵심어입니다.'
       );
     }
 
-    // 2. to부정사(to + 동사원형) vs 전치사 to 구별
+    // 2) to부정사(to + 동사원형) vs 전치사 to 구별
     if (clean === 'to') {
       if (KNOWN_AUX_AND_VERBS.has(nextClean)) {
         insidePrepositionPhrase = false;
@@ -4627,7 +4718,7 @@ export function buildDynamicDiagramSentence(
       );
     }
 
-    // 3. 한정사 (관사·소유격·지시사)
+    // 3) 한정사 (관사·소유격·지시사)
     if (KNOWN_DETERMINERS.has(clean)) {
       return makeToken(
         rawWord,
@@ -4640,7 +4731,7 @@ export function buildDynamicDiagramSentence(
       );
     }
 
-    // 4. 접속사
+    // 4) 접속사
     if (KNOWN_CONJUNCTIONS.has(clean)) {
       insidePrepositionPhrase = false;
       return makeToken(
@@ -4654,7 +4745,7 @@ export function buildDynamicDiagramSentence(
       );
     }
 
-    // 5. 전치사
+    // 5) 전치사
     if (KNOWN_PREPOSITIONS.has(clean)) {
       insidePrepositionPhrase = true;
       return makeToken(
@@ -4668,8 +4759,11 @@ export function buildDynamicDiagramSentence(
       );
     }
 
-    // 6. 부사
-    if (KNOWN_ADVERBS.has(clean) || (clean.endsWith('ly') && clean !== 'family' && clean !== 'friendly')) {
+    // 6) 부사
+    if (
+      KNOWN_ADVERBS.has(clean) ||
+      (clean.endsWith('ly') && clean !== 'family' && clean !== 'friendly')
+    ) {
       return makeToken(
         rawWord,
         'M',
@@ -4681,10 +4775,23 @@ export function buildDynamicDiagramSentence(
       );
     }
 
-    // 7. 형용사 (명사 앞 수식어 M vs 2형식 SC vs 5형식 OC 정밀 분기)
+    // 7) 형용사 (명사 앞 수식어 M vs 2형식 SC vs 5형식 전치사구 앞/문장 끝 OC 정밀 분기)
     if (KNOWN_ADJECTIVES.has(clean)) {
-      const isAtClauseEnd = idx === words.length - 1 || /[,.;!?]$/.test(rawWord);
-      if (mainVerbFound && FIVE_PATTERN_VERBS.has(mainVerbWord) && isAtClauseEnd && !insidePrepositionPhrase) {
+      const followedByBoundaryOrPrep =
+        idx === words.length - 1 ||
+        /[,.;!?]$/.test(rawWord) ||
+        KNOWN_PREPOSITIONS.has(nextClean) ||
+        KNOWN_CONJUNCTIONS.has(nextClean) ||
+        KNOWN_ADVERBS.has(nextClean) ||
+        nextClean === 'to';
+
+      if (
+        mainVerbFound &&
+        FIVE_PATTERN_VERBS.has(mainVerbWord) &&
+        directObjectFound &&
+        followedByBoundaryOrPrep &&
+        !insidePrepositionPhrase
+      ) {
         return makeToken(
           rawWord,
           'OC',
@@ -4692,10 +4799,15 @@ export function buildDynamicDiagramSentence(
           'Adj',
           '형용사 (Adj)',
           '목적어 상태 보충',
-          '5형식 동사 뒤에서 목적어(DO)의 상태를 보충 설명하는 목적격보어(OC)입니다.'
+          '5형식 동사와 목적어(DO) 뒤에서 목적어의 상태를 보충 설명하는 목적격보어(OC)입니다.'
         );
       }
-      if (mainVerbFound && LINKING_VERBS.has(mainVerbWord) && !insidePrepositionPhrase) {
+      if (
+        mainVerbFound &&
+        LINKING_VERBS.has(mainVerbWord) &&
+        followedByBoundaryOrPrep &&
+        !insidePrepositionPhrase
+      ) {
         return makeToken(
           rawWord,
           'SC',
@@ -4717,8 +4829,20 @@ export function buildDynamicDiagramSentence(
       );
     }
 
-    // 8. 동사 (to 뒤의 준동사와 본동사 구별)
-    if (KNOWN_AUX_AND_VERBS.has(clean)) {
+    // 8) 동사 (사전 등록 동사 + 주어 뒤 굴절 어미 패턴 추정)
+    const looksLikeInflectedVerb =
+      !mainVerbFound &&
+      idx > 0 &&
+      !insidePrepositionPhrase &&
+      !KNOWN_DETERMINERS.has(prevClean) &&
+      !KNOWN_ADJECTIVES.has(prevClean) &&
+      (clean.endsWith('ed') ||
+        clean.endsWith('ize') ||
+        clean.endsWith('ate') ||
+        clean.endsWith('ify') ||
+        (KNOWN_PRONOUNS.has(prevClean) && clean.endsWith('s')));
+
+    if (KNOWN_AUX_AND_VERBS.has(clean) || looksLikeInflectedVerb) {
       if (prevClean === 'to') {
         return makeToken(
           rawWord,
@@ -4744,7 +4868,7 @@ export function buildDynamicDiagramSentence(
       );
     }
 
-    // 9. 대명사
+    // 9) 대명사
     if (KNOWN_PRONOUNS.has(clean)) {
       if (!mainVerbFound) {
         return makeToken(
@@ -4757,7 +4881,11 @@ export function buildDynamicDiagramSentence(
           '문장의 주체가 되는 주어(S) 대명사입니다.'
         );
       }
-      if (prevClean === 'give' || prevClean === 'gives' || prevClean === 'giving') {
+      if (
+        prevClean === 'give' ||
+        prevClean === 'gives' ||
+        prevClean === 'giving'
+      ) {
         return makeToken(
           rawWord,
           'IO',
@@ -4768,6 +4896,7 @@ export function buildDynamicDiagramSentence(
           '4형식 수여동사 뒤에서 대상을 받는 간접목적어(IO)입니다.'
         );
       }
+      directObjectFound = true;
       return makeToken(
         rawWord,
         'DO',
@@ -4775,12 +4904,23 @@ export function buildDynamicDiagramSentence(
         'Pron',
         '대명사 (Pron)',
         '목적어 대명사',
-        '동사나 전치사의 대상이 되는 목적격 대명사입니다.'
+        '동사의 대상이 되는 목적격 대명사입니다.'
       );
     }
 
-    // 10. 일반 명사 (본동사 앞이면 주어 S, 전치사구 내부면 M, 2형식 동사 뒤면 SC, 타동사 뒤면 DO)
+    // 10) 일반 명사 (본동사 앞 주어 S / 전치사구 내부 M / 2형식 보어 SC / 타동사 목적어 DO)
     if (!mainVerbFound) {
+      if (isIntroParticipleClause && firstCommaIdx !== -1 && idx <= firstCommaIdx) {
+        return makeToken(
+          rawWord,
+          'M',
+          '분사구문 내부 (M)',
+          'N',
+          '명사 (N)',
+          '분사구문 목적어/수식어',
+          '문두 분사구문 내부를 구성하는 명사(M)입니다.'
+        );
+      }
       return makeToken(
         rawWord,
         'S',
@@ -4814,6 +4954,7 @@ export function buildDynamicDiagramSentence(
         '2형식 연결동사 뒤에서 주어를 보충 설명하는 주격보어(SC) 명사입니다.'
       );
     }
+    directObjectFound = true;
     return makeToken(
       rawWord,
       'DO',
@@ -4826,11 +4967,11 @@ export function buildDynamicDiagramSentence(
   });
 
   return {
-    title: `${tagLabel} (문법 구조 분석)`,
+    title: `${tagLabel} (문맥 규칙 기반 추정 분류)`,
     rawEn,
     naturalKo,
     skeleton: '주어부(S) + 서술어 동사(V) + 목적어/보어(O/C) + 수식어구(M)',
-    patternType: '문맥 기반 구문 분석 (어절 터치 시 상세 역할 표시)',
+    patternType: '추정 분류 (사전 미등록 문장에 대한 문맥 규칙 추정)',
     wordOrderTip:
       '각 단어 카드를 클릭하면 위의 16개 문법 노드(7성분 + 9품사) 다이어그램에서 해당 결합선이 하이라이트됩니다.',
     isHeuristic: true,
@@ -4839,18 +4980,39 @@ export function buildDynamicDiagramSentence(
 }
 // ============================================================================
 // src/App.tsx — [파트 4/4]
-// - 안전 JSON 파서 & 한국 표준시(KST) 날짜 유틸리티
-// - 메인 App 컴포넌트 (누락 UI 14종 복원 · 0.30x~1.25x 배속 · 획 배열 펜슬 엔진)
-// - 전체 총람 치트시트 & 프로젝트 전체 아키텍처 제작과정 백서(devStory)
+// - SSR 안전 로컬스토리지 파서(readStorageJson / readStorageString) 및 KST 시간 유틸리티
+// - 표제어 단독 스피커 · 1교시 정답 1~4번 무작위 분산 · 빈칸 정답 스포일러 가림 토글
+// - 2교시 어순 조립 중복 방지 및 개별 취소 · 규칙 기반 문장 점검 코치 · 필압 반영 펜슬 엔진
 // ============================================================================
 
-function safeJsonParse<T>(raw: string | null, fallback: T): T {
-  if (!raw) return fallback;
+function readStorageJson<T>(storageKey: string, fallback: T): T {
+  if (typeof window === 'undefined' || !window.localStorage) return fallback;
   try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) return fallback;
     const parsed = JSON.parse(raw);
     return parsed ?? fallback;
   } catch {
     return fallback;
+  }
+}
+
+function readStorageString(storageKey: string, fallback: string): string {
+  if (typeof window === 'undefined' || !window.localStorage) return fallback;
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    return raw !== null ? raw : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeStorageString(storageKey: string, value: string): void {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  try {
+    window.localStorage.setItem(storageKey, value);
+  } catch {
+    // ignore storage quota errors
   }
 }
 
@@ -4920,9 +5082,9 @@ export default function App() {
     useState<ExamTrackId>('CSAT_MASTER');
   const [activeModulePeriod, setActiveModulePeriod] = useState<1 | 2 | 3 | 4 | 5>(1);
 
-  // 2. UI 환경 설정 (다크모드 · 글씨체 · 테마색 · 화면 분할 · 발음 표시)
+  // 2. UI 환경 설정 (SSR 안전한 readStorageJson 사용으로 기존 저장값 완벽 복원)
   const [darkMode, setDarkMode] = useState<boolean>(() =>
-    safeJsonParse('yanadu_dark_v1', false)
+    readStorageJson('yanadu_dark_v1', false)
   );
   const [fontStyle, setFontStyle] = useState<'sans' | 'serif' | 'mono'>('sans');
   const [colorTheme, setColorTheme] = useState<'blue' | 'emerald' | 'indigo' | 'amber'>('blue');
@@ -4931,13 +5093,14 @@ export default function App() {
   const [hideWords, setHideWords] = useState<boolean>(false);
   const [hideMeanings, setHideMeanings] = useState<boolean>(false);
   const [revealedWordIds, setRevealedWordIds] = useState<number[]>([]);
+  const [revealedBlankKeys, setRevealedBlankKeys] = useState<Record<string, boolean>>({});
 
   // 3. TTS 음성 합성 & 리딩 속도 5단계 (0.30x · 0.50x · 0.75x · 1.0x · 1.25x)
   const [ttsRate, setTtsRate] = useState<number>(1.0);
   const [ttsAccent, setTtsAccent] = useState<'en-US' | 'en-GB' | 'en-AU' | 'en-CA'>('en-US');
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
 
-  // 4. 9대 매체 트렌드 & 실시간 사전 상태
+  // 4. 9대 매체 큐레이션 & 구글 뉴스 RSS 동기화 상태
   const [mediaPlatforms, setMediaPlatforms] =
     useState<MediaTrendPlatform[]>(INITIAL_MEDIA_PLATFORMS);
   const [activePlatformId, setActivePlatformId] =
@@ -4946,8 +5109,9 @@ export default function App() {
     useState<MediaTrendKeyword | null>(null);
   const [isTrendSyncing, setIsTrendSyncing] = useState<boolean>(false);
   const [lastTrendSyncTime, setLastTrendSyncTime] = useState<string>(() =>
-    localStorage.getItem('yanadu_trend_sync_time') || getKstTimestampString()
+    readStorageString('yanadu_trend_sync_time', '기본 큐레이션 로드됨')
   );
+  const [trendSyncStatus, setTrendSyncStatus] = useState<'curated' | 'rss_ok' | 'local_shuffle'>('curated');
   const [trendSyncCount, setTrendSyncCount] = useState<number>(0);
   const [liveDictData, setLiveDictData] = useState<{
     word: string;
@@ -4958,11 +5122,11 @@ export default function App() {
     notFound?: boolean;
   } | null>(null);
 
-  // 5. STEP 3 (16요소 다이어그램 & 사전 탭 전환) 및 STEP 4/5 상태
+  // 5. STEP 3 (16노드 다이어그램 & 사전 탭 전환) 및 STEP 4/5 상태
   const [diagramTab, setDiagramTab] = useState<'all' | 'comp' | 'pos'>('all');
   const [diagramSourceMode, setDiagramSourceMode] = useState<'theme' | 'standard'>('theme');
   const [selectedStandardExIdx, setSelectedStandardExIdx] = useState<number>(0);
-  const [activeSentenceIdx, setActiveSentenceIdx] = useState<number>(1);
+  const [activeSentenceIdx, setActiveSentenceIdx] = useState<number>(0);
   const [selectedTokenIdx, setSelectedTokenIdx] = useState<number>(0);
   const [focusedNode, setFocusedNode] = useState<{
     type: 'comp' | 'pos';
@@ -4975,7 +5139,7 @@ export default function App() {
   const [writingInput, setWritingInput] = useState<string>('');
   const [showWritingModel, setShowWritingModel] = useState<boolean>(false);
 
-  // 6. 1~5교시 실전 모듈 & 어순 배열(Scramble) 상태
+  // 6. 1~5교시 실전 모듈 & 어순 배열(Scramble 인덱스 추적) 상태
   const [wordbookLevelFilter, setWordbookLevelFilter] = useState<
     '전체' | WordbookLevel
   >('전체');
@@ -4984,7 +5148,9 @@ export default function App() {
   const [syntaxGeneratorSeed, setSyntaxGeneratorSeed] = useState<number>(1);
   const [period1Answers, setPeriod1Answers] = useState<Record<string, number>>({});
   const [quiz406Answers, setQuiz406Answers] = useState<Record<number, 'A' | 'B'>>({});
-  const [scrambleBuiltMap, setScrambleBuiltMap] = useState<Record<string, string[]>>({});
+  const [scramblePickedIndices, setScramblePickedIndices] = useState<
+    Record<string, number[]>
+  >({});
   const [customSchoolPassage, setCustomSchoolPassage] = useState<string>(
     'Not until we step out of our comfort zone can we genuinely broaden our perspective. Streamlining the approval process makes the entire project feasible within the deadline.'
   );
@@ -4992,9 +5158,9 @@ export default function App() {
   const [examStepEssayInputs, setExamStepEssayInputs] = useState<Record<string, string>>({});
   const [examStepShowModel, setExamStepShowModel] = useState<Record<string, boolean>>({});
 
-  // 7. 단어·문장 보관함 (고유 ID 기반 관리)
+  // 7. 단어·문장 보관함 (readStorageJson으로 기존 저장 데이터 안전 복원)
   const [bookmarkedWords, setBookmarkedWords] = useState<SavedWordItem[]>(() =>
-    safeJsonParse('yanadu_words_v3', [
+    readStorageJson('yanadu_words_v3', [
       {
         id: 'init-w-1',
         word: 'streamline',
@@ -5024,7 +5190,7 @@ export default function App() {
     ])
   );
   const [savedSentences, setSavedSentences] = useState<SavedSentenceItem[]>(() =>
-    safeJsonParse('yanadu_sents_v3', [
+    readStorageJson('yanadu_sents_v3', [
       {
         id: 'init-s-1',
         en: 'Streamlining the approval process makes the entire project feasible.',
@@ -5059,7 +5225,7 @@ export default function App() {
     note: '',
   });
 
-  // 8. AI 코치 & 실제 음성 인식(SpeechRecognition) 타이머 상태
+  // 8. 규칙 기반 문장 점검 코치 & 실제 음성 인식(SpeechRecognition) 타이머 상태
   const [speakingGoalMins, setSpeakingGoalMins] = useState<5 | 15 | 30>(15);
   const [speakingSeconds, setSpeakingSeconds] = useState<number>(0);
   const [isSpeakingTimerRunning, setIsSpeakingTimerRunning] = useState<boolean>(false);
@@ -5067,16 +5233,16 @@ export default function App() {
   const [chatHistory, setChatHistory] = useState<ChatTurn[]>([
     {
       role: 'coach',
-      text: '안녕하세요! 오늘 배운 핵심 표현(streamline, feasible, unwind, pull off 등)을 넣어 한 문장을 영어로 작성하거나 🎙️마이크 버튼으로 말씀해 보세요. 문장 성분과 어조를 점검해 드립니다.',
+      text: '안녕하세요! 오늘 배운 핵심 표현(streamline, feasible, unwind, pull off 등)을 넣어 영어 문장을 작성하거나 🎙️마이크 버튼으로 말씀해 보세요. 어절 수, 대소문자·구두점, 5형식 보어 품사 등 핵심 구문 규칙을 점검해 드립니다.',
     },
   ]);
   const [userChatInput, setUserChatInput] = useState<string>('');
 
-  // 9. 아이패드 애플펜슬 필기장 상태 (굵기 1.5~9px · 형광펜 색상/투명도 · Undo · 플로팅)
+  // 9. 아이패드 애플펜슬 필기장 상태 (실제 필압 반영 · 최대 200획 자동 보존 · Undo)
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isDrawingRef = useRef<boolean>(false);
   const strokesRef = useRef<CanvasStroke[]>(
-    safeJsonParse('yanadu_strokes_v1', [])
+    readStorageJson('yanadu_strokes_v1', [])
   );
   const currentStrokeRef = useRef<CanvasStroke | null>(null);
   const [strokeCount, setStrokeCount] = useState<number>(
@@ -5095,40 +5261,24 @@ export default function App() {
   const [isPadFloating, setIsPadFloating] = useState<boolean>(true);
   const [isPadMinimized, setIsPadMinimized] = useState<boolean>(false);
   const [padQuickText, setPadQuickText] = useState<string>(() =>
-    localStorage.getItem('yanadu_pad_quick_text') || ''
+    readStorageString('yanadu_pad_quick_text', '')
   );
 
-  // 보관함 및 다크모드 로컬스토리지 동기화
+  // 보관함 및 다크모드 로컬스토리지 안전 동기화
   useEffect(() => {
-    try {
-      localStorage.setItem('yanadu_words_v3', JSON.stringify(bookmarkedWords));
-    } catch {
-      // ignore quota error
-    }
+    writeStorageString('yanadu_words_v3', JSON.stringify(bookmarkedWords));
   }, [bookmarkedWords]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('yanadu_sents_v3', JSON.stringify(savedSentences));
-    } catch {
-      // ignore quota error
-    }
+    writeStorageString('yanadu_sents_v3', JSON.stringify(savedSentences));
   }, [savedSentences]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('yanadu_dark_v1', JSON.stringify(darkMode));
-    } catch {
-      // ignore
-    }
+    writeStorageString('yanadu_dark_v1', JSON.stringify(darkMode));
   }, [darkMode]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('yanadu_pad_quick_text', padQuickText);
-    } catch {
-      // ignore
-    }
+    writeStorageString('yanadu_pad_quick_text', padQuickText);
   }, [padQuickText]);
 
   // 브라우저 TTS 음성 목록 비동기 로드 (voiceschanged 대응)
@@ -5145,7 +5295,7 @@ export default function App() {
     };
   }, []);
 
-  // 안전한 TTS 발화 함수 (슬래시/물결 기호 제거, 안드로이드 en_US 호환, Chrome cancel 지연 처리)
+  // 안전한 TTS 발화 함수
   const speakText = (text: string, customRate?: number) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
     const cleaned = (text || '')
@@ -5167,6 +5317,11 @@ export default function App() {
       if (matchedVoice) utter.voice = matchedVoice;
       window.speechSynthesis.speak(utter);
     }, 45);
+  };
+
+  // 빈칸 정답 확인 개별 토글 헬퍼
+  const toggleBlankKey = (key: string) => {
+    setRevealedBlankKeys((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   // 영영사전 Live API 조회 (불용어 건너뛰기 및 dictTargetWord 우선 사용)
@@ -5210,7 +5365,7 @@ export default function App() {
           meaningObj?.definition || '표준 영영사전 정의가 확인된 어휘입니다.',
         example:
           meaningObj?.example ||
-          ` Let's apply "${candidate}" in a real conversation.`,
+          `Let's apply "${candidate}" in a real conversation.`,
         loading: false,
         notFound: false,
       });
@@ -5219,7 +5374,7 @@ export default function App() {
         word: candidate,
         phonetic: '사전 API 미등재 (구동사·복합어)',
         definition:
-          '복합 구동사 또는 파생 형태이므로 하단STEP 2 단어장 해설이나 우측 외부 사전 링크를 참고해 주세요.',
+          '복합 구동사 또는 파생 형태이므로 하단 STEP 2 단어장 해설이나 우측 외부 사전 링크를 참고해 주세요.',
         example: '',
         loading: false,
         notFound: true,
@@ -5227,7 +5382,7 @@ export default function App() {
     }
   };
 
-  // 9대 매체 트렌드 강제 업데이트 (encodeURIComponent 적용 + 피셔-예이츠 셔플 + 날짜/시간 기록)
+  // 9대 매체 큐레이션 셔플 & 구글 뉴스 RSS 동기화 (RSS 성공과 로컬 셔플 상태를 정직하게 구분)
   const handleForceSyncTrends = async () => {
     setIsTrendSyncing(true);
     const nextSeed = trendSyncCount + getKstDayOfYear() + Math.floor(Date.now() % 97);
@@ -5240,10 +5395,13 @@ export default function App() {
       const res = await fetch(
         `https://api.rss2json.com/v1/api.json?rss_url=${rssUrl}`
       );
+      if (!res.ok) throw new Error('RSS fetch failed');
       const data = await res.json();
       const liveTitles: string[] = Array.isArray(data?.items)
         ? data.items.slice(0, 5).map((it: { title?: string }) => it.title || '')
         : [];
+
+      if (liveTitles.length === 0) throw new Error('No RSS items');
 
       setMediaPlatforms((prev) =>
         prev.map((plat) => {
@@ -5253,13 +5411,18 @@ export default function App() {
               rank: idx + 1,
               koTitle:
                 plat.id === 'GOOGLE_TRENDS' && liveTitles[idx]
-                  ? `[뉴스연동] ${liveTitles[idx].slice(0, 26)}… (${kw.enExpression})`
+                  ? `[뉴스헤드라인] ${liveTitles[idx].slice(0, 24)}… · 학습표현: ${kw.koTitle}`
                   : kw.koTitle,
             })
           );
           return { ...plat, keywords: shuffled };
         })
       );
+
+      const stamp = `${getKstTimestampString()} (구글RSS 연동 + 큐레이션 셔플)`;
+      setLastTrendSyncTime(stamp);
+      setTrendSyncStatus('rss_ok');
+      writeStorageString('yanadu_trend_sync_time', stamp);
     } catch {
       setMediaPlatforms((prev) =>
         prev.map((plat) => ({
@@ -5272,19 +5435,15 @@ export default function App() {
           ),
         }))
       );
+      const fallbackStamp = `${getKstTimestampString()} (로컬 큐레이션 순서 셔플됨)`;
+      setLastTrendSyncTime(fallbackStamp);
+      setTrendSyncStatus('local_shuffle');
     } finally {
-      const stamp = getKstTimestampString();
-      setLastTrendSyncTime(stamp);
-      try {
-        localStorage.setItem('yanadu_trend_sync_time', stamp);
-      } catch {
-        // ignore
-      }
       setIsTrendSyncing(false);
     }
   };
 
-  // 트렌드 키워드 클릭 핸들러 (비문 없는 검증 문장 생성 및 레벨 인덱스 유지)
+  // 트렌드 키워드 클릭 핸들러
   const handleClickTrendKeyword = (kw: MediaTrendKeyword) => {
     setSelectedLiveKeyword(kw);
     setSelectedThemeId(kw.targetThemeId);
@@ -5295,19 +5454,7 @@ export default function App() {
     fetchLiveDictionary(kw.enExpression, kw.dictTargetWord);
   };
 
-  // 레벨 변경 시 해당 레벨 문장으로 정확히 포커싱 (인덱스 밀림 버그 완벽 해결)
-  const handleSelectLevel = (lvl: LearningLevel) => {
-    setLearningLevel(lvl);
-    const defaultSpeed = lvl === 'beginner' ? 0.5 : lvl === 'intermediate' ? 0.75 : 1.0;
-    setTtsRate(defaultSpeed);
-    const matchIdx = currentTheme.sentences.findIndex((s) => s.levelTag === lvl);
-    if (matchIdx !== -1) {
-      setActiveSentenceIdx(matchIdx);
-      setSelectedTokenIdx(0);
-    }
-  };
-
-  // 현재 활성화된 테마 데이터 (useMemo로 불필요한 재계산 방지 및 문법적으로 완전한 트렌드 문장 결합)
+  // 현재 활성화된 테마 데이터
   const currentTheme: ThemeData = useMemo(() => {
     const base = THEMES.find((t) => t.id === selectedThemeId) || THEMES[0];
     if (!selectedLiveKeyword) return base;
@@ -5333,8 +5480,8 @@ export default function App() {
       pronLine: `${selectedLiveKeyword.pron} — [인 프랙티컬 커뮤니케이션 / 위 오픈 유즈 "${expr}" / 투 컨베이 아워 포인트 클리얼리]`,
       naturalKo: `실전 의사소통에서 우리는 "${ko}"라는 뜻을 명확히 전달하기 위해 "${expr}" 표현을 자주 활용합니다.`,
       paraphraseVersion: `Mastering the phrase "${expr}" helps us communicate more naturally.`,
-      grammarPoint: `어떤 문법 형태의 구절(동사구·명사구·형용사구)이든 타동사 use의 동격 명사구 목적어로 안전하게 결합하여 비문 없이 연습할 수 있습니다.`,
-      contextNuance: `좌측 9대 매체 토픽에서 선택한 "${ko}" 표현을 실전 문장 속에서 체화하는 맞춤형 카드입니다.`,
+      grammarPoint: `어떤 문법 형태의 구절(동사구·명사구·형용사구)이든 타동사 use의 목적어로 안전하게 결합하여 비문 없이 연습할 수 있습니다.`,
+      contextNuance: `좌측 9대 매체 큐레이션 토픽에서 선택한 "${ko}" 표현을 실전 문장 속에서 체화하는 맞춤형 카드입니다.`,
     };
 
     return {
@@ -5343,13 +5490,27 @@ export default function App() {
     };
   }, [selectedThemeId, selectedLiveKeyword, learningLevel]);
 
+  const handleSelectLevel = (lvl: LearningLevel) => {
+    setLearningLevel(lvl);
+    const defaultSpeed =
+      lvl === 'beginner' ? 0.5 : lvl === 'intermediate' ? 0.75 : 1.0;
+    setTtsRate(defaultSpeed);
+    const matchIdx = currentTheme.sentences.findIndex(
+      (s) => s.levelTag === lvl && s.id !== 9999
+    );
+    if (matchIdx !== -1) {
+      setActiveSentenceIdx(matchIdx);
+      setSelectedTokenIdx(0);
+    }
+  };
+
   const currentTrack: LevelTrackContent = currentTheme.levelTracks[learningLevel];
   const activePlatform =
     mediaPlatforms.find((p) => p.id === activePlatformId) || mediaPlatforms[0];
   const currentSentence: TrainingSentence =
     currentTheme.sentences[activeSentenceIdx] || currentTheme.sentences[0];
 
-  // STEP 3 다이어그램 분석 대상 문장 (useMemo)
+  // STEP 3 다이어그램 분석 대상 문장
   const currentDiagramData: DiagramSentence = useMemo(() => {
     if (diagramSourceMode === 'standard') {
       return DIAGRAM_EXAMPLES[selectedStandardExIdx] || DIAGRAM_EXAMPLES[0];
@@ -5364,7 +5525,7 @@ export default function App() {
   const activeToken: DiagramToken =
     currentDiagramData.tokens[selectedTokenIdx] || currentDiagramData.tokens[0];
 
-  // 1~5교시 파생 데이터 (useMemo 최적화)
+  // 코어 단어장 & 구문 아카이브 & 학교 지문 파생 데이터
   const wordbookEntries = useMemo(() => {
     const levels: WordbookLevel[] =
       wordbookLevelFilter === '전체'
@@ -5385,7 +5546,58 @@ export default function App() {
     [customSchoolPassage]
   );
 
-  // 스피킹 타이머 (StrictMode 안전 처리 & 목표 도달 후 재시작 시 자동 리셋)
+  // [핵심 수정] 1교시 어휘 20문항: 다른 실제 단어들의 뜻으로 오답 3개를 구성하고 보기 4개를 셔플하여 정답 번호(1~4번)를 고르게 분산
+  const period1QuizQuestions = useMemo(() => {
+    const allPool = (
+      ['중등 필수', '고등·수능 핵심', '비즈니스·실무', '오픽(OPIc)·구동사'] as WordbookLevel[]
+    ).flatMap((lv) => getExpandedWordbookByDay(lv, 1));
+
+    const selectedItems = deterministicShuffle(
+      allPool,
+      vocabChallengeSetSeed * 13
+    ).slice(0, 20);
+
+    return selectedItems.map((item, idx) => {
+      const otherMeanings = allPool
+        .filter((other) => other.word !== item.word)
+        .map((other) => other.meaning);
+      const pickedDistractors = deterministicShuffle(
+        otherMeanings,
+        vocabChallengeSetSeed * 29 + idx * 7
+      ).slice(0, 3);
+      const rawOptions = [item.meaning, ...pickedDistractors];
+      const shuffledOptions = deterministicShuffle(
+        rawOptions,
+        vocabChallengeSetSeed * 41 + idx * 11
+      );
+      const correctIdx = shuffledOptions.indexOf(item.meaning);
+
+      return {
+        item,
+        options: shuffledOptions,
+        correctIdx: correctIdx >= 0 ? correctIdx : 0,
+      };
+    });
+  }, [vocabChallengeSetSeed]);
+
+  const period1CorrectCount = useMemo(() => {
+    let count = 0;
+    period1QuizQuestions.forEach((q, idx) => {
+      const key = `${vocabChallengeSetSeed}-${idx}`;
+      if (period1Answers[key] === q.correctIdx) count++;
+    });
+    return count;
+  }, [period1QuizQuestions, period1Answers, vocabChallengeSetSeed]);
+
+  const quiz406CorrectCount = useMemo(() => {
+    let count = 0;
+    GRAMMAR_406_QUIZ_BANK.forEach((q) => {
+      if (quiz406Answers[q.id] === q.correct) count++;
+    });
+    return count;
+  }, [quiz406Answers]);
+
+  // 스피킹 타이머
   useEffect(() => {
     if (!isSpeakingTimerRunning) return;
     const goalSecs = speakingGoalMins * 60;
@@ -5409,11 +5621,15 @@ export default function App() {
     setIsSpeakingTimerRunning((prev) => !prev);
   };
 
-  // Web Speech API 실제 음성 인식 (마이크 발화 -> 텍스트 입력)
+  // Web Speech API 실제 음성 인식
   const handleStartVoiceRecognition = () => {
     const SpeechRec =
-      (window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown })
-        .SpeechRecognition ||
+      (
+        window as unknown as {
+          SpeechRecognition?: unknown;
+          webkitSpeechRecognition?: unknown;
+        }
+      ).SpeechRecognition ||
       (window as unknown as { webkitSpeechRecognition?: unknown })
         .webkitSpeechRecognition;
     if (!SpeechRec) {
@@ -5433,7 +5649,9 @@ export default function App() {
       recognition.onresult = (event: any) => {
         const transcript = event?.results?.[0]?.[0]?.transcript || '';
         if (transcript) {
-          setUserChatInput((prev) => (prev ? `${prev} ${transcript}` : transcript));
+          setUserChatInput((prev) =>
+            prev ? `${prev} ${transcript}` : transcript
+          );
         }
         setIsMicListening(false);
       };
@@ -5445,28 +5663,55 @@ export default function App() {
     }
   };
 
-  // AI 코치 문장 점검 및 피드백 생성 (실제 입력 문장 분석 반영)
+  // 규칙 기반 문장·표현 점검 코치 (어절 수, 대소문자, 구두점, 동사 유무, 5형식 보어 부사 오용 등 실제 규칙 검사)
   const handleSendCoachMessage = () => {
     const raw = userChatInput.trim();
     if (!raw) return;
+
     const words = raw.split(/\s+/);
-    const hasTarget = currentTheme.vocab.some((v) =>
-      raw.toLowerCase().includes(v.word.toLowerCase().split(' ')[0])
+    const lower = raw.toLowerCase();
+    const notes: string[] = [];
+
+    if (words.length < 3) {
+      notes.push('주어와 동사가 포함된 3어절 이상의 완전한 문장으로 작성해 보세요.');
+    }
+    if (!/^[A-Z]/.test(raw)) {
+      notes.push('문장 첫 글자는 대문자로 시작하는 것이 표준 표기입니다.');
+    }
+    if (!/[.!?]$/.test(raw)) {
+      notes.push('문장 끝에 마침표(.)나 물음표(?) 등 종결 부호를 붙여 주세요.');
+    }
+    if (/\b(make|makes|made|keep|keeps|kept)\b.*\b(feasibly|comfortably|independently|ambiguousl?y)\b/i.test(raw)) {
+      notes.push(
+        '주의: 5형식 동사(make/keep)의 목적격보어(OC) 자리에는 부사(-ly)가 아니라 형용사(feasible, comfortable 등)를 써야 합니다.'
+      );
+    }
+    if (/\bstick\s+(my|our|the)\b/i.test(raw)) {
+      notes.push(
+        '주의: stick이 "~을 고수하다/지키다"라는 뜻일 때는 전치사 to를 붙여 "stick to + 명사구"로 써야 합니다.'
+      );
+    }
+
+    const matchedVocab = currentTheme.vocab.find((v) =>
+      lower.includes(v.word.toLowerCase())
     );
     const polished =
       raw.charAt(0).toUpperCase() +
       raw.slice(1) +
       (/[.!?]$/.test(raw) ? '' : '.');
 
+    const feedbackText =
+      notes.length > 0
+        ? `🔍 [구문 규칙 점검 결과] ${notes.join(' / ')}`
+        : matchedVocab
+        ? `✅ [규칙 통과] 총 ${words.length}어절 문장이며, 오늘 테마의 핵심 표현("${matchedVocab.word}")이 자연스럽게 포함되었습니다!`
+        : `✅ [기본 구두점 통과] 총 ${words.length}어절 문장입니다. 여기에 오늘의 핵심 패턴("${currentTrack.patternEn}")이나 주요 어휘를 결합해 보면 더욱 좋습니다.`;
+
     const replyTurn: ChatTurn = {
       role: 'coach',
-      text: hasTarget
-        ? `훌륭합니다! 오늘 테마의 핵심 어휘를 정확히 활용해 총 ${words.length}어절 문장을 완성하셨습니다.`
-        : `좋은 시도입니다! 작성하신 ${words.length}어절 문장에 오늘의 대표 표현("${currentTrack.patternEn}")을 결합하면 한층 더 설득력 있는 문장이 됩니다.`,
-      correction: `다듬은 문장: "${polished}"`,
-      nuanceTip: `고급 확장 팁: Not only does this clarify our goal, but it also helps us ${
-        currentTheme.vocab[0]?.collocation || 'streamline the workflow'
-      }.`,
+      text: feedbackText,
+      correction: `교정 표기: "${polished}"`,
+      nuanceTip: `참고 패턴: ${currentTrack.patternEn} (${currentTrack.patternMeaningKo})`,
     };
 
     setChatHistory((prev) => [...prev, { role: 'user', text: raw }, replyTurn]);
@@ -5475,7 +5720,7 @@ export default function App() {
 
   // ============================================================================
   // 아이패드 애플펜슬 벡터 획 배열(strokesRef) 캔버스 렌더링 엔진
-  // - 형광펜 겹침 얼룩 방지 / 다크모드 시 검정 필기 -> 흰색 자동 반전 / 실행 취소(Undo) 완벽 지원
+  // - 만년필 실제 필압(point.pressure) 두께 반영 / 최대 200획 자동 보존 / 다크모드 검정->흰색 반전
   // ============================================================================
   const renderAllStrokes = () => {
     const canvas = canvasRef.current;
@@ -5509,6 +5754,12 @@ export default function App() {
       ctx.lineCap = st.tool === 'highlighter' ? 'square' : 'round';
       ctx.lineJoin = 'round';
 
+      const avgPressure =
+        st.points.reduce((acc, pt) => acc + (pt.pressure || 0.5), 0) /
+        st.points.length;
+      const pressureFactor =
+        st.tool === 'fountain' ? 0.65 + avgPressure * 0.75 : 1.0;
+
       if (st.tool === 'eraser') {
         ctx.globalCompositeOperation = 'destination-out';
         ctx.globalAlpha = 1.0;
@@ -5517,7 +5768,6 @@ export default function App() {
       } else {
         ctx.globalCompositeOperation = 'source-over';
         ctx.globalAlpha = st.tool === 'highlighter' ? st.alpha : 1.0;
-        // 다크모드일 때 기존 검정/슬레이트(#0f172a) 필기를 밝은 흰색(#f8fafc)으로 자동 반전
         const effectiveColor =
           darkMode && st.color === '#0f172a' ? '#f8fafc' : st.color;
         ctx.strokeStyle = effectiveColor;
@@ -5526,7 +5776,7 @@ export default function App() {
             ? st.width * 3.2
             : st.tool === 'ballpoint'
             ? Math.max(1.2, st.width * 0.85)
-            : st.width;
+            : st.width * pressureFactor;
       }
 
       ctx.beginPath();
@@ -5549,7 +5799,6 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [darkMode, canvasHeight, isPadMinimized, layoutMode, strokeCount]);
 
-  // iPadOS Safari 터치 시 파란 블록 선택 방지 네이티브 리스너
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -5611,17 +5860,15 @@ export default function App() {
       // ignore
     }
     if (currentStrokeRef.current && currentStrokeRef.current.points.length > 0) {
-      strokesRef.current = [...strokesRef.current, currentStrokeRef.current];
+      strokesRef.current = [...strokesRef.current, currentStrokeRef.current].slice(
+        -200
+      );
       currentStrokeRef.current = null;
       setStrokeCount(strokesRef.current.length);
-      try {
-        localStorage.setItem(
-          'yanadu_strokes_v1',
-          JSON.stringify(strokesRef.current.slice(-80))
-        );
-      } catch {
-        // ignore
-      }
+      writeStorageString(
+        'yanadu_strokes_v1',
+        JSON.stringify(strokesRef.current)
+      );
     }
     renderAllStrokes();
   };
@@ -5630,11 +5877,7 @@ export default function App() {
     if (strokesRef.current.length === 0) return;
     strokesRef.current = strokesRef.current.slice(0, -1);
     setStrokeCount(strokesRef.current.length);
-    try {
-      localStorage.setItem('yanadu_strokes_v1', JSON.stringify(strokesRef.current));
-    } catch {
-      // ignore
-    }
+    writeStorageString('yanadu_strokes_v1', JSON.stringify(strokesRef.current));
     renderAllStrokes();
   };
 
@@ -5642,15 +5885,17 @@ export default function App() {
     strokesRef.current = [];
     currentStrokeRef.current = null;
     setStrokeCount(0);
-    try {
-      localStorage.removeItem('yanadu_strokes_v1');
-    } catch {
-      // ignore
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        window.localStorage.removeItem('yanadu_strokes_v1');
+      } catch {
+        // ignore
+      }
     }
     renderAllStrokes();
   };
 
-  // 단어·문장 보관함 핸들러 (토글 삭제 버그 수정 및 고유 ID 기반)
+  // 단어·문장 보관함 핸들러
   const isWordBookmarked = (wordStr: string) =>
     bookmarkedWords.some((w) => w.word.toLowerCase() === wordStr.toLowerCase());
 
@@ -5763,7 +6008,6 @@ export default function App() {
     });
   };
 
-  // 스타일 헬퍼
   const fontClass =
     fontStyle === 'serif'
       ? 'font-serif'
@@ -5796,35 +6040,12 @@ export default function App() {
     { px: 9, label: '강조 9.0' },
   ];
 
-  // 1교시 & 5교시 실시간 채점 점수 계산
-  const period1QuizItems = useMemo(() => {
-    return deterministicShuffle(wordbookEntries, vocabChallengeSetSeed).slice(0, 20);
-  }, [wordbookEntries, vocabChallengeSetSeed]);
-
- const period1CorrectCount = useMemo(() => {
-  let count = 0;
-  period1QuizItems.forEach((_item, idx) => {
-    const key = `${vocabChallengeSetSeed}-${idx}`;
-    if (period1Answers[key] === 0) count++;
-  });
-  return count;
-}, [period1QuizItems, period1Answers, vocabChallengeSetSeed]);
-
-  const quiz406CorrectCount = useMemo(() => {
-    let count = 0;
-    GRAMMAR_406_QUIZ_BANK.forEach((q) => {
-      if (quiz406Answers[q.id] === q.correct) count++;
-    });
-    return count;
-  }, [quiz406Answers]);
-
   return (
     <div
-      className={`min-h-dvh ${fontClass} ${
+      className={`min-h-dvh pb-40 ${fontClass} ${
         darkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'
       }`}
     >
-      {/* 인쇄 시 전체 페이지 출력 보장 CSS */}
       <style>{`
         @media print {
           html, body, #root { height: auto !important; overflow: visible !important; }
@@ -5834,7 +6055,7 @@ export default function App() {
       `}</style>
 
       {/* ==================================================================== */}
-      {/* 상단 글로벌 헤더 (모드 전환 · 한글발음 스위치 · 글씨체 한글화 · 테마색 영문) */}
+      {/* 상단 글로벌 헤더 */}
       {/* ==================================================================== */}
       <header
         className={`sticky top-0 z-30 border-b px-4 py-2.5 backdrop-blur-md no-print ${
@@ -5855,12 +6076,11 @@ export default function App() {
             </h1>
           </div>
 
-          {/* 메인 6대 모드 탭 */}
           <nav className="flex flex-wrap items-center gap-1">
             {[
               { id: 'daily', label: '📚 일일 강의 (STEP 1~5)' },
               { id: 'examCourses', label: '🎓 1~5교시·수능·내신' },
-              { id: 'wordbook', label: '📘 8,000단어장 (Day 1~100)' },
+              { id: 'wordbook', label: '📘 코어 80단어 & 파생어 족보' },
               {
                 id: 'myVault',
                 label: `⭐ 내 보관함 (${bookmarkedWords.length + savedSentences.length})`,
@@ -5894,7 +6114,6 @@ export default function App() {
             ))}
           </nav>
 
-          {/* 우측 직관적 설정 컨트롤 바 */}
           <div className="flex flex-wrap items-center gap-1.5 text-xs">
             <button
               onClick={() => setShowPronGuide((p) => !p)}
@@ -5909,7 +6128,6 @@ export default function App() {
               {showPronGuide ? '👁️ 한글발음 켜짐' : '🙈 한글발음 가림'}
             </button>
 
-            {/* 글씨체: 고딕 · 명조 · 코딩체 직관적 한글 표기 */}
             <div
               className={`flex items-center rounded-md border px-1.5 py-0.5 gap-1 ${
                 darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-slate-100'
@@ -5937,7 +6155,6 @@ export default function App() {
               ))}
             </div>
 
-            {/* 테마색: 기존처럼 영문(BLUE/EMERALD/INDIGO/AMBER) 유지 */}
             <div
               className={`flex items-center rounded-md border px-1.5 py-0.5 gap-1 ${
                 darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-slate-100'
@@ -5994,13 +6211,13 @@ export default function App() {
       </header>
 
       {/* ==================================================================== */}
-      {/* 메인 레이아웃 컨테이너 (좌측 사이드바 + 우측 본문) */}
+      {/* 메인 레이아웃 컨테이너 */}
       {/* ==================================================================== */}
       <div className="max-w-[1600px] mx-auto flex flex-col lg:flex-row gap-4 p-3 md:p-4 print-expand">
-        {/* 좌측 사이드바: 리딩 속도 5단계 + 9대 매체 트렌드 & 강제 업데이트 + 테마 선택 */}
+        {/* 좌측 사이드바 */}
         {layoutMode === 'split' && (
           <aside className="w-full lg:w-80 shrink-0 space-y-4 no-print">
-            {/* 1) 리딩 속도 5단계 (0.30x · 0.50x · 0.75x · 1.0x · 1.25x) & 4개국 억양 */}
+            {/* 1) 리딩 속도 5단계 & 4개국 억양 */}
             <div
               className={`p-3.5 rounded-2xl border ${
                 darkMode
@@ -6060,7 +6277,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* 2) 9대 매체 트렌드 허브 + [⚡ 강제 업데이트] 버튼 + 날짜·시간 표시 */}
+            {/* 2) 9대 매체 큐레이션 토픽 & 구글 뉴스 RSS 동기화 */}
             <div
               className={`p-3.5 rounded-2xl border ${
                 darkMode
@@ -6071,10 +6288,15 @@ export default function App() {
               <div className="flex items-center justify-between gap-2 mb-1.5">
                 <div>
                   <h2 className="text-xs font-extrabold">
-                    🌐 9대 매체 트렌드 표현 TOP 10
+                    🌐 9대 매체 큐레이션 표현 10선
                   </h2>
                   <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                    📅 최근 업데이트: <strong className="text-emerald-500">{lastTrendSyncTime}</strong>
+                    {trendSyncStatus === 'rss_ok'
+                      ? '🟢'
+                      : trendSyncStatus === 'local_shuffle'
+                      ? '🟡'
+                      : '📚'}{' '}
+                    상태: <strong className="text-emerald-500">{lastTrendSyncTime}</strong>
                   </p>
                 </div>
                 <button
@@ -6082,11 +6304,10 @@ export default function App() {
                   disabled={isTrendSyncing}
                   className="px-2.5 py-1.5 rounded-lg text-[11px] font-extrabold bg-rose-600 text-white hover:bg-rose-700 shadow-xs shrink-0"
                 >
-                  {isTrendSyncing ? '⏳ 동기화 중...' : '⚡ 강제 업데이트'}
+                  {isTrendSyncing ? '⏳ 동기화 중...' : '🔄 셔플·뉴스연동'}
                 </button>
               </div>
 
-              {/* 9대 플랫폼 탭 */}
               <div className="flex flex-wrap gap-1 my-2">
                 {mediaPlatforms.map((plat) => (
                   <button
@@ -6113,7 +6334,7 @@ export default function App() {
                   rel="noreferrer"
                   className="text-blue-500 font-bold underline"
                 >
-                  원문 매체↗
+                  매체 바로가기↗
                 </a>
               </div>
 
@@ -6164,7 +6385,6 @@ export default function App() {
                 })}
               </div>
 
-              {/* 영영사전 API 실시간 조회 결과창 */}
               {liveDictData && (
                 <div
                   className={`mt-2.5 p-2.5 rounded-xl border text-xs ${
@@ -6236,11 +6456,10 @@ export default function App() {
         {/* ================================================================== */}
         <main className="flex-1 min-w-0 space-y-6 print-expand">
           {/* ---------------------------------------------------------------- */}
-          {/* [모드 1] 📚 일일 강의 (STEP 1 ~ STEP 5 누락 항목 100% 복원) */}
+          {/* [모드 1] 📚 일일 강의 (STEP 1 ~ STEP 5) */}
           {/* ---------------------------------------------------------------- */}
           {activeMode === 'daily' && (
             <div className="space-y-6">
-              {/* 초·중·고급 3단계 레벨 스위치 */}
               <div
                 className={`p-4 rounded-2xl border ${
                   darkMode
@@ -6337,7 +6556,6 @@ export default function App() {
                       📐 <strong>핵심 어순·문법 해설:</strong> {currentTrack.grammarSummary}
                     </div>
 
-                    {/* 단계별 속도 즉시 듣기 버튼 (0.30x · 0.50x · 0.75x · 1.0x) */}
                     <div className="flex flex-wrap items-center gap-2 mt-3">
                       <button
                         onClick={() => speakText(currentTrack.patternEn, 0.3)}
@@ -6366,7 +6584,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* 패러프레이징(표현 업그레이드) 비교 */}
+                  {/* 패러프레이징 비교 */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 mt-3">
                     {currentTrack.paraphraseDrill.map((pd, idx) => (
                       <div
@@ -6390,7 +6608,7 @@ export default function App() {
                     ))}
                   </div>
 
-                  {/* [복원 완료 #23] 💬 A/B 2인 실전 롤플레이 대화문 */}
+                  {/* 💬 2인 실전 롤플레이 대화문 */}
                   <div
                     className={`mt-3 p-3.5 rounded-xl border ${
                       darkMode
@@ -6447,7 +6665,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* [복원 완료 #23] 📊 3단계 어조·격식도 온도계 (synonymScales) */}
+                  {/* 📊 3단계 어조·격식도 온도계 */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
                     {currentTheme.synonymScales.map((sc, idx) => (
                       <div
@@ -6506,7 +6724,7 @@ export default function App() {
               </div>
 
               {/* ============================================================ */}
-              {/* STEP 2. 핵심 어휘 & 7성분·9품사 역할 & 빈칸 예문 (개별 가림 해제 완비) */}
+              {/* STEP 2. 핵심 어휘 (표제어 옆 단독 스피커 추가 & 빈칸 정답 가림 토글 적용) */}
               {/* ============================================================ */}
               <section
                 className={`p-4 rounded-2xl border ${
@@ -6521,7 +6739,7 @@ export default function App() {
                       STEP 2 · 테마 필수 어휘 & 문법 성분(7직책)·품사(9신분) 매칭표
                     </span>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                      단어나 뜻을 가린 뒤 개별 칸을 클릭하면 해당 단어만 다시 확인할 수 있습니다.
+                      짧은 표제어 바로 옆의 <strong>[🔊 단어]</strong> 버튼으로 단어 발음을 바로 듣거나, 우측의 <strong>[❓ 정답 확인]</strong>을 눌러 빈칸 추론 훈련을 할 수 있습니다.
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5 text-xs">
@@ -6568,11 +6786,11 @@ export default function App() {
                             : 'border-slate-200 bg-slate-100 text-slate-700'
                         }`}
                       >
-                        <th className="p-2.5">단어 & 소리블록 · 한글발음</th>
+                        <th className="p-2.5">단어(🔊) & 소리블록 · 한글발음</th>
                         <th className="p-2.5">뜻 & 영영정의</th>
                         <th className="p-2.5">품사(9신분) & 문장성분(7직책)</th>
                         <th className="p-2.5">실전 연어 & 빈칸 적용 예문</th>
-                        <th className="p-2.5 text-center">음성·보관함</th>
+                        <th className="p-2.5 text-center">연어발음·보관함</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
@@ -6581,6 +6799,8 @@ export default function App() {
                         const maskWord = hideWords && !isRevealed;
                         const maskMean = hideMeanings && !isRevealed;
                         const saved = isWordBookmarked(v.word);
+                        const blankKey = `step2-blank-${v.id}`;
+                        const isBlankShown = !!revealedBlankKeys[blankKey];
 
                         return (
                           <tr
@@ -6595,16 +6815,39 @@ export default function App() {
                             className="cursor-pointer hover:bg-blue-50/40 dark:hover:bg-slate-800/50"
                           >
                             <td className="p-2.5 align-top">
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex flex-wrap items-center gap-1.5">
                                 <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/15 text-blue-600 dark:text-blue-400">
                                   {v.recommendLevel.toUpperCase()}
                                 </span>
                                 <span className="font-black text-sm text-blue-600 dark:text-blue-400">
                                   {maskWord ? v.masked : v.word}
                                 </span>
+                                {/* [성만 님 요청 반영] 짧은 표제어 바로 오른쪽 옆 전용 스피커 버튼 */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    speakText(v.word);
+                                  }}
+                                  title={`"${v.word}" 단어 발음 듣기`}
+                                  className="px-1.5 py-0.5 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] shadow-xs"
+                                >
+                                  🔊 단어
+                                </button>
                               </div>
-                              <div className="text-[11px] font-mono text-slate-500 mt-0.5">
-                                {v.ipa} · 끊어읽기: <strong>{v.soundBlock}</strong>
+                              <div className="text-[11px] font-mono text-slate-500 mt-1 flex flex-wrap items-center gap-1">
+                                <span>{v.ipa} · 끊어읽기:</span>
+                                <strong>{v.soundBlock}</strong>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    speakText(v.soundBlock);
+                                  }}
+                                  className="px-1 py-0.2 rounded bg-slate-200 dark:bg-slate-700 text-[10px] font-bold"
+                                >
+                                  🔊
+                                </button>
                               </div>
                               {showPronGuide && (
                                 <div className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5">
@@ -6639,12 +6882,27 @@ export default function App() {
                               </p>
                             </td>
 
-                            <td className="p-2.5 align-top">
+                            <td
+                              className="p-2.5 align-top"
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               <div className="font-bold text-blue-600 dark:text-blue-400">
                                 🔗 {v.collocation} ({v.collocationKo})
                               </div>
-                              <div className="text-[11px] mt-1 font-mono bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
-                                빈칸훈련: {v.exampleBlank} (정답: <strong>{v.word}</strong>)
+                              {/* 빈칸 훈련 정답 스포일러 가림 토글 */}
+                              <div className="text-[11px] mt-1 font-mono bg-slate-100 dark:bg-slate-800 px-2 py-1.5 rounded flex flex-wrap items-center justify-between gap-1.5">
+                                <span>빈칸훈련: {v.exampleBlank}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleBlankKey(blankKey)}
+                                  className={`px-2 py-0.5 rounded font-sans font-bold text-[10px] ${
+                                    isBlankShown
+                                      ? 'bg-emerald-600 text-white'
+                                      : 'bg-amber-500 text-slate-950'
+                                  }`}
+                                >
+                                  {isBlankShown ? `정답: ${v.word}` : '❓ 정답 확인'}
+                                </button>
                               </div>
                             </td>
 
@@ -6654,9 +6912,9 @@ export default function App() {
                             >
                               <button
                                 onClick={() => speakText(v.collocation)}
-                                className="w-full px-2 py-1 rounded bg-blue-600 text-white font-bold text-[11px]"
+                                className="w-full px-2 py-1 rounded bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px]"
                               >
-                                🔊 발음
+                                🔊 연어발음
                               </button>
                               <button
                                 onClick={() =>
@@ -6679,7 +6937,7 @@ export default function App() {
                                     : 'bg-slate-100 border-slate-300 text-slate-700'
                                 }`}
                               >
-                                {saved ? '⭐ 저장됨' : '☆ 단어장저장'}
+                                {saved ? '⭐ 저장됨' : '☆ 단어장 저장'}
                               </button>
                             </td>
                           </tr>
@@ -6691,7 +6949,7 @@ export default function App() {
               </section>
 
               {/* ============================================================ */}
-              {/* STEP 3. 16개 문법 노드(7성분+9품사) 연결도 & 사전 탭 전환 (완벽 복원) */}
+              {/* STEP 3. 16개 문법 노드(7성분+9품사) 연결도 & 사전 탭 전환 */}
               {/* ============================================================ */}
               <section
                 className={`p-4 rounded-2xl border ${
@@ -6706,11 +6964,10 @@ export default function App() {
                       STEP 3 · 문장 성분 7개(구·절 역할) + 9품사(단어 정체) = 총 16개 문법 노드 & 사전
                     </span>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                      우측 버튼에서 <strong>[문장 성분(7직책) 사전]</strong>이나 <strong>[9품사(한정사 포함) 사전]</strong>을 클릭하면 수식어·한정사·간접목적어 등 각각의 상세 뜻과 어순 규칙 페이지로 즉시 전환됩니다.
+                      ※ 연결선은 단어 품사 자체가 곧바로 성분이 된다는 뜻이 아니라, <strong>해당 품사가 단독으로 쓰이거나 구(전치사구·준동사구·명사구)·절을 구성하여 해당 문장 성분 역할을 수행할 수 있음</strong>을 나타냅니다.
                     </p>
                   </div>
 
-                  {/* [핵심 복원 #8] 3대 탭 전환 버튼 */}
                   <div className="flex flex-wrap items-center gap-1.5">
                     {(
                       [
@@ -6736,10 +6993,8 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* 탭 1: 16개 문법 노드 SVG 연결도 + 어절 클릭 해부기 */}
                 {diagramTab === 'all' && (
                   <div className="space-y-4">
-                    {/* 분석할 문장 선택 바 (현재 테마 문장 vs 대표 표준 예문 3선) */}
                     <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-100 dark:bg-slate-950 text-xs">
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span className="font-extrabold">분석 문장 선택:</span>
@@ -6756,14 +7011,14 @@ export default function App() {
                         >
                           현재 테마 문장 ({currentSentence.tag})
                         </button>
-{DIAGRAM_EXAMPLES.map((_ex, idx) => (
-  <button
-    key={idx}
-    onClick={() => {
-      setDiagramSourceMode('standard');
-      setSelectedStandardExIdx(idx);
-      setSelectedTokenIdx(0);
-    }}
+                        {DIAGRAM_EXAMPLES.map((exItem, idx) => (
+                          <button
+                            key={exItem.rawEn}
+                            onClick={() => {
+                              setDiagramSourceMode('standard');
+                              setSelectedStandardExIdx(idx);
+                              setSelectedTokenIdx(0);
+                            }}
                             className={`px-2.5 py-1 rounded-lg font-bold ${
                               diagramSourceMode === 'standard' &&
                               selectedStandardExIdx === idx
@@ -6777,12 +7032,11 @@ export default function App() {
                       </div>
                       {currentDiagramData.isHeuristic && (
                         <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400">
-                          ℹ️ 문맥 규칙 기반 자동 분석 (어절 터치 시 상세 확인)
+                          ℹ️ 참고: 사전 미등록 문장에 대한 문맥 규칙 기반 추정 분류입니다
                         </span>
                       )}
                     </div>
 
-                    {/* SVG 16노드 다이어그램 (다크모드 완벽 대응 #28) */}
                     <div
                       className={`p-3 rounded-2xl border overflow-x-auto ${
                         darkMode
@@ -6801,7 +7055,7 @@ export default function App() {
                             darkMode ? 'fill-blue-400' : 'fill-blue-700'
                           }`}
                         >
-                          ▲ 상단 7개 노드: 문장 성분 (구·절이 문장에서 맡는 역할) — 원을 클릭하면 아래에 뜻이 표시됩니다
+                          ▲ 상단 7개 노드: 문장 성분 (단어·구·절이 문장에서 맡는 역할) — 원을 클릭하면 아래에 상세 설명이 표시됩니다
                         </text>
                         <text
                           x="20"
@@ -6810,10 +7064,9 @@ export default function App() {
                             darkMode ? 'fill-emerald-400' : 'fill-emerald-700'
                           }`}
                         >
-                          ▲ 하단 9개 노드: 품사 (개별 단어의 고유 신분, 한정사 포함) — 현재 선택 어절: &quot;{activeToken?.word}&quot; ({activeToken?.comp} ↔ {activeToken?.pos})
+                          ▲ 하단 9개 노드: 품사 (개별 단어의 정체, 한정사 포함) — 현재 선택 어절: &quot;{activeToken?.word}&quot; ({activeToken?.comp} ↔ {activeToken?.pos})
                         </text>
 
-                        {/* 20개 대표 결합선 */}
                         {MAPPING_EDGES.map((edge, idx) => {
                           const cPos = COMP_COORDS[edge.comp];
                           const pPos = POS_COORDS[edge.pos];
@@ -6841,7 +7094,6 @@ export default function App() {
                           );
                         })}
 
-                        {/* 상단 7개 문장 성분 노드 */}
                         {(Object.keys(COMP_COORDS) as CompId[]).map((cid) => {
                           const coord = COMP_COORDS[cid];
                           const isActive =
@@ -6899,7 +7151,6 @@ export default function App() {
                           );
                         })}
 
-                        {/* 하단 9개 품사 노드 */}
                         {(Object.keys(POS_COORDS) as PosId[]).map((pid) => {
                           const coord = POS_COORDS[pid];
                           const isActive =
@@ -6959,7 +7210,6 @@ export default function App() {
                       </svg>
                     </div>
 
-                    {/* 동그라미(노드) 직접 클릭 시 해당 문장성분/품사 상세 뜻 팝업 박스 */}
                     {focusedNode && (
                       <div
                         className={`p-3.5 rounded-xl border text-xs ${
@@ -6989,7 +7239,7 @@ export default function App() {
                                 </div>
                                 <p className="mt-1 font-semibold">{info.easyMeaning}</p>
                                 <p className="mt-1 text-slate-600 dark:text-slate-300">
-                                  • <strong>어순 규칙:</strong> {info.wordOrderRule} | <strong>결합 가능 품사:</strong> {info.allowedPos.join(', ')}
+                                  • <strong>어순 규칙:</strong> {info.wordOrderRule} | <strong>결합 가능 품사(구·절 포함):</strong> {info.allowedPos.join(', ')}
                                 </p>
                                 <p className="mt-1 font-mono text-emerald-600 dark:text-emerald-400">
                                   • <strong>대표 예문:</strong> {info.exampleHighlight}
@@ -7018,7 +7268,7 @@ export default function App() {
                                 </div>
                                 <p className="mt-1 font-semibold">{info.easyMeaning}</p>
                                 <p className="mt-1 text-slate-600 dark:text-slate-300">
-                                  • <strong>담당하는 문장 성분 자리:</strong> {info.allowedComp.join(', ')}
+                                  • <strong>수행 가능한 문장 성분 역할(구 단위 포함):</strong> {info.allowedComp.join(', ')}
                                 </p>
                                 <p className="mt-1 font-mono text-blue-600 dark:text-blue-400">
                                   • <strong>대표 어휘:</strong> {info.exampleWords}
@@ -7030,7 +7280,6 @@ export default function App() {
                       </div>
                     )}
 
-                    {/* 어절별 터치 카드 & [복원 완료 #24] 선택한 어절 상세 문법 해설판 */}
                     <div>
                       <div className="text-xs font-bold mb-2">
                         👇 아래 문장의 각 단어를 클릭하면 위 연결선이 움직이고 아래에 상세 문법 역할이 표시됩니다:
@@ -7074,6 +7323,9 @@ export default function App() {
                             • 단어 의미: {activeToken.meaning} | 문법 역할: {activeToken.roleExplanation}
                           </p>
                           <p className="mt-1 text-slate-600 dark:text-slate-300">
+                            • <strong>문장 해석:</strong> {currentDiagramData.naturalKo}
+                          </p>
+                          <p className="mt-0.5 text-slate-600 dark:text-slate-300">
                             • <strong>문장 뼈대 공식:</strong> {currentDiagramData.skeleton} ({currentDiagramData.patternType})
                           </p>
                           <p className="mt-0.5 text-slate-600 dark:text-slate-300">
@@ -7085,7 +7337,6 @@ export default function App() {
                   </div>
                 )}
 
-                {/* [핵심 복원 #8] 탭 2: 문장 성분(7직책) 전체 사전 페이지 */}
                 {diagramTab === 'comp' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {SENTENCE_COMPONENTS.map((comp) => (
@@ -7112,7 +7363,7 @@ export default function App() {
                           📐 <strong>어순 규칙:</strong> {comp.wordOrderRule}
                         </p>
                         <p className="mt-1 text-emerald-600 dark:text-emerald-400 font-bold">
-                          🔗 <strong>들어갈 수 있는 품사:</strong> {comp.allowedPos.join(', ')}
+                          🔗 <strong>결합 가능 품사(구·절 포함):</strong> {comp.allowedPos.join(', ')}
                         </p>
                         <div className="mt-2 p-2 rounded bg-white dark:bg-slate-900 font-mono text-[11px]">
                           예문: {comp.exampleHighlight}
@@ -7122,7 +7373,6 @@ export default function App() {
                   </div>
                 )}
 
-                {/* [핵심 복원 #8] 탭 3: 9품사(한정사 포함) 전체 사전 페이지 */}
                 {diagramTab === 'pos' && (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     {PARTS_OF_SPEECH.map((pos) => (
@@ -7146,7 +7396,7 @@ export default function App() {
                           💡 <strong>쉬운 뜻:</strong> {pos.easyMeaning}
                         </p>
                         <p className="mt-1.5 text-blue-600 dark:text-blue-400 font-bold">
-                          🎯 <strong>담당하는 문장 성분:</strong> {pos.allowedComp.join(', ')}
+                          🎯 <strong>담당하는 문장 성분(구 단위 포함):</strong> {pos.allowedComp.join(', ')}
                         </p>
                         <div className="mt-2 p-2 rounded bg-white dark:bg-slate-900 font-mono text-[11px]">
                           대표 단어: {pos.exampleWords}
@@ -7158,7 +7408,7 @@ export default function App() {
               </section>
 
               {/* ============================================================ */}
-              {/* STEP 4. 3단 소리블록 직독직해 & 따라 쓰기 완벽 일치 판정 (#21) */}
+              {/* STEP 4. 3단 소리블록 직독직해 & 따라 쓰기 완벽 일치 판정 */}
               {/* ============================================================ */}
               <section
                 className={`p-4 rounded-2xl border ${
@@ -7200,9 +7450,21 @@ export default function App() {
                         }`}
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <span className="px-2 py-0.5 rounded text-[11px] font-extrabold bg-blue-600 text-white">
-                            {sent.tag} · 핵심어: {sent.targetWord}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="px-2 py-0.5 rounded text-[11px] font-extrabold bg-blue-600 text-white">
+                              {sent.tag} · 핵심어: {sent.targetWord}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                speakText(sent.targetWord);
+                              }}
+                              className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-[10px] font-bold"
+                            >
+                              🔊 핵심어
+                            </button>
+                          </div>
                           <div
                             className="flex items-center gap-1.5"
                             onClick={(e) => e.stopPropagation()}
@@ -7217,7 +7479,7 @@ export default function App() {
                               onClick={() => speakText(sent.rawEn, 1.0)}
                               className="px-2 py-1 rounded bg-blue-600 text-white text-[11px] font-bold"
                             >
-                              🔊 1.0x 듣기
+                              🔊 1.0x 문장듣기
                             </button>
                             <button
                               onClick={() =>
@@ -7235,7 +7497,6 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* 3단 직독직해 (① 의미단위 한글 -> ② 소리블록 영어 & 발음 -> ③ 자연스러운 완역 & 문법공식) */}
                         <div className="mt-2.5 space-y-1.5 text-xs">
                           <div className="text-slate-600 dark:text-slate-300 font-semibold">
                             ① <strong>의미단위 직독:</strong> {sent.koLine}
@@ -7269,7 +7530,6 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* 따라 쓰기(필사) 입력창 & 완벽 일치 자동 판정 */}
                         <div
                           className="mt-3 flex flex-wrap items-center gap-2"
                           onClick={(e) => e.stopPropagation()}
@@ -7305,7 +7565,7 @@ export default function App() {
               </section>
 
               {/* ============================================================ */}
-              {/* STEP 5. 단계별 확인 퀴즈(해설 표시) & 서술형 영작 미션 + AI 코치 */}
+              {/* STEP 5. 단계별 확인 퀴즈(정답 위치 분산 완료) & 서술형 영작 · 규칙 점검 코치 */}
               {/* ============================================================ */}
               <section
                 className={`p-4 rounded-2xl border space-y-4 ${
@@ -7315,7 +7575,7 @@ export default function App() {
                 }`}
               >
                 <span className="px-2.5 py-1 rounded-md text-xs font-black bg-rose-600 text-white">
-                  STEP 5 · 초·중·고급 실전 점검 퀴즈 & 서술형 영작 · AI 스피킹 코치
+                  STEP 5 · 초·중·고급 실전 점검 퀴즈 & 서술형 영작 · 규칙 기반 구문 점검 코치
                 </span>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
@@ -7327,8 +7587,17 @@ export default function App() {
                         : 'bg-slate-50 border-slate-200'
                     }`}
                   >
-                    <div className="font-extrabold text-blue-500 mb-1">
-                      🌱 초급 어휘 확인: &quot;{currentTheme.quiz.beginner.word}&quot; ({currentTheme.quiz.beginner.ipa})
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-extrabold text-blue-500">
+                        🌱 초급 어휘: &quot;{currentTheme.quiz.beginner.word}&quot;
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => speakText(currentTheme.quiz.beginner.word)}
+                        className="px-1.5 py-0.5 rounded bg-blue-600 text-white text-[10px] font-bold"
+                      >
+                        🔊 발음
+                      </button>
                     </div>
                     <div className="space-y-1.5 mt-2">
                       {currentTheme.quiz.beginner.options.map((opt, idx) => (
@@ -7436,7 +7705,7 @@ export default function App() {
                                 : 'bg-white border-slate-200'
                             }`}
                           >
-                            {opt}
+                            {idx + 1}. {opt}
                           </button>
                         );
                       })}
@@ -7449,7 +7718,7 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* 서술형 영작 미션 & 모범답안 확인 토글 (#25 복원) */}
+                {/* 서술형 영작 미션 */}
                 <div
                   className={`p-3.5 rounded-xl border text-xs ${
                     darkMode
@@ -7480,13 +7749,21 @@ export default function App() {
                     }`}
                   />
                   {showWritingModel && (
-                    <div className="mt-2 p-2.5 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 font-bold">
-                      ✅ 모범 답안: {currentTheme.quiz.writingMission.modelAnswer}
+                    <div className="mt-2 p-2.5 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 font-bold flex items-center justify-between">
+                      <span>✅ 모범 답안: {currentTheme.quiz.writingMission.modelAnswer}</span>
+                      <button
+                        onClick={() =>
+                          speakText(currentTheme.quiz.writingMission.modelAnswer)
+                        }
+                        className="px-2 py-0.5 rounded bg-emerald-600 text-white text-[11px]"
+                      >
+                        🔊 듣기
+                      </button>
                     </div>
                   )}
                 </div>
 
-                {/* AI 스피킹 타이머 & 음성 인식(SpeechRecognition) 코칭 */}
+                {/* 규칙 기반 문장·표현 점검 코치 */}
                 <div
                   className={`p-3.5 rounded-xl border text-xs ${
                     darkMode
@@ -7496,7 +7773,7 @@ export default function App() {
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                     <div className="font-extrabold">
-                      🎙️ 실전 스피킹 타이머 & 1:1 문장 첨삭 코치
+                      🤖 규칙 기반 문장·표현 점검 코치 & 실전 스피킹 타이머
                     </div>
                     <div className="flex items-center gap-1.5">
                       {([5, 15, 30] as const).map((m) => (
@@ -7581,7 +7858,7 @@ export default function App() {
                       onClick={handleSendCoachMessage}
                       className="px-3 py-2 rounded-lg font-extrabold bg-blue-600 text-white shrink-0"
                     >
-                      첨삭받기
+                      구문점검
                     </button>
                   </div>
                 </div>
@@ -7594,7 +7871,6 @@ export default function App() {
           {/* ---------------------------------------------------------------- */}
           {activeMode === 'examCourses' && (
             <div className="space-y-6">
-              {/* 상단 1~5교시 탭 전환 */}
               <div
                 className={`p-4 rounded-2xl border ${
                   darkMode
@@ -7633,12 +7909,16 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* 1교시: 어휘 스피드 테스트 + 실시간 점수 채점판 & 다시 풀기 (#20) */}
+                {/* 1교시: 어휘 스피드 20문항 (정답 번호 1~4번 무작위 셔플 완료) */}
                 {activeModulePeriod === 1 && (
                   <div className="space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl bg-blue-500/10 text-xs">
                       <div className="font-extrabold">
-                        🎯 실시간 채점 점수: <span className="text-blue-600 dark:text-blue-400 text-sm">{period1CorrectCount} / {period1QuizItems.length}점</span> (응시 {Object.keys(period1Answers).length}문항)
+                        🎯 실시간 채점 점수:{' '}
+                        <span className="text-blue-600 dark:text-blue-400 text-sm">
+                          {period1CorrectCount} / {period1QuizQuestions.length}점
+                        </span>{' '}
+                        (응시 {Object.keys(period1Answers).length}문항 · 정답 위치 1~4번 무작위 배정)
                       </div>
                       <div className="flex items-center gap-2">
                         <button
@@ -7654,21 +7934,17 @@ export default function App() {
                           }}
                           className="px-2.5 py-1 rounded bg-blue-600 text-white font-bold"
                         >
-                          🎲 새 시험지 세트 생성 (Set #{vocabChallengeSetSeed})
+                          🎲 새 시험지 셔플 생성 (Set #{vocabChallengeSetSeed})
                         </button>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                      {period1QuizItems.map((item, idx) => {
+                      {period1QuizQuestions.map((qObj, idx) => {
+                        const { item, options, correctIdx } = qObj;
                         const qKey = `${vocabChallengeSetSeed}-${idx}`;
                         const picked = period1Answers[qKey];
-                        const distractors = [
-                          item.meaning,
-                          '일정을 무기한 연기하다',
-                          '예산을 삭감하고 축소하다',
-                          '규정을 위반하여 제재를 받다',
-                        ];
+
                         return (
                           <div
                             key={qKey}
@@ -7689,11 +7965,11 @@ export default function App() {
                                 onClick={() => speakText(item.word)}
                                 className="px-2 py-0.5 rounded bg-blue-600 text-white text-[10px] font-bold"
                               >
-                                🔊
+                                🔊 단어듣기
                               </button>
                             </div>
                             <div className="grid grid-cols-2 gap-1.5 mt-2">
-                              {distractors.map((opt, oIdx) => (
+                              {options.map((opt, oIdx) => (
                                 <button
                                   key={oIdx}
                                   onClick={() =>
@@ -7704,7 +7980,7 @@ export default function App() {
                                   }
                                   className={`p-1.5 rounded border text-left font-semibold ${
                                     picked === oIdx
-                                      ? oIdx === 0
+                                      ? oIdx === correctIdx
                                         ? 'bg-emerald-600 text-white border-emerald-600'
                                         : 'bg-rose-600 text-white border-rose-600'
                                       : darkMode
@@ -7723,17 +7999,17 @@ export default function App() {
                   </div>
                 )}
 
-                {/* 2교시: 12대 검증 구문 아카이브 & 클릭형 어순 배열(Scramble) 조립기 (#26) */}
+                {/* 2교시: 12대 검증 구문 아카이브 & 중복 방지·개별 취소 어순 조립기 */}
                 {activeModulePeriod === 2 && (
                   <div className="space-y-4 text-xs">
                     <div className="flex items-center justify-between">
                       <span className="font-extrabold">
-                        🧩 검증 구문 12선 (한글발음 + 시드 기반 피셔-예이츠 어순 배열 훈련)
+                        🧩 검증 구문 12선 (한글발음 + 시드 기반 결정론적 어순 배열 훈련)
                       </span>
                       <button
                         onClick={() => {
                           setSyntaxGeneratorSeed((s) => s + 1);
-                          setScrambleBuiltMap({});
+                          setScramblePickedIndices({});
                         }}
                         className="px-3 py-1 rounded-lg bg-blue-600 text-white font-bold"
                       >
@@ -7743,8 +8019,11 @@ export default function App() {
 
                     <div className="space-y-3">
                       {generatedSyntaxList.map((syn, idx) => {
-                        const built = scrambleBuiltMap[syn.id] || [];
-                        const builtStr = built.join(' ');
+                        const pickedIdxs = scramblePickedIndices[syn.id] || [];
+                        const builtWords = pickedIdxs.map(
+                          (i) => syn.scrambleTokens[i]
+                        );
+                        const builtStr = builtWords.join(' ');
                         const isComplete =
                           builtStr.toLowerCase() ===
                           syn.sentenceEn.trim().toLowerCase();
@@ -7758,9 +8037,9 @@ export default function App() {
                                 : 'bg-slate-50 border-slate-200'
                             }`}
                           >
-                            <div className="flex items-center justify-between">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
                               <span className="font-extrabold text-blue-500">
-                                #{idx + 1} · {syn.openerRule} (표제어: {syn.targetWord} / 문장내 형태: {syn.matchedForm})
+                                #{idx + 1} · {syn.openerRule} (표제어: {syn.targetWord} / 문장 속 형태·파생형: {syn.matchedForm})
                               </span>
                               <button
                                 onClick={() => speakText(syn.sentenceEn)}
@@ -7779,47 +8058,81 @@ export default function App() {
                             )}
                             <div className="mt-1 font-semibold">{syn.sentenceKo}</div>
                             <div className="text-[11px] opacity-80 mt-0.5">
-                              🔄 Paraphrase: {syn.paraphrasedEn}
+                              🔄 조건·의미 보존 Paraphrase: {syn.paraphrasedEn}
                             </div>
 
-                            {/* 클릭형 어순 조립 훈련판 */}
+                            {/* 중복 클릭 방지 및 개별 단어 클릭 취소 지원 어순 조립판 */}
                             <div className="mt-2.5 pt-2 border-t border-dashed border-slate-300 dark:border-slate-700">
                               <div className="flex items-center justify-between mb-1.5">
                                 <span className="font-bold text-amber-500">
-                                  🧩 아래 섞인 어절을 순서대로 클릭해 문장을 조립해 보세요:
+                                  🧩 섞인 어절을 클릭해 조립하세요 (이미 선택한 조각이나 아래 조립된 단어를 다시 누르면 개별 취소됩니다):
                                 </span>
                                 <button
                                   onClick={() =>
-                                    setScrambleBuiltMap((prev) => ({
+                                    setScramblePickedIndices((prev) => ({
                                       ...prev,
                                       [syn.id]: [],
                                     }))
                                   }
-                                  className="text-[11px] underline"
+                                  className="text-[11px] underline font-bold"
                                 >
-                                  초기화
+                                  전체 초기화
                                 </button>
                               </div>
                               <div className="flex flex-wrap gap-1.5 mb-2">
-                                {syn.scrambleTokens.map((tok, tIdx) => (
-                                  <button
-                                    key={tIdx}
-                                    onClick={() =>
-                                      setScrambleBuiltMap((prev) => ({
-                                        ...prev,
-                                        [syn.id]: [...(prev[syn.id] || []), tok],
-                                      }))
-                                    }
-                                    className="px-2 py-1 rounded border bg-white dark:bg-slate-900 font-bold hover:border-blue-500"
-                                  >
-                                    {tok}
-                                  </button>
-                                ))}
+                                {syn.scrambleTokens.map((tok, tIdx) => {
+                                  const isUsed = pickedIdxs.includes(tIdx);
+                                  return (
+                                    <button
+                                      key={tIdx}
+                                      onClick={() =>
+                                        setScramblePickedIndices((prev) => {
+                                          const cur = prev[syn.id] || [];
+                                          return {
+                                            ...prev,
+                                            [syn.id]: cur.includes(tIdx)
+                                              ? cur.filter((x) => x !== tIdx)
+                                              : [...cur, tIdx],
+                                          };
+                                        })
+                                      }
+                                      className={`px-2 py-1 rounded border font-bold transition-all ${
+                                        isUsed
+                                          ? 'opacity-40 bg-slate-200 dark:bg-slate-800 line-through border-slate-400'
+                                          : 'bg-white dark:bg-slate-900 hover:border-blue-500'
+                                      }`}
+                                    >
+                                      {tok}
+                                    </button>
+                                  );
+                                })}
                               </div>
-                              <div className="p-2 rounded bg-white dark:bg-slate-900 font-mono min-h-[32px] flex items-center justify-between">
-                                <span>
-                                  {builtStr || '👆 위 단어 조각을 클릭하면 여기에 조립됩니다.'}
-                                </span>
+                              <div className="p-2 rounded bg-white dark:bg-slate-900 min-h-[36px] flex flex-wrap items-center justify-between gap-2">
+                                <div className="flex flex-wrap items-center gap-1">
+                                  {pickedIdxs.length === 0 ? (
+                                    <span className="text-slate-400 font-mono">
+                                      👆 위 단어 조각을 순서대로 클릭해 보세요.
+                                    </span>
+                                  ) : (
+                                    pickedIdxs.map((tokenIndex, orderIdx) => (
+                                      <button
+                                        key={`${tokenIndex}-${orderIdx}`}
+                                        onClick={() =>
+                                          setScramblePickedIndices((prev) => ({
+                                            ...prev,
+                                            [syn.id]: (prev[syn.id] || []).filter(
+                                              (x) => x !== tokenIndex
+                                            ),
+                                          }))
+                                        }
+                                        title="클릭하면 이 단어를 뺍니다"
+                                        className="px-2 py-0.5 rounded bg-blue-600/15 text-blue-600 dark:text-blue-300 font-mono font-bold hover:bg-rose-500/20 hover:text-rose-500"
+                                      >
+                                        {syn.scrambleTokens[tokenIndex]} ✕
+                                      </button>
+                                    ))
+                                  )}
+                                </div>
                                 {isComplete && (
                                   <span className="px-2 py-0.5 rounded bg-emerald-600 text-white font-bold">
                                     ✅ 어순 완벽 일치!
@@ -7928,7 +8241,6 @@ export default function App() {
                                   </div>
                                 </div>
 
-                                {/* 어법 함정 양자택일 */}
                                 <div className="p-3 rounded-lg border border-slate-300 dark:border-slate-700">
                                   <div className="font-extrabold mb-1.5">
                                     ⚡ 핵심 어법 판별: {st.grammarTrapQuestion.prompt}
@@ -7966,7 +8278,6 @@ export default function App() {
                                   )}
                                 </div>
 
-                                {/* 서술형 조건 영작 (givenWords 100% 일치) */}
                                 <div className="p-3 rounded-lg border border-slate-300 dark:border-slate-700">
                                   <div className="flex items-center justify-between">
                                     <span className="font-extrabold text-indigo-500">
@@ -8017,7 +8328,7 @@ export default function App() {
                   </div>
                 )}
 
-                {/* 4교시: 학술 6대 영역 독해 지문 (철학·경제·인지과학·생태학·사회학·미학) */}
+                {/* 4교시: 학술 6대 영역 독해 지문 */}
                 {activeModulePeriod === 4 && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                     {EBS_MAJOR_TOPICS.map((top) => (
@@ -8070,7 +8381,7 @@ export default function App() {
                   </div>
                 )}
 
-                {/* 5교시: 핵심 빈출 어법 10문항 채점 & 내 학교 지문 직접 붙여넣기 분석기 */}
+                {/* 5교시: 핵심 빈출 어법 10문항 채점 & 내 학교 지문 분석기 (빈칸 정답 스포일러 가림 토글 적용) */}
                 {activeModulePeriod === 5 && (
                   <div className="space-y-6 text-xs">
                     <div>
@@ -8153,7 +8464,7 @@ export default function App() {
                       }`}
                     >
                       <h3 className="font-black text-sm mb-1">
-                        🏫 내 학교 교과서·모의고사 지문 직접 붙여넣기 분석기
+                        🏫 내 학교 교과서·모의고사 지문 직접 붙여넣기 분석기 (약어·소수점 보호 적용)
                       </h3>
                       <p className="text-[11px] opacity-80 mb-2">
                         {customPassageAnalysis.statusMessage}
@@ -8167,34 +8478,50 @@ export default function App() {
                       />
                       {!customPassageAnalysis.isEmpty && (
                         <div className="space-y-2.5 mt-3">
-                          {customPassageAnalysis.sentences.map((s) => (
-                            <div
-                              key={s.idx}
-                              className="p-3 rounded-lg border bg-white dark:bg-slate-900 space-y-1"
-                            >
-                              <div className="flex items-center justify-between">
-                                <span className="font-extrabold text-blue-500">
-                                  문장 #{s.idx} 의미단위 청크 분할
-                                </span>
-                                <button
-                                  onClick={() => speakText(s.rawEn)}
-                                  className="px-2 py-0.5 rounded bg-blue-600 text-white font-bold"
-                                >
-                                  🔊 듣기
-                                </button>
+                          {customPassageAnalysis.sentences.map((s) => {
+                            const pBlankKey = `passage-blank-${s.idx}`;
+                            const isPBlankShown = !!revealedBlankKeys[pBlankKey];
+                            return (
+                              <div
+                                key={s.idx}
+                                className="p-3 rounded-lg border bg-white dark:bg-slate-900 space-y-1.5"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="font-extrabold text-blue-500">
+                                    문장 #{s.idx} 의미단위 청크 분할
+                                  </span>
+                                  <button
+                                    onClick={() => speakText(s.rawEn)}
+                                    className="px-2 py-0.5 rounded bg-blue-600 text-white font-bold"
+                                  >
+                                    🔊 듣기
+                                  </button>
+                                </div>
+                                <div className="font-black text-sm">
+                                  {s.soundBlockEn}
+                                </div>
+                                <div className="text-[11px] text-amber-600 dark:text-amber-400 font-mono flex flex-wrap items-center justify-between gap-2">
+                                  <span>빈칸 추론: {s.blankQuizSentence}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleBlankKey(pBlankKey)}
+                                    className={`px-2 py-0.5 rounded font-sans font-bold text-[10px] ${
+                                      isPBlankShown
+                                        ? 'bg-emerald-600 text-white'
+                                        : 'bg-amber-500 text-slate-950'
+                                    }`}
+                                  >
+                                    {isPBlankShown
+                                      ? `정답: ${s.answerWord}`
+                                      : '❓ 정답 확인'}
+                                  </button>
+                                </div>
+                                <div className="text-[11px] text-slate-500">
+                                  어순 배열 시드 셔플: {s.scrambledWords.join(' / ')}
+                                </div>
                               </div>
-                              <div className="font-black text-sm">
-                                {s.soundBlockEn}
-                              </div>
-                              <div className="text-[11px] text-amber-600 dark:text-amber-400 font-mono">
-                                빈칸 추론: {s.blankQuizSentence} (정답:{' '}
-                                <strong>{s.answerWord}</strong>)
-                              </div>
-                              <div className="text-[11px] text-slate-500">
-                                어순 배열 시드 셔플: {s.scrambledWords.join(' / ')}
-                              </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -8205,7 +8532,7 @@ export default function App() {
           )}
 
           {/* ---------------------------------------------------------------- */}
-          {/* [모드 3] 📘 8,000단어장 (Day 1~100 패밀리 확장 학습 원리 안내판 탑재) */}
+          {/* [모드 3] 📘 코어 80단어 & 파생어 족보 (데이터 구조와 일치하는 정직한 안내 + 표제어 단독 스피커) */}
           {/* ---------------------------------------------------------------- */}
           {activeMode === 'wordbook' && (
             <section
@@ -8217,11 +8544,43 @@ export default function App() {
             >
               <div className="p-3.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs">
                 <div className="font-black text-sm text-blue-600 dark:text-blue-400">
-                  💡 8,000단어 마스터 구성 원리 (표제어 + 파생어 패밀리 입체 확장 시스템)
+                  💡 4대 영역 코어 80단어 & 파생어 족보 순환 학습장 (영역별 20개 × 4영역 정밀 검증 DB)
                 </div>
                 <p className="mt-1 leading-relaxed">
-                  본 단어장은 억지로 부사를 덧붙인 합성 단어를 배제하고, <strong>[핵심 뿌리 표제어] + [품사별 파생어(명사·형용사·부사)] + [반의어·유의어] + [실전 연어(Collocation)]</strong>를 하나의 패밀리 족보로 묶어 Day 1~100 동안 반복·순환 체화하도록 설계되었습니다. 각 카드 하단의 <strong>📌 [파생어 & 어법 족보]</strong> 설명을 함께 확인하면 품사와 문장 성분을 절대 헷갈리지 않습니다.
+                  본 단어장은 중등 필수·수능 학술·비즈니스 실무·오픽 구동사 4대 영역의 <strong>핵심 표제어 80선</strong>을 중심으로, 각 카드 하단 <strong>📌 [파생어 & 어법 족보]</strong>를 통해 품사별 파생어·반의어·문장 성분 역할을 함께 익히도록 구성되어 있습니다. Day(Set)를 이동하면 시작 오프셋이 5칸씩 순환하여 매일 새로운 순서로 복습할 수 있습니다.
                 </p>
+              </div>
+
+              {/* 영영정의 워밍업 챌린지 5선 */}
+              <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
+                <div className="font-extrabold text-indigo-500 mb-2">
+                  🔥 필수 다의어·파생어 워밍업 5선 (미국식 IPA & 영영정의)
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+                  {NAVER_OFFICIAL_WORD_CHALLENGE.map((ch) => (
+                    <div
+                      key={ch.id}
+                      className="p-2.5 rounded-lg border bg-slate-50 dark:bg-slate-950 space-y-1"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-black text-blue-600 dark:text-blue-400">
+                          {ch.word}
+                        </span>
+                        <button
+                          onClick={() => speakText(ch.word)}
+                          className="px-1.5 py-0.5 rounded bg-blue-600 text-white text-[10px] font-bold"
+                        >
+                          🔊
+                        </button>
+                      </div>
+                      <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
+                        {ch.ipa} {showPronGuide ? ch.pron : ''}
+                      </div>
+                      <div className="font-bold text-[11px]">{ch.meaning}</div>
+                      <div className="text-[10px] opacity-75">{ch.enDef}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
@@ -8258,10 +8617,10 @@ export default function App() {
                     }
                     className="px-2.5 py-1 rounded border font-bold"
                   >
-                    ◀ 이전 Day
+                    ◀ 이전 순환 Set
                   </button>
                   <span className="font-black text-sm text-blue-500">
-                    Day {selectedWordbookDay} / 100
+                    순환 Set #{selectedWordbookDay}
                   </span>
                   <button
                     onClick={() =>
@@ -8269,7 +8628,7 @@ export default function App() {
                     }
                     className="px-2.5 py-1 rounded border font-bold"
                   >
-                    다음 Day ▶
+                    다음 순환 Set ▶
                   </button>
                 </div>
               </div>
@@ -8284,7 +8643,7 @@ export default function App() {
                         : 'bg-slate-50 border-slate-200'
                     }`}
                   >
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-1">
                       <div className="flex items-center gap-1.5">
                         <span className="px-2 py-0.5 rounded bg-blue-500/15 text-blue-500 font-bold text-[10px]">
                           {entry.level}
@@ -8295,10 +8654,17 @@ export default function App() {
                         <span className="font-mono text-[11px] opacity-75">
                           {entry.ipa}
                         </span>
+                        {/* 표제어 단독 발음 스피커 */}
+                        <button
+                          onClick={() => speakText(entry.word)}
+                          className="px-2 py-0.5 rounded bg-blue-600 text-white font-bold text-[10px]"
+                        >
+                          🔊 단어
+                        </button>
                       </div>
                       <button
                         onClick={() => speakText(entry.exampleEn)}
-                        className="px-2 py-0.5 rounded bg-blue-600 text-white font-bold text-[10px]"
+                        className="px-2 py-0.5 rounded bg-indigo-600 text-white font-bold text-[10px]"
                       >
                         🔊 예문듣기
                       </button>
@@ -8343,11 +8709,10 @@ export default function App() {
           )}
 
           {/* ---------------------------------------------------------------- */}
-          {/* [모드 4] ⭐ 내 보관함 (고유 ID 기반 수정 · 직접 추가 시 삭제 버그 해결) */}
+          {/* [모드 4] ⭐ 내 보관함 */}
           {/* ---------------------------------------------------------------- */}
           {activeMode === 'myVault' && (
             <div className="space-y-6 text-xs">
-              {/* 단어 보관함 */}
               <section
                 className={`p-4 rounded-2xl border space-y-3 ${
                   darkMode
@@ -8356,10 +8721,9 @@ export default function App() {
                 }`}
               >
                 <h2 className="text-base font-black">
-                  ⭐ 내 단어 보관함 ({bookmarkedWords.length}개)
+                  ⭐ 내 단어 보관함 ({bookmarkedWords.length}개 · 브라우저 자동 보존)
                 </h2>
 
-                {/* 새 단어 직접 등록 폼 */}
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-2 p-3 rounded-xl bg-slate-100 dark:bg-slate-950">
                   <input
                     type="text"
@@ -8429,7 +8793,7 @@ export default function App() {
                             onClick={() => speakText(bw.word)}
                             className="px-2 py-0.5 rounded bg-blue-600 text-white font-bold"
                           >
-                            🔊
+                            🔊 단어
                           </button>
                           <button
                             onClick={() =>
@@ -8445,7 +8809,7 @@ export default function App() {
                                 : 'bg-slate-200 dark:bg-slate-800'
                             }`}
                           >
-                            {bw.mastered ? '✅ 암기완료(클릭시 해제)' : '암기체크'}
+                            {bw.mastered ? '✅ 암기완료' : '암기체크'}
                           </button>
                           <button
                             onClick={() => {
@@ -8532,7 +8896,6 @@ export default function App() {
                 </div>
               </section>
 
-              {/* 문장 보관함 */}
               <section
                 className={`p-4 rounded-2xl border space-y-3 ${
                   darkMode
@@ -8541,7 +8904,7 @@ export default function App() {
                 }`}
               >
                 <h2 className="text-base font-black">
-                  📌 내 문장 보관함 ({savedSentences.length}개)
+                  📌 내 문장 보관함 ({savedSentences.length}개 · 브라우저 자동 보존)
                 </h2>
 
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-2 p-3 rounded-xl bg-slate-100 dark:bg-slate-950">
@@ -8618,7 +8981,7 @@ export default function App() {
                                 : 'bg-slate-200 dark:bg-slate-800'
                             }`}
                           >
-                            {ss.mastered ? '✅ 체화완료(클릭시 해제)' : '체화체크'}
+                            {ss.mastered ? '✅ 체화완료' : '체화체크'}
                           </button>
                           <button
                             onClick={() => {
@@ -8708,7 +9071,7 @@ export default function App() {
           )}
 
           {/* ---------------------------------------------------------------- */}
-          {/* [모드 5] 🗓️ 전체 총람 (전 과정 15개 트랙 비교 & 핵심 어법 치트시트 #16) */}
+          {/* [모드 5] 🗓️ 전체 총람 (전 과정 15개 트랙 비교 치트시트) */}
           {/* ---------------------------------------------------------------- */}
           {activeMode === 'curriculum' && (
             <section
@@ -8793,7 +9156,7 @@ export default function App() {
           )}
 
           {/* ---------------------------------------------------------------- */}
-          {/* [모드 6] 🛠️ 제작과정 백서 (App.tsx 파트 1~4 & studyData.ts 전 과정 상세 수록 #12) */}
+          {/* [모드 6] 🛠️ 제작과정 백서 */}
           {/* ---------------------------------------------------------------- */}
           {activeMode === 'devStory' && (
             <section
@@ -8821,10 +9184,10 @@ export default function App() {
                     1. 핵심 교육 철학: 16개 문법 노드(7성분 + 9품사)와 소리블록(Chunking)
                   </h3>
                   <p>
-                    • <strong>단어(품사)와 구·절(문장 성분)의 입체적 분리:</strong> 학습자가 가장 혼동하는 &apos;문장 성분 7개(S·V·IO·DO·SC·OC·M)&apos;와 &apos;9품사(명·대·동·형·부·전·접·한정사·감탄사)&apos;를 총 16개 노드로 시각화하고, 동명사구 주어·전치사구 보어·한정사의 명사구 내부 한정 원리까지 정확히 구현했습니다.
+                    • <strong>단어(품사)와 구·절(문장 성분)의 입체적 연결:</strong> 문장 성분 7개(S·V·IO·DO·SC·OC·M)와 9품사(명·대·동·형·부·전·접·한정사·감탄사)를 총 16개 노드로 시각화하고, 명사 수식어(<code>M-N</code>), 동명사구 주어(<code>S</code>), 전치사구 보어(<code>SC</code>), 한정사의 명사구 내부 한정 원리까지 일관되게 구현했습니다.
                   </p>
                   <p>
-                    • <strong>전 문장 미국식 IPA & 실전 연음 한글 발음 탑재:</strong> 관사와 명사가 쪼개지지 않는 의미 단위 소리블록과 한글 연음 가이드, 그리고 초보자를 위한 <strong>0.30x(초저속) · 0.50x(천천히) · 0.75x · 1.0x · 1.25x 5단계 배속</strong>을 결합했습니다.
+                    • <strong>전 문장 미국식 IPA & 실전 연음 한글 발음 탑재:</strong> 모든 표제어와 구문에 개별 발음 스피커와 <strong>0.30x · 0.50x · 0.75x · 1.0x · 1.25x 5단계 배속</strong>을 결합했습니다.
                   </p>
                 </div>
 
@@ -8833,25 +9196,22 @@ export default function App() {
                     2. <code>src/App.tsx</code> (파트 1 ~ 파트 4) 프론트엔드 모듈 구조
                   </h3>
                   <p>
-                    • <strong>[파트 1/4]:</strong> 단방향 타입 시스템 통합, 16개 문법 노드 사전, <code>DIAGRAM_EXAMPLES</code> 표준 주석 예문 3선, 9대 매체 토픽 90선(<code>dictTargetWord</code>·미국식 IPA·한글발음 1:1 내장).
+                    • <strong>[파트 1/4 ~ 3/4]:</strong> 단방향 타입 시스템, 16노드 사전, 9대 매체 큐레이션 90선, 5대 테마 초·중·고급 커리큘럼, 수능·서술형·내신 3대 코스, 그리고 사전 검증된 토큰 주석 맵(<code>VERIFIED_SENTENCE_TOKEN_MAP</code>)과 문맥 기반 추정 분류기를 결합한 구문 분석 엔진.
                   </p>
                   <p>
-                    • <strong>[파트 2/4 & 3/4]:</strong> 5대 테마 초·중·고급 커리큘럼, 2인 롤플레이 대화문, 단일 의미축 어조 온도계(<code>synonymScales</code>), 수능·서술형·내신 3대 마스터 코스, 그리고 오분류 0건을 보장하는 <strong>정밀 토큰 주석 맵(<code>VERIFIED_SENTENCE_TOKEN_MAP</code>) 기반 구문 해부 엔진</strong>.
-                  </p>
-                  <p>
-                    • <strong>[파트 4/4]:</strong> STEP 1~5 통합 학습 뷰어, 7성분/9품사 사전 즉시 전환 탭, 실시간 채점판 및 클릭형 어순 조립기, 고유 ID 기반 단어·문장 보관함.
+                    • <strong>[파트 4/4]:</strong> SSR 안전한 로컬스토리지 복원기(<code>readStorageJson</code>), 정답 위치가 1~4번으로 무작위 분산되는 1교시 어휘 채점 엔진, 중복 클릭 방지 어순 조립기, 규칙 기반 구문 점검 코치.
                   </p>
                 </div>
 
                 <div className="p-4 rounded-xl border bg-slate-50 dark:bg-slate-950 space-y-2">
                   <h3 className="text-sm font-black text-amber-500">
-                    3. <code>src/studyData.ts</code> 데이터 무결성 및 알고리즘 설계
+                    3. <code>src/studyData.ts</code> 데이터 무결성 및 결정론적 셔플
                   </h3>
                   <p>
-                    • <strong>임의 문장 합성기 폐기 & 100% 검증 데이터 수록:</strong> 기계적 부사 결합이나 조각 합성을 완전히 배제하고, 사전과 실제 기출에서 검증된 80개 핵심 어휘 패밀리(<code>derivativesTip</code> 전용 필드 분리)와 12대 고정 구문 아카이브를 수록했습니다.
+                    • <strong>코어 80단어 & 파생어 패밀리 DB:</strong> 4대 영역 80개 핵심 어휘의 의미 단위 소리블록과 파생어·어법 족보(<code>derivativesTip</code>), 12대 고정 구문 아카이브, 학술 독해 6대 지문 및 빈출 어법 10문항을 수록했습니다.
                   </p>
                   <p>
-                    • <strong>시드 기반 피셔-예이츠(Fisher-Yates) 셔플 & Safari 호환 분석기:</strong> 어순 배열 문제에서 원문 순서가 노출되지 않도록 문장 전체 어절을 결정론적으로 셔플하며, 구형 iPadOS Safari에서도 크래시 없이 작동하는 문장 분리기와 전치사·접속사 경계 기반 의미 청크 분할기를 구현했습니다.
+                    • <strong>시드 기반의 결정론적 피셔-예이츠 방식 셔플 & 약어 보호 분석기:</strong> 어순 배열 문제에서 원문 순서가 노출되지 않도록 문장 전체 어절을 재현 가능하게 섞으며, 약어(<code>Dr.</code>, <code>e.g.</code>)와 소수점(<code>3.14</code>)을 보호하는 문장 분리기를 구현했습니다.
                   </p>
                 </div>
 
@@ -8860,10 +9220,10 @@ export default function App() {
                     4. 아이패드(iPadOS Safari) 애플펜슬 벡터 획 배열(<code>strokesRef</code>) 엔진
                   </h3>
                   <p>
-                    • <strong>필기감 및 시각적 완성도 극대화:</strong> 레티나 디스플레이 <code>devicePixelRatio</code> 1:1 매칭, <code>setPointerCapture</code> 적용, 노트 필기에 최적화된 5단계 굵기(<code>1.5px · 2.5px · 4px · 6px · 9px</code>), 형광펜 5색 자유 선택 및 3단계 투명도(<code>15% · 30% · 50%</code>) 조절을 구현했습니다.
+                    • <strong>실제 필압 반영 및 시각적 완성도:</strong> 만년필 도구에서 포인트의 실제 <code>pressure</code>(필압) 값을 선 두께에 반영하며, 5단계 굵기(<code>1.5~9px</code>), 형광펜 5색 및 3단계 투명도(<code>15/30/50%</code>) 조절을 지원합니다.
                   </p>
                   <p>
-                    • <strong>획 단위 렌더링 아키텍처:</strong> 모든 획을 배열로 관리하여 형광펜 중첩 얼룩을 원천 제거했고, <strong>↩️ 실행취소(Undo)</strong>, 메모장 최소화 시 필기 보존(<code>hidden</code> 클래스), 다크모드 전환 시 검정 글씨의 흰색 자동 반전까지 완벽히 해결했습니다.
+                    • <strong>최대 200획 자동 보존 및 다크모드 반전:</strong> 최근 200획까지 브라우저 스토리지에 안전하게 자동 보존하며, <strong>↩️ 실행취소(Undo)</strong>, 메모장 접기 시 필기 보존(<code>hidden</code> 클래스), 다크모드 전환 시 검정 필기의 흰색 자동 반전을 지원합니다.
                   </p>
                 </div>
               </div>
@@ -8871,7 +9231,7 @@ export default function App() {
           )}
 
           {/* ================================================================ */}
-          {/* 하단 아이패드 애플펜슬 전용 필기장 (1.5~9px · 형광펜 색상/투명도 · Undo · hidden 보존) */}
+          {/* 하단 아이패드 애플펜슬 전용 필기장 */}
           {/* ================================================================ */}
           <section
             className={`${
@@ -8884,17 +9244,15 @@ export default function App() {
                 : 'bg-white/95 border-slate-300'
             }`}
           >
-            {/* 펜슬 컨트롤 툴바 */}
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-1.5 text-xs">
                 <span className="font-black text-blue-500 mr-1">
-                  ✏️ 애플펜슬 노트 ({strokeCount}획)
+                  ✏️ 애플펜슬 노트 ({strokeCount} / 최대 200획 자동보존)
                 </span>
 
-                {/* 펜 종류 5종 */}
                 {(
                   [
-                    { id: 'fountain', label: '✒️ 만년필' },
+                    { id: 'fountain', label: '✒️ 만년필(필압)' },
                     { id: 'ballpoint', label: '🖊️ 볼펜' },
                     { id: 'marker', label: '🖍️ 사인펜' },
                     { id: 'highlighter', label: '🌟 형광펜' },
@@ -8916,7 +9274,6 @@ export default function App() {
                   </button>
                 ))}
 
-                {/* 색상 5종 (형광펜 포함 모든 펜에서 자유 선택 가능 #15) */}
                 <div className="flex items-center gap-1 ml-1">
                   {(
                     [
@@ -8944,7 +9301,6 @@ export default function App() {
                   ))}
                 </div>
 
-                {/* 세밀화된 5단계 굵기 (1.5px · 2.5px · 4px · 6px · 9px #14) */}
                 <div className="flex items-center gap-1 ml-1">
                   {PEN_WIDTH_STEPS.map((w) => (
                     <button
@@ -8963,7 +9319,6 @@ export default function App() {
                   ))}
                 </div>
 
-                {/* 형광펜 전용 투명도(농도) 3단계 스위치 (#15) */}
                 {penType === 'highlighter' && (
                   <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/15 border border-amber-500/30">
                     <span className="text-[10px] font-extrabold text-amber-500">
@@ -8992,7 +9347,6 @@ export default function App() {
                 )}
               </div>
 
-              {/* 우측 실행취소(Undo) · 배경 · 크기 · 락/접기 버튼 */}
               <div className="flex flex-wrap items-center gap-1.5 text-xs">
                 <button
                   onClick={handleUndoStroke}
@@ -9043,7 +9397,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* 캔버스 영역: 조건부 언마운트 대신 hidden 클래스를 사용하여 접었다 펼쳐도 필기 100% 보존 (#10) */}
             <div className={isPadMinimized ? 'hidden' : 'block mt-2.5 space-y-2'}>
               <div className="flex items-center gap-2 text-xs">
                 <span className="font-bold shrink-0">⌨️ 빠른 타이핑 메모:</span>
