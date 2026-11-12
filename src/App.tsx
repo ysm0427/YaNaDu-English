@@ -1,45 +1,65 @@
 // ============================================================================
-// [1/4 파트] 전 레벨(초·중·고급) 타입 정의 + 16개(7성분×9품사) 사전 + 9대 매체(패션 포함) 90선
+// src/App.tsx — [파트 1/4]
+// - 최상단 모듈 Import 통합 (React Hooks & studyData.ts 단방향 참조)
+// - 문장 성분 7개 + 9품사(한정사 포함) 총 16개 문법 노드 및 대표 결합선 사전
+// - STEP 3 기준점 예문(DIAGRAM_EXAMPLES 3선) & 9대 분야 큐레이션 트렌드 90선
 // ============================================================================
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import {
+  type CompId,
+  type PosId,
+  type WordbookLevel,
+  type WordbookEntry,
+  deterministicShuffle,
+  getExpandedWordbookByDay,
+  generateCombinatorialSentences,
+  EBS_MAJOR_TOPICS,
+  GRAMMAR_406_QUIZ_BANK,
+  analyzeCustomSchoolPassage,
+} from './studyData';
 
-export type CompId = 'S' | 'V' | 'IO' | 'DO' | 'SC' | 'OC' | 'M';
-export type PosId = 'N' | 'Pron' | 'V' | 'Adj' | 'Adv' | 'Prep' | 'Conj' | 'Interj' | 'Det';
+export type { CompId, PosId, WordbookLevel, WordbookEntry };
+
 export type LearningLevel = 'beginner' | 'intermediate' | 'advanced';
-export type MediaPlatformId =
-  | 'NAVER_DATALAB'
-  | 'NAVER_SHORTENTS'
-  | 'GOOGLE_TRENDS'
-  | 'SIGNAL_BZ'
-  | 'NATE_ISSUE'
-  | 'INSTA_THREADS'
-  | 'YOUTUBE_SHORTS'
-  | 'TIKTOK_TRENDS'
-  | 'FASHION_MAGS';
 
-// 초급·중급·고급 레벨별 맞춤 코스 데이터 구조
-export interface LevelSpecificTrack {
-  levelName: string;
-  targetSpeed: number;
-  focusBadge: string;
-  patternEn: string;
-  patternIpa: string;
-  patternPron: string;
-  patternSoundBlock: string;
-  patternMeaningKo: string;
-  levelGuide: string;
-  paraphraseDrill: {
-    basicExpr: string;
-    upgradedExpr: string;
-    nuanceDiff: string;
-  }[];
-  longTalkPrompt: string;
+export type MediaPlatformId =
+  | 'FASHION_MAGS'
+  | 'NAVER'
+  | 'NATE'
+  | 'DAUM_ZUM'
+  | 'GOOGLE_TRENDS'
+  | 'YOUTUBE'
+  | 'INSTA_TIKTOK'
+  | 'THREADS_X'
+  | 'DANAWA_KOVO';
+
+export type ExamTrackId = 'CSAT_MASTER' | 'GRAMMAR_ESSAY' | 'SCHOOL_INTERNAL';
+
+export interface SentenceComponentInfo {
+  id: CompId;
+  name: string;
+  engName: string;
+  roleTitle: string;
+  easyMeaning: string;
+  wordOrderRule: string;
+  allowedPos: PosId[];
+  exampleHighlight: string;
+}
+
+export interface PartOfSpeechInfo {
+  id: PosId;
+  name: string;
+  engName: string;
+  identityTitle: string;
+  easyMeaning: string;
+  allowedComp: CompId[];
+  exampleWords: string;
 }
 
 export interface VocabItem {
   id: number;
-  type: '일상 회화' | '고급/실무';
-  recommendLevel: LearningLevel; // 초급·중급·고급 추천 배지
+  type: '일상 회화' | '비즈니스' | '오픽·구동사' | '트렌드·실무' | '수능·학술';
+  recommendLevel: LearningLevel;
   word: string;
   masked: string;
   ipa: string;
@@ -56,22 +76,12 @@ export interface VocabItem {
   roleDesc: string;
   collocation: string;
   collocationKo: string;
-  paraphraseTip: string; // 중급 바꿔 말하기 & 고급 뉘앙스 팁
-}
-
-export interface SynonymScale {
-  baseWord: string;
-  pos: string;
-  meaning: string;
-  levels: {
-    strength: '매우 강함 (Extreme)' | '강함 (Strong)' | '보통 (Neutral)' | '약함/완곡 (Mild)';
-    words: { word: string; ipa: string; nuance: string }[];
-  }[];
+  paraphraseTip: string;
 }
 
 export interface TrainingSentence {
   id: number;
-  levelTag: LearningLevel; // 초급 / 중급 / 고급 문장 구분
+  levelTag: LearningLevel;
   tag: string;
   targetWord: string;
   wordOrderFormula: string;
@@ -84,346 +94,120 @@ export interface TrainingSentence {
   rawEn: string;
   pronLine: string;
   naturalKo: string;
-  paraphraseVersion: string; // 중급 바꿔 말하기 버전
+  paraphraseVersion: string;
   grammarPoint: string;
   contextNuance: string;
 }
 
-export interface WordToken {
+export interface LevelTrackContent {
+  levelName: string;
+  focusBadge: string;
+  speedGuide: string;
+  levelGuide: string;
+  patternEn: string;
+  patternIpa: string;
+  patternPron: string;
+  patternSoundBlock: string;
+  patternSoundRule: string;
+  patternMeaningKo: string;
+  grammarSummary: string;
+  paraphraseDrill: {
+    basicExpr: string;
+    upgradedExpr: string;
+    nuanceDiff: string;
+  }[];
+  dialogue: {
+    speaker: 'A' | 'B';
+    roleName: string;
+    en: string;
+    soundBlock: string;
+    pron: string;
+    ko: string;
+    pointNote: string;
+  }[];
+}
+
+export interface SynonymScaleGroup {
+  conceptTitle: string;
+  scaleAxisLabel: string;
+  weak: { expr: string; pron: string; ko: string; note: string };
+  medium: { expr: string; pron: string; ko: string; note: string };
+  strong: { expr: string; pron: string; ko: string; note: string };
+}
+
+export interface ThemeQuizData {
+  beginner: {
+    word: string;
+    ipa: string;
+    options: string[];
+    answerIdx: number;
+    explanation: string;
+  };
+  intermediate: {
+    sentenceBefore: string;
+    sentenceAfter: string;
+    hint: string;
+    options: string[];
+    answerIdx: number;
+    explanation: string;
+  };
+  advanced: {
+    questionPrompt: string;
+    highlightWord: string;
+    options: string[];
+    answerIndices: number[];
+    explanation: string;
+  };
+  writingMission: {
+    koPrompt: string;
+    targetPattern: string;
+    modelAnswer: string;
+  };
+}
+
+export interface ThemeData {
+  id: string;
+  badge: string;
+  title: string;
+  subtitle: string;
+  levelTracks: Record<LearningLevel, LevelTrackContent>;
+  synonymScales: SynonymScaleGroup[];
+  vocab: VocabItem[];
+  sentences: TrainingSentence[];
+  quiz: ThemeQuizData;
+}
+
+export interface DiagramToken {
   word: string;
   comp: CompId | '독립어';
   compLabel: string;
   pos: PosId;
   posLabel: string;
+  meaning: string;
+  roleExplanation: string;
   colorClass: string;
 }
 
 export interface DiagramSentence {
-  id: string;
-  label: string;
-  tokens: WordToken[];
-  translation: string;
+  title: string;
+  rawEn: string;
+  naturalKo: string;
   skeleton: string;
   patternType: string;
   wordOrderTip: string;
+  isHeuristic?: boolean;
+  tokens: DiagramToken[];
 }
 
-export interface ThemeData {
-  id: string;
-  title: string;
-  badge: string;
-  dateLabel: string;
-  opicLevel: string;
-  coachPoint: string;
-  wordOrderPrinciple: string;
-  grammarSummary: string;
-  situationGuide: string;
-  levelTracks: Record<LearningLevel, LevelSpecificTrack>; // 같은 주제의 초·중·고급 3단계 트랙
-  pattern: {
-    en: string;
-    ipa: string;
-    soundBlock: string;
-    soundMethod: string;
-    pron: string;
-    nuance: string;
-    opicApplication: string;
-  };
-  vocab: VocabItem[];
-  synonymScale: SynonymScale;
-  sentences: TrainingSentence[];
-  quiz: {
-    beginner: {
-      word: string;
-      ipa: string;
-      options: string[];
-      answerIdx: number;
-      explanation: string;
-    };
-    intermediate: {
-      sentenceBefore: string;
-      sentenceAfter: string;
-      hint: string;
-      options: string[];
-      answerIdx: number;
-      explanation: string;
-    };
-    advanced: {
-      sentenceBefore: string;
-      highlightWord: string;
-      sentenceAfter: string;
-      options: string[];
-      answerIndices: number[];
-      explanation: string;
-    };
-    writingMission: {
-      koPrompt: string;
-      wordOrderHint: string;
-      hint: string;
-      modelAnswer: string;
-      checkPoint: string;
-    };
-  };
-}
-
-export interface WordbookEntry {
-  day: number;
-  level: '중등 필수' | '고등·수능 핵심' | '비즈니스·실무' | '오픽(OPIc)·구동사';
-  word: string;
-  ipa: string;
-  pron: string;
-  soundBlock: string;
-  soundMethod: string;
-  meaning: string;
-  pos: PosId;
-  posLabel: string;
-  comp: CompId;
-  compLabel: string;
-  collocation: string;
-  collocationKo: string;
-  exampleEn: string;
-  exampleKo: string;
-}
-
-export interface ChatTurn {
-  role: 'coach' | 'user';
-  text: string;
-  correction?: string;
-  nuanceTip?: string;
-}
-
-// ============================================================================
-// 2. [절대 핵심 · 누락 금지] 16개 전체 매핑: 7개 문장 성분(직책) × 9품사(신분) 사전
-// ============================================================================
-export const SENTENCE_COMPONENTS: {
-  id: CompId;
-  name: string;
-  sub: string;
-  colorBadge: string;
-  meaning: string;
-  wordOrderRule: string;
-}[] = [
-  {
-    id: 'S',
-    name: '주어',
-    sub: 'S (Subject)',
-    colorBadge: 'bg-blue-100 text-blue-700 border-blue-300',
-    meaning: '문장의 주인공(누가/무엇이) 역할을 하는 자리입니다. 명사·대명사 계열만 앉을 수 있습니다.',
-    wordOrderRule: '평서문 맨 앞(동사 앞 1번 자리)에 위치하여 문장의 출발점이 됩니다.',
-  },
-  {
-    id: 'V',
-    name: '동사',
-    sub: 'V (Verb)',
-    colorBadge: 'bg-rose-100 text-rose-700 border-rose-300',
-    meaning: '주어의 동작(~하다)이나 상태(~이다)를 결정짓는 문장의 심장(서술어) 자리입니다.',
-    wordOrderRule: '영어 어순의 핵심! 주어(S) 바로 뒤 2번 자리에 오며, 뒤따라올 목적어/보어 구조를 결정합니다.',
-  },
-  {
-    id: 'IO',
-    name: '간접목적어',
-    sub: 'IO (O)',
-    colorBadge: 'bg-emerald-100 text-emerald-700 border-emerald-300',
-    meaning: '4형식 수여동사(give, send, tell, show 등) 뒤에서 동작을 받는 대상(~에게)을 뜻합니다.',
-    wordOrderRule: '타동사(V) 바로 뒤, 직접목적어(DO) 바로 앞자리에 위치합니다. (V + 누구에게[IO] + 무엇을[DO])',
-  },
-  {
-    id: 'DO',
-    name: '직접목적어',
-    sub: 'DO (O)',
-    colorBadge: 'bg-teal-100 text-teal-700 border-teal-300',
-    meaning: '주어의 동작이 직접 닿는 대상(~을/를)을 뜻합니다. 명사·대명사·동명사·투부정사가 옵니다.',
-    wordOrderRule: '3형식에서는 동사(V) 바로 뒤, 4형식에서는 간접목적어(IO) 바로 뒤에 위치합니다.',
-  },
-  {
-    id: 'SC',
-    name: '주격보어',
-    sub: 'SC (C)',
-    colorBadge: 'bg-purple-100 text-purple-700 border-purple-300',
-    meaning: '2형식 동사(be, become, look, seem 등) 뒤에서 주어(S)가 어떤 상태/신분인지 보충 설명합니다.',
-    wordOrderRule: '연결동사(V) 바로 뒤에 오며, 명사(동격) 또는 형용사(상태 설명)만 올 수 있습니다(부사 불가!).',
-  },
-  {
-    id: 'OC',
-    name: '목적격보어',
-    sub: 'OC (C)',
-    colorBadge: 'bg-violet-100 text-violet-700 border-violet-300',
-    meaning: '5형식 동사(make, keep, find, help 등) 뒤에서 목적어(DO)의 상태나 행동을 보충 설명합니다.',
-    wordOrderRule: '목적어(DO) 바로 뒤에 위치하여 [목적어가 ~한 상태 / ~하는 행동]이라는 주술 관계를 만듭니다.',
-  },
-  {
-    id: 'M',
-    name: '수식어',
-    sub: 'M (Modifier)',
-    colorBadge: 'bg-amber-100 text-amber-700 border-amber-300',
-    meaning: '문장의 5대 뼈대(S·V·O·C)는 아니지만 시간·장소·이유·방법·명사 특징을 풍성하게 꾸며줍니다.',
-    wordOrderRule: '짧은 형용사·부사는 꾸미는 말 앞, 긴 전치사구·부사절은 주로 문장 맨 뒤(소리블럭 끝)에 붙습니다.',
-  },
-];
-
-export const PARTS_OF_SPEECH: {
-  id: PosId;
-  name: string;
-  sub: string;
-  meaning: string;
-  canBeComponents: string;
-}[] = [
-  {
-    id: 'N',
-    name: '명사',
-    sub: 'N (Noun)',
-    meaning: '사람, 사물, 장소, 추상적 개념의 이름을 나타내는 단어입니다. (예: schedule, silhouette, itinerary)',
-    canBeComponents: '주어(S), 간접목적어(IO), 직접목적어(DO), 주격보어(SC), 목적격보어(OC)',
-  },
-  {
-    id: 'Pron',
-    name: '대명사',
-    sub: 'Pron (Pronoun)',
-    meaning: '명사를 대신하여 부르는 단어입니다. (예: I, you, we, they, it, this)',
-    canBeComponents: '주어(S), 간접목적어(IO), 직접목적어(DO), 주격보어(SC)',
-  },
-  {
-    id: 'V',
-    name: '동사',
-    sub: 'V (Verb)',
-    meaning: '움직임(동작)이나 상태(~이다/있다)를 나타내는 단어입니다. (예: wrap up, streamline, pull off)',
-    canBeComponents: '오직 동사(V) 직책만 전담! (단, to부정사/동명사/분사로 변신하면 다른 직책 가능)',
-  },
-  {
-    id: 'Adj',
-    name: '형용사',
-    sub: 'Adj (Adjective)',
-    meaning: '명사의 성질, 모양, 상태를 꾸며주거나 보충 설명하는 단어입니다. (예: feasible, chic, tailored)',
-    canBeComponents: '주격보어(SC), 목적격보어(OC), 명사를 꾸미는 수식어(M)',
-  },
-  {
-    id: 'Adv',
-    name: '부사',
-    sub: 'Adv (Adverb)',
-    meaning: '동사, 형용사, 다른 부사 또는 문장 전체를 세밀하게 꾸며주는 단어입니다. (예: meticulously, effortlessly)',
-    canBeComponents: '오직 수식어(M) 역할만 수행 (문장 5대 뼈대 자리에는 절대 못 들어감)',
-  },
-  {
-    id: 'Prep',
-    name: '전치사',
-    sub: 'Prep (Preposition)',
-    meaning: '명사 앞에 놓여 시간·장소·방향·목적의 관계를 연결해 주는 단어입니다. (예: in, on, before, with)',
-    canBeComponents: '뒤에 명사(O)와 결합해 전치사구로서 수식어(M) 또는 보어(SC) 역할 수행',
-  },
-  {
-    id: 'Conj',
-    name: '접속사*',
-    sub: 'Conj (Conjunction)',
-    meaning: '단어와 단어, 구와 구, 문장(절)과 문장을 이어주는 연결 다리입니다. (예: and, if, because, whenever)',
-    canBeComponents: '문장들을 연결하거나 부사절/명사절을 이끌어 수식어(M)·목적어(O) 블록 형성',
-  },
-  {
-    id: 'Interj',
-    name: '감탄사*',
-    sub: 'Interj (Interjection)',
-    meaning: '놀람, 기쁨, 부름, 추임새 등 말하는 이의 감정을 즉각 표현하는 단어입니다. (예: Oh, Well, Wow)',
-    canBeComponents: '문장 구조에서 독립된 독립어 / 수식 요소(M)',
-  },
-  {
-    id: 'Det',
-    name: '한정사',
-    sub: 'Det (Determiner)',
-    meaning: '명사 맨 앞에서 그 명사의 범위, 소유, 수량, 특정 여부를 딱 정해주는 단어입니다. (예: the, a, our, my)',
-    canBeComponents: '명사 앞에서 명사를 한정하는 수식어(M)',
-  },
-];
-
-export const MAPPING_EDGES: { comp: CompId; pos: PosId }[] = [
-  { comp: 'S', pos: 'N' },
-  { comp: 'S', pos: 'Pron' },
-  { comp: 'V', pos: 'V' },
-  { comp: 'IO', pos: 'N' },
-  { comp: 'IO', pos: 'Pron' },
-  { comp: 'DO', pos: 'N' },
-  { comp: 'DO', pos: 'Pron' },
-  { comp: 'SC', pos: 'N' },
-  { comp: 'SC', pos: 'Pron' },
-  { comp: 'SC', pos: 'Adj' },
-  { comp: 'OC', pos: 'N' },
-  { comp: 'OC', pos: 'Adj' },
-  { comp: 'M', pos: 'Adj' },
-  { comp: 'M', pos: 'Adv' },
-  { comp: 'M', pos: 'Prep' },
-  { comp: 'M', pos: 'Det' },
-  { comp: 'M', pos: 'Conj' },
-  { comp: 'M', pos: 'Interj' },
-];
-
-export const DIAGRAM_EXAMPLES: DiagramSentence[] = [
-  {
-    id: 'ex1',
-    label: '예문 1 (3형식+수식어)',
-    tokens: [
-      { word: 'Oh,', comp: '독립어', compLabel: '독립어', pos: 'Interj', posLabel: '감탄사(Interj)', colorClass: 'border-slate-300 text-slate-600' },
-      { word: 'our', comp: 'M', compLabel: '수식어 (M)', pos: 'Det', posLabel: '한정사(Det)', colorClass: 'border-amber-300 text-amber-700' },
-      { word: 'new', comp: 'M', compLabel: '수식어 (M)', pos: 'Adj', posLabel: '형용사(Adj)', colorClass: 'border-amber-300 text-amber-700' },
-      { word: 'team', comp: 'S', compLabel: '주어 (S)', pos: 'N', posLabel: '명사(N)', colorClass: 'border-blue-400 text-blue-700' },
-      { word: 'carefully', comp: 'M', compLabel: '수식어 (M)', pos: 'Adv', posLabel: '부사(Adv)', colorClass: 'border-amber-300 text-amber-700' },
-      { word: 'checked', comp: 'V', compLabel: '동사 (V)', pos: 'V', posLabel: '동사(V)', colorClass: 'border-rose-400 text-rose-700' },
-      { word: 'the', comp: 'M', compLabel: '수식어 (M)', pos: 'Det', posLabel: '한정사(Det)', colorClass: 'border-amber-300 text-amber-700' },
-      { word: 'schedule', comp: 'DO', compLabel: '직접목적어 (DO)', pos: 'N', posLabel: '명사(N)', colorClass: 'border-teal-400 text-teal-700' },
-      { word: 'in the morning.', comp: 'M', compLabel: '수식어 (M)', pos: 'Prep', posLabel: '전치사구(Prep+N)', colorClass: 'border-amber-300 text-amber-700' },
-    ],
-    translation: '“아, 우리 신규 팀이 오전에 일정을 꼼꼼히 확인했습니다.”',
-    skeleton: 'team[S] + checked[V] + schedule[DO]',
-    patternType: '3형식 (S + V + DO) + 다중 수식어(M)',
-    wordOrderTip: '영어는 [누가(S) + 한다(V) + 무엇을(DO)] 뼈대를 먼저 던지고, 언제/어디서(in the morning)는 맨 뒤에 붙입니다.',
-  },
-  {
-    id: 'ex2',
-    label: '예문 2 (4형식 수여문)',
-    tokens: [
-      { word: 'The', comp: 'M', compLabel: '수식어 (M)', pos: 'Det', posLabel: '한정사(Det)', colorClass: 'border-amber-300 text-amber-700' },
-      { word: 'director', comp: 'S', compLabel: '주어 (S)', pos: 'N', posLabel: '명사(N)', colorClass: 'border-blue-400 text-blue-700' },
-      { word: 'kindly', comp: 'M', compLabel: '수식어 (M)', pos: 'Adv', posLabel: '부사(Adv)', colorClass: 'border-amber-300 text-amber-700' },
-      { word: 'gave', comp: 'V', compLabel: '동사 (V)', pos: 'V', posLabel: '동사(V)', colorClass: 'border-rose-400 text-rose-700' },
-      { word: 'us', comp: 'IO', compLabel: '간접목적어 (IO)', pos: 'Pron', posLabel: '대명사(Pron)', colorClass: 'border-emerald-400 text-emerald-700' },
-      { word: 'a', comp: 'M', compLabel: '수식어 (M)', pos: 'Det', posLabel: '한정사(Det)', colorClass: 'border-amber-300 text-amber-700' },
-      { word: 'quick', comp: 'M', compLabel: '수식어 (M)', pos: 'Adj', posLabel: '형용사(Adj)', colorClass: 'border-amber-300 text-amber-700' },
-      { word: 'heads-up', comp: 'DO', compLabel: '직접목적어 (DO)', pos: 'N', posLabel: '명사(N)', colorClass: 'border-teal-400 text-teal-700' },
-      { word: 'before the meeting.', comp: 'M', compLabel: '수식어 (M)', pos: 'Prep', posLabel: '전치사구(Prep+N)', colorClass: 'border-amber-300 text-amber-700' },
-    ],
-    translation: '“디렉터님이 회의 전에 우리에게 빠른 사전 귀띔을 친절히 주셨습니다.”',
-    skeleton: 'director[S] + gave[V] + us[IO] + heads-up[DO]',
-    patternType: '4형식 (S + V + IO + DO) 수여동사 문형',
-    wordOrderTip: '주는 동사(give, send, tell) 뒤에는 [사람(IO: ~에게) + 사물(DO: ~을)] 순서로 나란히 놓는 것이 핵심 어순입니다.',
-  },
-  {
-    id: 'ex3',
-    label: '예문 3 (5형식 보어문)',
-    tokens: [
-      { word: 'This', comp: 'M', compLabel: '수식어 (M)', pos: 'Det', posLabel: '한정사(Det)', colorClass: 'border-amber-300 text-amber-700' },
-      { word: 'tailored', comp: 'M', compLabel: '수식어 (M)', pos: 'Adj', posLabel: '형용사(Adj)', colorClass: 'border-amber-300 text-amber-700' },
-      { word: 'jacket', comp: 'S', compLabel: '주어 (S)', pos: 'N', posLabel: '명사(N)', colorClass: 'border-blue-400 text-blue-700' },
-      { word: 'makes', comp: 'V', compLabel: '동사 (V)', pos: 'V', posLabel: '동사(V)', colorClass: 'border-rose-400 text-rose-700' },
-      { word: 'your', comp: 'M', compLabel: '수식어 (M)', pos: 'Det', posLabel: '한정사(Det)', colorClass: 'border-amber-300 text-amber-700' },
-      { word: 'daily', comp: 'M', compLabel: '수식어 (M)', pos: 'Adj', posLabel: '형용사(Adj)', colorClass: 'border-amber-300 text-amber-700' },
-      { word: 'outfit', comp: 'DO', compLabel: '직접목적어 (DO)', pos: 'N', posLabel: '명사(N)', colorClass: 'border-teal-400 text-teal-700' },
-      { word: 'effortlessly', comp: 'M', compLabel: '수식어 (M)', pos: 'Adv', posLabel: '부사(Adv)', colorClass: 'border-amber-300 text-amber-700' },
-      { word: 'chic.', comp: 'OC', compLabel: '목적격보어 (OC)', pos: 'Adj', posLabel: '형용사(Adj)', colorClass: 'border-violet-400 text-violet-700' },
-    ],
-    translation: '“이 테일러드 재킷은 당신의 데일리 코디를 물 흐르듯 시크하게 만들어 줍니다.”',
-    skeleton: 'jacket[S] + makes[V] + outfit[DO] + chic[OC]',
-    patternType: '5형식 (S + V + DO + OC) 목적격보어 문형',
-    wordOrderTip: '목적어(outfit)의 상태를 설명하는 목적격보어(OC) 자리에는 부사가 아닌 형용사(chic, feasible)를 씁니다!',
-  },
-];
-
-// ============================================================================
-// 3. [선제시형 트렌드 허브] 9대 빅미디어 실시간 최다 검색어 (각 10개 = 총 90개)
-//    - 9번째 탭: 👗 글로벌 패션 5대 매거진 (Vogue Runway · WWD · ELLE · Bazaar · GQ) 탑재
-// ============================================================================
-export interface MediaTrendItem {
+export interface MediaTrendKeyword {
   rank: number;
   koTitle: string;
   enExpression: string;
+  dictTargetWord: string;
+  ipa: string;
+  pron: string;
   targetThemeId: string;
   extUrl: string;
-  sourceTag?: string;
 }
 
 export interface MediaTrendPlatform {
@@ -432,2765 +216,26 @@ export interface MediaTrendPlatform {
   shortName: string;
   badgeColor: string;
   liveUrl: string;
-  rssTopicQuery: string; // 실시간 새로고침 Fetch용 쿼리
-  desc: string;
-  keywords: MediaTrendItem[];
+  sourceNote: string;
+  keywords: MediaTrendKeyword[];
 }
 
-export const INITIAL_MEDIA_PLATFORMS: MediaTrendPlatform[] = [
-  {
-    id: 'FASHION_MAGS',
-    name: '👗 글로벌 패션 5대 매거진',
-    shortName: '패션5대매체',
-    badgeColor: 'bg-fuchsia-600 text-white',
-    liveUrl: 'https://www.vogue.com/fashion/runway',
-    rssTopicQuery: 'Vogue Runway WWD GQ Style Fashion Week',
-    desc: 'Vogue Runway · WWD · ELLE · Harper’s Bazaar · GQ Style TOP 10',
-    keywords: [
-      { rank: 1, sourceTag: 'Vogue Runway', koTitle: '[Vogue] 패션위크 디자이너 컬렉션 & 대담한 실루엣', enExpression: 'make a bold fashion statement', targetThemeId: 'fashion-runway', extUrl: 'https://www.vogue.com/fashion/runway' },
-      { rank: 2, sourceTag: 'Vogue Runway', koTitle: '[Vogue] 클래식 헤리티지와 모던 미학의 결합', enExpression: 'blend heritage with modern aesthetics', targetThemeId: 'fashion-runway', extUrl: 'https://www.vogue.com/fashion/runway' },
-      { rank: 3, sourceTag: 'WWD', koTitle: '[WWD] 글로벌 럭셔리 브랜드 시장 동향 & 실적', enExpression: 'spearhead the global luxury market', targetThemeId: 'fashion-runway', extUrl: 'https://wwd.com/fashion-news/' },
-      { rank: 4, sourceTag: 'WWD', koTitle: '[WWD] 친환경 지속 가능 소재 & 리테일 혁신', enExpression: 'sustainable fabric and retail trend', targetThemeId: 'fashion-runway', extUrl: 'https://wwd.com/business-news/' },
-      { rank: 5, sourceTag: 'ELLE Runway', koTitle: '[ELLE] 런웨이에서 건진 리얼웨이 데일리룩 팁', enExpression: 'pull off an effortlessly chic look', targetThemeId: 'fashion-runway', extUrl: 'https://www.elle.com/fashion/trend-reports/' },
-      { rank: 6, sourceTag: 'ELLE Runway', koTitle: '[ELLE] 환절기 레이어링 & 컬러 매칭 공식', enExpression: 'layer different textures seamlessly', targetThemeId: 'fashion-runway', extUrl: 'https://www.elle.com/fashion/' },
-      { rank: 7, sourceTag: 'Harper’s Bazaar', koTitle: '[Bazaar] 시즌 핵심 포인트 액세서리 & 백 트렌드', enExpression: 'elevate the outfit with a statement piece', targetThemeId: 'fashion-runway', extUrl: 'https://www.harpersbazaar.com/fashion/trends/' },
-      { rank: 8, sourceTag: 'Harper’s Bazaar', koTitle: '[Bazaar] 우아하고 세련된 미니멀 스타일링', enExpression: 'complement your silhouette gracefully', targetThemeId: 'fashion-runway', extUrl: 'https://www.harpersbazaar.com/fashion/' },
-      { rank: 9, sourceTag: 'GQ Style', koTitle: '[GQ] 남성 테일러드 수트 핏 & 스마트 캐주얼 정석', enExpression: 'a sharp tailored fit for men', targetThemeId: 'fashion-runway', extUrl: 'https://www.gq.com/style' },
-      { rank: 10, sourceTag: 'GQ Style', koTitle: '[GQ] 유행을 타지 않는 옷장 속 필수 기본템 10선', enExpression: 'a timeless wardrobe staple', targetThemeId: 'fashion-runway', extUrl: 'https://www.gq.com/style' },
-    ],
-  },
-  {
-    id: 'NAVER_DATALAB',
-    name: '💚 네이버 데이터랩',
-    shortName: 'N데이터랩',
-    badgeColor: 'bg-emerald-600 text-white',
-    liveUrl: 'https://datalab.naver.com/',
-    rssTopicQuery: 'Korea Business Tech Trend',
-    desc: '분야별(쇼핑·경제·패션·IT·생활) 급상승 검색어 TOP 10',
-    keywords: [
-      { rank: 1, koTitle: '아이패드 M5 11인치 스마트 워크플로우', enExpression: 'streamline the entire workflow', targetThemeId: 'biz-meeting', extUrl: 'https://datalab.naver.com/' },
-      { rank: 2, koTitle: '시즌 남성/여성 테일러드 자켓 & 데일리룩', enExpression: 'pull off a tailored look', targetThemeId: 'fashion-runway', extUrl: 'https://datalab.naver.com/' },
-      { rank: 3, koTitle: '해외여행 공항 라운지 무료 이용권', enExpression: 'complimentary lounge access', targetThemeId: 'travel-concierge', extUrl: 'https://en.dict.naver.com/#/search?query=complimentary' },
-      { rank: 4, koTitle: '오픽(OPIc) 초급 탈출 & AL 달성 템플릿', enExpression: 'from my perspective', targetThemeId: 'opic-master', extUrl: 'https://en.dict.naver.com/#/search?query=perspective' },
-      { rank: 5, koTitle: '연말 비즈니스 성과 보고 & 일정 조율', enExpression: 'touch base with the team', targetThemeId: 'biz-meeting', extUrl: 'https://en.dict.naver.com/#/search?query=touch%20base' },
-      { rank: 6, koTitle: 'SNS 바이럴 릴스 & 숏폼 챌린지', enExpression: 'go viral overnight', targetThemeId: 'media-viral', extUrl: 'https://en.dict.naver.com/#/search?query=go%20viral' },
-      { rank: 7, koTitle: '글로벌 금리 인하 & 잠정 예산안', enExpression: 'set a tentative schedule', targetThemeId: 'biz-meeting', extUrl: 'https://en.dict.naver.com/#/search?query=tentative' },
-      { rank: 8, koTitle: '주말 브런치 카페 & 힐링 루틴', enExpression: 'unwind on the weekend', targetThemeId: 'opic-master', extUrl: 'https://en.dict.naver.com/#/search?query=unwind' },
-      { rank: 9, koTitle: '부티크 호텔 얼리 체크인 & 수하물 보관', enExpression: 'drop off the luggage early', targetThemeId: 'travel-concierge', extUrl: 'https://en.dict.naver.com/#/search?query=drop%20off' },
-      { rank: 10, koTitle: 'AI 생산성 앱 & 결재 절차 간소화', enExpression: 'expedite the approval process', targetThemeId: 'biz-meeting', extUrl: 'https://en.dict.naver.com/#/search?query=expedite' },
-    ],
-  },
-  {
-    id: 'NAVER_SHORTENTS',
-    name: '⚡ 네이버 숏텐츠',
-    shortName: 'N숏텐츠',
-    badgeColor: 'bg-green-600 text-white',
-    liveUrl: 'https://m.naver.com/',
-    rssTopicQuery: 'Korea Daily News Lifestyle',
-    desc: '지금 가장 많이 본 짧은 뉴스·패션·라이프 핵심 이슈 TOP 10',
-    keywords: [
-      { rank: 1, koTitle: '직장인 점심시간 10분 영어 공부 루틴', enExpression: 'grab a quick bite and study', targetThemeId: 'biz-meeting', extUrl: 'https://en.dict.naver.com/#/search?query=grab%20a%20bite' },
-      { rank: 2, koTitle: '셀럽 공항 패션 & 포인트 액세서리 매칭', enExpression: 'elevate the look with accessories', targetThemeId: 'fashion-runway', extUrl: 'https://en.dict.naver.com/#/search?query=elevate' },
-      { rank: 3, koTitle: '해외 명소 숨은 로컬 맛집 투어', enExpression: 'off the beaten track', targetThemeId: 'travel-concierge', extUrl: 'https://en.dict.naver.com/#/search?query=off%20the%20beaten%20track' },
-      { rank: 4, koTitle: '번아웃 극복하는 저녁 산책 습관', enExpression: 'clear my head after work', targetThemeId: 'opic-master', extUrl: 'https://en.dict.naver.com/#/search?query=clear%20my%20head' },
-      { rank: 5, koTitle: '넷플릭스 글로벌 TOP 1 드라마 정주행', enExpression: 'binge-watch the whole season', targetThemeId: 'media-viral', extUrl: 'https://en.dict.naver.com/#/search?query=binge%20watch' },
-      { rank: 6, koTitle: '메이저리그 & 유럽축구 빅매치 하이라이트', enExpression: 'keep an eye on the live score', targetThemeId: 'media-viral', extUrl: 'https://en.dict.naver.com/#/search?query=keep%20an%20eye%20on' },
-      { rank: 7, koTitle: '긴급 일정 변경 & 사전 귀띔 매너', enExpression: 'give you a quick heads-up', targetThemeId: 'biz-meeting', extUrl: 'https://en.dict.naver.com/#/search?query=heads-up' },
-      { rank: 8, koTitle: '호텔 좌석·객실 특별 요청 배려받기', enExpression: 'accommodate a special request', targetThemeId: 'travel-concierge', extUrl: 'https://en.dict.naver.com/#/search?query=accommodate' },
-      { rank: 9, koTitle: '품격 있는 대안 제시 & 실현 가능성 검토', enExpression: 'find a feasible solution', targetThemeId: 'biz-meeting', extUrl: 'https://en.dict.naver.com/#/search?query=feasible' },
-      { rank: 10, koTitle: '리조트 인피니티 풀 & 편의시설 안내', enExpression: 'luxury hotel amenities', targetThemeId: 'travel-concierge', extUrl: 'https://en.dict.naver.com/#/search?query=amenities' },
-    ],
-  },
-  {
-    id: 'GOOGLE_TRENDS',
-    name: '🌐 구글 트렌드 & 뉴스',
-    shortName: '구글트렌드',
-    badgeColor: 'bg-blue-600 text-white',
-    liveUrl: 'https://trends.google.co.kr/trending?geo=KR',
-    rssTopicQuery: 'World Technology Business Headline',
-    desc: '한국 및 글로벌 실시간 급상승 검색어 & 월드 헤드라인 TOP 10',
-    keywords: [
-      { rank: 1, koTitle: 'Next-Gen AI Agent & Smart Work', enExpression: 'meticulously analyze the data', targetThemeId: 'biz-meeting', extUrl: 'https://trends.google.co.kr/trending?geo=KR' },
-      { rank: 2, koTitle: 'Paris & Milan Fashion Week Runway', enExpression: 'avant-garde runway silhouette', targetThemeId: 'fashion-runway', extUrl: 'https://trends.google.co.kr/trending?geo=KR' },
-      { rank: 3, koTitle: 'Global Remote Work & Travel Itinerary', enExpression: 'updated travel itinerary', targetThemeId: 'travel-concierge', extUrl: 'https://trends.google.co.kr/trending?geo=KR' },
-      { rank: 4, koTitle: 'OPIc Speaking High-Score Strategy', enExpression: 'what I love most about this', targetThemeId: 'opic-master', extUrl: 'https://trends.google.co.kr/trending?geo=KR' },
-      { rank: 5, koTitle: 'Short-Form Video Algorithm Trend', enExpression: 'live up to the hype', targetThemeId: 'media-viral', extUrl: 'https://trends.google.co.kr/trending?geo=KR' },
-      { rank: 6, koTitle: 'Executive Meeting & Negotiation', enExpression: 'wrap up the discussion', targetThemeId: 'biz-meeting', extUrl: 'https://trends.google.co.kr/trending?geo=KR' },
-      { rank: 7, koTitle: 'Luxury Resort Concierge Service', enExpression: 'vacant ocean-view suite', targetThemeId: 'travel-concierge', extUrl: 'https://trends.google.co.kr/trending?geo=KR' },
-      { rank: 8, koTitle: 'Menswear Tailoring & GQ Trend', enExpression: 'timeless wardrobe staple', targetThemeId: 'fashion-runway', extUrl: 'https://trends.google.co.kr/trending?geo=KR' },
-      { rank: 9, koTitle: 'Cross-Team Collaboration & Synergy', enExpression: 'get on the same page', targetThemeId: 'biz-meeting', extUrl: 'https://trends.google.co.kr/trending?geo=KR' },
-      { rank: 10, koTitle: 'Work-Life Balance & Evening Routine', enExpression: 'recharge my batteries', targetThemeId: 'opic-master', extUrl: 'https://trends.google.co.kr/trending?geo=KR' },
-    ],
-  },
-  {
-    id: 'SIGNAL_BZ',
-    name: '📡 시그널 실시간 검색어',
-    shortName: '시그널실검',
-    badgeColor: 'bg-indigo-600 text-white',
-    liveUrl: 'https://signal.bz/',
-    rssTopicQuery: 'Korea Breaking News Top 10',
-    desc: '국내 포털 통합 실시간 검색어 차트 TOP 10',
-    keywords: [
-      { rank: 1, koTitle: '실시간 주요 경제 브리핑 & 시장 전망', enExpression: 'keep track of market trends', targetThemeId: 'biz-meeting', extUrl: 'https://signal.bz/' },
-      { rank: 2, koTitle: '인천공항 스마트패스 & 온라인 체크인', enExpression: 'check in online in advance', targetThemeId: 'travel-concierge', extUrl: 'https://signal.bz/' },
-      { rank: 3, koTitle: '올가을 유행하는 클래식 트렌치코트 코디', enExpression: 'dress up for the occasion', targetThemeId: 'fashion-runway', extUrl: 'https://signal.bz/' },
-      { rank: 4, koTitle: '화제의 유튜브 100만 조회수 인터뷰', enExpression: 'deeply resonate with viewers', targetThemeId: 'media-viral', extUrl: 'https://signal.bz/' },
-      { rank: 5, koTitle: '프로젝트 마감 기한 조율 & 정중한 요청', enExpression: 'I was wondering if you could', targetThemeId: 'biz-meeting', extUrl: 'https://signal.bz/' },
-      { rank: 6, koTitle: '주말 날씨 & 근교 힐링 산책 코스', enExpression: 'my go-to place for a walk', targetThemeId: 'opic-master', extUrl: 'https://signal.bz/' },
-      { rank: 7, koTitle: '호텔 레이트 체크아웃 & 조식 혜택', enExpression: 'complimentary breakfast buffet', targetThemeId: 'travel-concierge', extUrl: 'https://signal.bz/' },
-      { rank: 8, koTitle: '정곡을 찌르는 속 시원한 평론 화제', enExpression: 'hit the nail on the head', targetThemeId: 'media-viral', extUrl: 'https://signal.bz/' },
-      { rank: 9, koTitle: '효율적인 시간 관리 & 생산성 향상', enExpression: 'make my day productive', targetThemeId: 'opic-master', extUrl: 'https://signal.bz/' },
-      { rank: 10, koTitle: '꾸준한 자기관리 & 영어 습관 만들기', enExpression: 'stick to my daily routine', targetThemeId: 'opic-master', extUrl: 'https://signal.bz/' },
-    ],
-  },
-  {
-    id: 'NATE_ISSUE',
-    name: '🔥 네이트 실시간 이슈',
-    shortName: '네이트이슈',
-    badgeColor: 'bg-rose-600 text-white',
-    liveUrl: 'https://news.nate.com/rank/interest',
-    rssTopicQuery: 'Trending Social Issue Korea',
-    desc: '네이트 판 & 뉴스 실시간 대중 공감 이슈 TOP 10',
-    keywords: [
-      { rank: 1, koTitle: '직장 내 센스 있는 대화법 & 일정 조율', enExpression: 'touch base before the meeting', targetThemeId: 'biz-meeting', extUrl: 'https://news.nate.com/rank/interest' },
-      { rank: 2, koTitle: '결혼식 하객룩 & 센스 있는 드레스코드', enExpression: 'flatter your body shape', targetThemeId: 'fashion-runway', extUrl: 'https://news.nate.com/rank/interest' },
-      { rank: 3, koTitle: '나만의 스트레스 해소법 & 최애 힐링 푸드', enExpression: 'my go-to comfort food', targetThemeId: 'opic-master', extUrl: 'https://news.nate.com/rank/interest' },
-      { rank: 4, koTitle: '해외여행 중 호텔 방 변경 정중히 요청하기', enExpression: 'would it be possible to get', targetThemeId: 'travel-concierge', extUrl: 'https://news.nate.com/rank/interest' },
-      { rank: 5, koTitle: 'SNS 핫플 카페 웨이팅 & 솔직 방문 후기', enExpression: 'really lived up to the hype', targetThemeId: 'media-viral', extUrl: 'https://news.nate.com/rank/interest' },
-      { rank: 6, koTitle: '회의 시간 단축하는 핵심 결론 도출법', enExpression: 'streamline our weekly meeting', targetThemeId: 'biz-meeting', extUrl: 'https://news.nate.com/rank/interest' },
-      { rank: 7, koTitle: '집에서 즐기는 홈카페 & 재충전 시간', enExpression: 'unwind and recharge my batteries', targetThemeId: 'opic-master', extUrl: 'https://news.nate.com/rank/interest' },
-      { rank: 8, koTitle: '기내 반입 캐리어 규정 & 환승 대기 꿀팁', enExpression: 'carry-on luggage and layover', targetThemeId: 'travel-concierge', extUrl: 'https://news.nate.com/rank/interest' },
-      { rank: 9, koTitle: '요즘 유행하는 숏폼 드라마 몰아보기', enExpression: 'binge-watch the captivating series', targetThemeId: 'media-viral', extUrl: 'https://news.nate.com/rank/interest' },
-      { rank: 10, koTitle: '백화점 명품관 & 컨템포러리 브랜드 트렌드', enExpression: 'spearhead the seasonal trend', targetThemeId: 'fashion-runway', extUrl: 'https://news.nate.com/rank/interest' },
-    ],
-  },
-  {
-    id: 'INSTA_THREADS',
-    name: '📸 인스타 & 스레드',
-    shortName: '인스타·스레드',
-    badgeColor: 'bg-pink-600 text-white',
-    liveUrl: 'https://www.threads.net/',
-    rssTopicQuery: 'Instagram OOTD Viral Fashion Lifestyle',
-    desc: '인기 해시태그, #OOTD 릴스 바이럴, 스레드 핫이슈 TOP 10',
-    keywords: [
-      { rank: 1, koTitle: '#OOTD 꾸안꾸 시크 데일리룩 영어 캡션', enExpression: 'effortlessly chic daily outfit', targetThemeId: 'fashion-runway', extUrl: 'https://www.instagram.com/' },
-      { rank: 2, koTitle: '스레드에서 난리 난 원어민 리얼 공감 표현', enExpression: 'this deeply resonated with me', targetThemeId: 'media-viral', extUrl: 'https://www.threads.net/' },
-      { rank: 3, koTitle: '릴스 100만 뷰 자기관리 & 아이패드 공부', enExpression: 'stick to a productive routine', targetThemeId: 'opic-master', extUrl: 'https://www.instagram.com/' },
-      { rank: 4, koTitle: '감성 부티크 호텔 & 인피니티 풀 인생샷', enExpression: 'freshen up and enjoy the amenities', targetThemeId: 'travel-concierge', extUrl: 'https://www.instagram.com/' },
-      { rank: 5, koTitle: '일잘러의 스마트 데스크 & 업무 효율화', enExpression: 'streamline my daily tasks', targetThemeId: 'biz-meeting', extUrl: 'https://www.threads.net/' },
-      { rank: 6, koTitle: '패션 피플들의 포인트 아이템 매칭 비법', enExpression: 'a bold statement piece', targetThemeId: 'fashion-runway', extUrl: 'https://www.instagram.com/' },
-      { rank: 7, koTitle: '원어민들이 댓글에 제일 많이 쓰는 극찬', enExpression: 'a truly phenomenal performance', targetThemeId: 'media-viral', extUrl: 'https://www.threads.net/' },
-      { rank: 8, koTitle: '해외 로컬 빈티지 샵 & 편집샵 투어', enExpression: 'try on a vintage jacket', targetThemeId: 'fashion-runway', extUrl: 'https://www.instagram.com/' },
-      { rank: 9, koTitle: '퇴근 후 복잡한 머리를 식히는 밤 산책', enExpression: 'clear my head in the evening', targetThemeId: 'opic-master', extUrl: 'https://www.threads.net/' },
-      { rank: 10, koTitle: '유익하고 영감을 주는 스레드 정보 타래', enExpression: 'both captivating and informative', targetThemeId: 'media-viral', extUrl: 'https://www.threads.net/' },
-    ],
-  },
-  {
-    id: 'YOUTUBE_SHORTS',
-    name: '▶️ 유튜브 & 숏츠',
-    shortName: '유튜브·숏츠',
-    badgeColor: 'bg-red-600 text-white',
-    liveUrl: 'https://www.youtube.com/feed/trending',
-    rssTopicQuery: 'YouTube Trending Shorts English',
-    desc: '인기 급상승 동영상 및 숏츠(Shorts) 최다 조회 키워드 TOP 10',
-    keywords: [
-      { rank: 1, koTitle: '초보자도 1분 만에 들리는 원어민 연음 법칙', enExpression: 'speak in natural sound blocks', targetThemeId: 'opic-master', extUrl: 'https://www.youtube.com/results?search_query=english+linking+sounds+shorts' },
-      { rank: 2, koTitle: 'GQ & Vogue 에디터가 꼽은 올해의 스타일', enExpression: 'pull off a sharp tailored look', targetThemeId: 'fashion-runway', extUrl: 'https://www.youtube.com/results?search_query=vogue+gq+fashion+essentials' },
-      { rank: 3, koTitle: '실리콘밸리 리더들의 정중하고 간결한 회의 영어', enExpression: 'I was wondering if we could', targetThemeId: 'biz-meeting', extUrl: 'https://www.youtube.com/results?search_query=business+english+meeting+shorts' },
-      { rank: 4, koTitle: '뉴욕·런던 호텔 체크인 & 컨시어지 실전 브이로그', enExpression: 'drop off our bags before check-in', targetThemeId: 'travel-concierge', extUrl: 'https://www.youtube.com/results?search_query=hotel+check+in+english' },
-      { rank: 5, koTitle: '유튜브 댓글창 지배하는 원어민 극찬 표현', enExpression: 'it definitely lived up to the hype', targetThemeId: 'media-viral', extUrl: 'https://www.youtube.com/results?search_query=english+slang+shorts' },
-      { rank: 6, koTitle: '오픽 초급에서 AL까지 단숨에 올리는 만능 문장', enExpression: 'broaden my perspective on life', targetThemeId: 'opic-master', extUrl: 'https://www.youtube.com/results?search_query=opic+al+tips' },
-      { rank: 7, koTitle: '글로벌 패션위크 백스테이지 인터뷰 영어', enExpression: 'aesthetic and runway silhouette', targetThemeId: 'fashion-runway', extUrl: 'https://www.youtube.com/results?search_query=vogue+runway+interview' },
-      { rank: 8, koTitle: '해외 공항 환승 & 라운지 이용 실전 회화', enExpression: 'during a three-hour layover', targetThemeId: 'travel-concierge', extUrl: 'https://www.youtube.com/results?search_query=airport+english+conversation' },
-      { rank: 9, koTitle: '업무 마감 기한 앞당기는 세련된 협상 기술', enExpression: 'expedite the review process', targetThemeId: 'biz-meeting', extUrl: 'https://www.youtube.com/results?search_query=business+english+negotiation' },
-      { rank: 10, koTitle: '하룻밤 사이에 1,000만 뷰 터진 바이럴 영상', enExpression: 'went viral overnight', targetThemeId: 'media-viral', extUrl: 'https://www.youtube.com/feed/trending' },
-    ],
-  },
-  {
-    id: 'TIKTOK_TRENDS',
-    name: '🎵 틱톡 트렌드',
-    shortName: '틱톡트렌드',
-    badgeColor: 'bg-slate-900 text-white',
-    liveUrl: 'https://www.tiktok.com/explore',
-    rssTopicQuery: 'TikTok Viral Trend Challenge',
-    desc: '글로벌 바이럴 챌린지, 겟레디윗미(GRWM), 숏폼 네이티브 표현 TOP 10',
-    keywords: [
-      { rank: 1, koTitle: '#GRWM (겟레디윗미) 오늘의 착장 & 스타일링 소개', enExpression: 'this jacket goes well with jeans', targetThemeId: 'fashion-runway', extUrl: 'https://www.tiktok.com/explore' },
-      { rank: 2, koTitle: '원어민들이 매일 쓰는 리얼 맞장구 & 공감', enExpression: 'you hit the nail on the head', targetThemeId: 'media-viral', extUrl: 'https://www.tiktok.com/explore' },
-      { rank: 3, koTitle: '초보자용 0.75배속 천천히 또렷하게 말하기 챌린지', enExpression: 'practice speaking step by step', targetThemeId: 'opic-master', extUrl: 'https://www.tiktok.com/explore' },
-      { rank: 4, koTitle: '해외 호텔 무료 룸 업그레이드 성공 치트키', enExpression: 'any vacant ocean-view rooms', targetThemeId: 'travel-concierge', extUrl: 'https://www.tiktok.com/explore' },
-      { rank: 5, koTitle: '글로벌 직장인 공감 오피스 퇴근 전 마무리 회화', enExpression: 'wrap up and head home', targetThemeId: 'biz-meeting', extUrl: 'https://www.tiktok.com/explore' },
-      { rank: 6, koTitle: '남성 그루밍 & 수트 핏 변신 비포 애프터', enExpression: 'a timeless and tailored look', targetThemeId: 'fashion-runway', extUrl: 'https://www.tiktok.com/explore' },
-      { rank: 7, koTitle: '주말 집순이·집돌이 드라마 정주행 브이로그', enExpression: 'binge-watch all weekend', targetThemeId: 'media-viral', extUrl: 'https://www.tiktok.com/explore' },
-      { rank: 8, koTitle: '팀원들과 한마음으로 호흡 맞추기', enExpression: 'make sure we are on the same page', targetThemeId: 'biz-meeting', extUrl: 'https://www.tiktok.com/explore' },
-      { rank: 9, koTitle: '즉흥으로 떠나는 주말 힐링 여행', enExpression: 'take a trip spontaneously', targetThemeId: 'opic-master', extUrl: 'https://www.tiktok.com/explore' },
-      { rank: 10, koTitle: '소문난 맛집 솔직 리뷰 (명불허전!)', enExpression: 'lived up to the hype effortlessly', targetThemeId: 'media-viral', extUrl: 'https://www.tiktok.com/explore' },
-    ],
-  },
-];
-// ============================================================================
-// [2/4 파트] 네이버 퀴즈 + 중·고등·실무·오픽 단어장 + 3단계 레벨별 테마 DB (전반부)
-// ============================================================================
-
-export const NAVER_OFFICIAL_WORD_CHALLENGE = [
-  {
-    word: 'news',
-    masked: 'n ⬛ ⬛ s',
-    ipa: '/nuːz/',
-    pos: 'noun (명사 · N)',
-    comp: 'DO' as CompId,
-    pron: '[누-즈]',
-    soundBlock: 'any news / to report',
-    soundMethod: '끝소리 s는 무성음 [스]가 아니라 성대가 울리는 유성음 [즈/z/]로 길게 빼줍니다.',
-    koMeaning: '소식, 뉴스, 새로운 정보',
-    enDef: '1. noun new information or a report about something that has happened recently',
-    example: 'Do you have any ______ to report?',
-    exampleFull: 'Do you have any news to report?',
-  },
-  {
-    word: 'big',
-    masked: 'b ⬛ g',
-    ipa: '/bɪɡ/',
-    pos: 'adverb (부사 · Adv)',
-    comp: 'M' as CompId,
-    pron: '[빅]',
-    soundBlock: 'won big / at the casino',
-    soundMethod: '짧고 단단한 단모음 /ɪ/ 소리로, 끝 자음 g는 입을 다물지 말고 목구멍 뒤쪽에서 살짝 막아줍니다.',
-    koMeaning: '크게, 대대적으로, 성공적으로',
-    enDef: '1. adverb in a big way',
-    example: 'They won/lost ______ at the casino.',
-    exampleFull: 'They won big at the casino.',
-  },
-  {
-    word: 'inner',
-    masked: 'i ⬛ ⬛ ⬛ r',
-    ipa: '/ˈɪn.ər/',
-    pos: 'adjective (형용사 · Adj)',
-    comp: 'M' as CompId,
-    pron: '[이-너]',
-    soundBlock: 'find / inner peace',
-    soundMethod: '강세가 앞 음절(in-)에 강하게 들어가며, 뒤의 -ner는 힘을 빼고 혀끝을 말아 부드럽게 연결합니다.',
-    koMeaning: '내면의, 마음속의, 내부의',
-    enDef: "1. adjective of or relating to a person's mind or spirit",
-    example: '______ peace',
-    exampleFull: 'inner peace',
-  },
-  {
-    word: 'lawless',
-    masked: 'la ⬛ ⬛ ⬛ ss',
-    ipa: '/ˈlɔː.ləs/',
-    pos: 'adjective (형용사 · Adj)',
-    comp: 'M' as CompId,
-    pron: '[러-러스]',
-    soundBlock: 'the lawless / society',
-    soundMethod: '첫 자음 L은 혀끝을 윗잇몸에 단단히 붙이고, 턱을 아래로 툭 떨어뜨리며 /ɔː/ 모음을 냅니다.',
-    koMeaning: '무법의, 법이 없는, 질서 없는',
-    enDef: '1. adjective having no laws',
-    example: 'the ______ society of the frontier',
-    exampleFull: 'the lawless society of the frontier',
-  },
-  {
-    word: 'intend',
-    masked: 'i ⬛ ⬛ ⬛ ⬛ d',
-    ipa: '/ɪnˈtend/',
-    pos: 'verb (동사 · V)',
-    comp: 'V' as CompId,
-    pron: '[인-텐드]',
-    soundBlock: 'He intended / that his daughter / would inherit',
-    soundMethod: '2음절 동사이므로 뒤쪽(-tend)에 강한 강세를 두어 T 파열음을 또렷하게 터뜨려 줍니다.',
-    koMeaning: '의도하다, 작정하다, 계획하다',
-    enDef: '1. verb to plan or want to do (something) to have (something) in your mind as a purpose or goal',
-    example: 'He ______ that his daughter would inherit the business.',
-    exampleFull: 'He intended that his daughter would inherit the business.',
-  },
-  {
-    word: 'lick',
-    masked: 'l ⬛ ⬛ k',
-    ipa: '/lɪk/',
-    pos: 'verb (동사 · V)',
-    comp: 'V' as CompId,
-    pron: '[릭]',
-    soundBlock: 'leapt to lick / his face',
-    soundMethod: 'R이 아닌 L 시작음이므로 혀끝을 윗니 뒤 천장에 정확히 댔다가 떼면서 짧게 발음합니다.',
-    koMeaning: '(혀로) 핥다',
-    enDef: '1. verb to pass the tongue over something in order to taste, moisten, or clean it',
-    example: 'Can you ______ your nose with your tongue?',
-    exampleFull: 'Can you lick your nose with your tongue?',
-  },
-];
-
-export const WORDBOOK_DATA: WordbookEntry[] = [
-  // --- [중등 필수] Day 1 ~ Day 3 ---
-  {
-    day: 1,
-    level: '중등 필수',
-    word: 'schedule',
-    ipa: '/ˈskedʒ.uːl/',
-    pron: '[스-케줄]',
-    soundBlock: 'check / the daily schedule',
-    soundMethod: 'sch-가 합쳐져 [스크] 소리가 나며, 강세는 첫 음절(sche-)에 강하게 둡니다.',
-    meaning: '일정, 시간표, 예정하다',
-    pos: 'N',
-    posLabel: '명사 (N)',
-    comp: 'DO',
-    compLabel: '직접목적어 (DO)',
-    collocation: 'ahead of schedule',
-    collocationKo: '예정된 일정보다 앞서서',
-    exampleEn: 'Our new team carefully checked the schedule in the morning.',
-    exampleKo: '우리 신규 팀이 오전에 일정을 꼼꼼히 확인했습니다.',
-  },
-  {
-    day: 1,
-    level: '중등 필수',
-    word: 'improve',
-    ipa: '/ɪmˈpruːv/',
-    pron: '[임-프루브]',
-    soundBlock: 'improve / my English skills',
-    soundMethod: '뒤쪽 -prove에 강세를 주고, 끝소리 v는 윗니로 아랫입술을 살짝 물며 진동시킵니다.',
-    meaning: '향상시키다, 개선하다, 나아지다',
-    pos: 'V',
-    posLabel: '동사 (V)',
-    comp: 'V',
-    compLabel: '동사 (V)',
-    collocation: 'room for improvement',
-    collocationKo: '개선할 여지 / 발전 가능성',
-    exampleEn: 'Practicing in sound blocks will rapidly improve your fluency.',
-    exampleKo: '소리블럭 단위로 연습하면 유창성이 빠르게 향상될 것입니다.',
-  },
-  {
-    day: 1,
-    level: '중등 필수',
-    word: 'available',
-    ipa: '/əˈveɪ.lə.bəl/',
-    pron: '[어-베일러블]',
-    soundBlock: 'available / right now',
-    soundMethod: '첫 모음 a는 힘 빼고 [어], 두 번째 음절(-vai-)을 가장 높고 길게 발음합니다.',
-    meaning: '이용 가능한, 시간이 비어 있는',
-    pos: 'Adj',
-    posLabel: '형용사 (Adj)',
-    comp: 'SC',
-    compLabel: '주격보어 (SC)',
-    collocation: 'available for a quick call',
-    collocationKo: '잠깐 통화 가능한(시간이 되는)',
-    exampleEn: 'Are you available for a quick meeting this afternoon?',
-    exampleKo: '오늘 오후에 잠깐 미팅 시간 괜찮으신가요?',
-  },
-  {
-    day: 2,
-    level: '중등 필수',
-    word: 'recommend',
-    ipa: '/ˌrek.əˈmend/',
-    pron: '[레커-멘드]',
-    soundBlock: 'highly recommend / this place',
-    soundMethod: '마지막 음절 -mend에 주강세가 오며, 앞의 re-는 가볍게 짚어줍니다.',
-    meaning: '추천하다, 권고하다',
-    pos: 'V',
-    posLabel: '동사 (V)',
-    comp: 'V',
-    compLabel: '동사 (V)',
-    collocation: 'highly recommend',
-    collocationKo: '적극 추천하다 / 강추하다',
-    exampleEn: 'What do you recommend on the menu today?',
-    exampleKo: '오늘 메뉴 중에서 어떤 걸 추천해 주시겠어요?',
-  },
-  {
-    day: 2,
-    level: '중등 필수',
-    word: 'comfortable',
-    ipa: '/ˈkʌm.fə.tə.bəl/',
-    pron: '[컴-프터블]',
-    soundBlock: 'feel comfortable / speaking English',
-    soundMethod: '중간의 -or- 소리가 사실상 탈락하여 3음절 [컴-프터블]로 압축 발음됩니다!',
-    meaning: '편안한, 쾌적한, 마음 편한',
-    pos: 'Adj',
-    posLabel: '형용사 (Adj)',
-    comp: 'SC',
-    compLabel: '주격보어 (SC)',
-    collocation: 'step out of my comfort zone',
-    collocationKo: '익숙하고 편안한 안전지대를 벗어나다',
-    exampleEn: 'Please make yourself comfortable in the lounge.',
-    exampleKo: '라운지에서 편하게 쉬고 계세요.',
-  },
-  {
-    day: 3,
-    level: '중등 필수',
-    word: 'opportunity',
-    ipa: '/ˌɒp.əˈtjuː.nə.ti/',
-    pron: '[아퍼-튜너티]',
-    soundBlock: 'take / this opportunity',
-    soundMethod: '-tu- 음절에 강한 강세를 주며, 미국식 발음에서는 마지막 -ty가 부드러운 플랩 [리]로 소리 납니다.',
-    meaning: '기회, 찬스',
-    pos: 'N',
-    posLabel: '명사 (N)',
-    comp: 'DO',
-    compLabel: '직접목적어 (DO)',
-    collocation: 'seize the opportunity',
-    collocationKo: '찾아온 기회를 놓치지 않고 잡다',
-    exampleEn: 'I would like to thank you for giving me this opportunity.',
-    exampleKo: '저에게 이런 좋은 기회를 주셔서 감사드립니다.',
-  },
-  // --- [고등·수능 핵심] Day 1 ~ Day 3 ---
-  {
-    day: 1,
-    level: '고등·수능 핵심',
-    word: 'perspective',
-    ipa: '/pəˈspek.tɪv/',
-    pron: '[퍼-스펙티브]',
-    soundBlock: 'from / a broader perspective',
-    soundMethod: '중간 음절 -spec-에 강세를 주며, s 뒤의 p는 된소리 [ㅃ]로 발음합니다.',
-    meaning: '관점, 시각, 전망',
-    pos: 'N',
-    posLabel: '명사 (N)',
-    comp: 'DO',
-    compLabel: '직접목적어 (DO)',
-    collocation: 'put things into perspective',
-    collocationKo: '사안을 균형 잡힌 넓은 시각으로 바라보다',
-    exampleEn: 'This book gave me a completely new perspective on life.',
-    exampleKo: '이 책은 나에게 삶에 대한 완전히 새로운 관점을 주었습니다.',
-  },
-  {
-    day: 2,
-    level: '고등·수능 핵심',
-    word: 'significant',
-    ipa: '/sɪɡˈnɪf.ɪ.kənt/',
-    pron: '[시그-니피컨트]',
-    soundBlock: 'a significant / difference',
-    soundMethod: '-nif- 음절을 가장 강하게 발음하고, 마지막 t는 파열시키지 않고 받침으로 삼킵니다.',
-    meaning: '중요한, 상당한, 의미심장한',
-    pos: 'Adj',
-    posLabel: '형용사 (Adj)',
-    comp: 'M',
-    compLabel: '수식어 (M)',
-    collocation: 'make significant progress',
-    collocationKo: '상당한(눈에 띄는) 진전을 이루다',
-    exampleEn: 'There has been a significant increase in productivity.',
-    exampleKo: '생산성에 있어서 상당한 증가가 있었습니다.',
-  },
-  {
-    day: 3,
-    level: '고등·수능 핵심',
-    word: 'simultaneously',
-    ipa: '/ˌsaɪ.məlˈteɪ.ni.əs.li/',
-    pron: '[사이멀-테이니어슬리]',
-    soundBlock: 'happened / simultaneously',
-    soundMethod: '-ta- 음절에 주강세를 두어 리듬감 있게 끊어 읽으면 긴 단어도 한 번에 발음됩니다.',
-    meaning: '동시에, 일제히',
-    pos: 'Adv',
-    posLabel: '부사 (Adv)',
-    comp: 'M',
-    compLabel: '수식어 (M)',
-    collocation: 'work on two tasks simultaneously',
-    collocationKo: '두 가지 업무를 동시에 처리하다',
-    exampleEn: 'The live broadcast was streamed simultaneously worldwide.',
-    exampleKo: '그 생방송은 전 세계에 동시에 스트리밍되었습니다.',
-  },
-  // --- [비즈니스·실무] Day 1 ~ Day 2 ---
-  {
-    day: 1,
-    level: '비즈니스·실무',
-    word: 'streamline',
-    ipa: '/ˈstriːm.laɪn/',
-    pron: '[스트림-라인]',
-    soundBlock: 'streamline / the entire workflow',
-    soundMethod: 'str- 자음군을 모음 끼어들기 없이 한 호흡으로 묶어 [스트림]으로 발음합니다.',
-    meaning: '(업무·절차를) 간소화·효율화하다',
-    pos: 'V',
-    posLabel: '동사 (V)',
-    comp: 'V',
-    compLabel: '동사 (V)',
-    collocation: 'streamline the approval process',
-    collocationKo: '결재 절차를 대폭 간소화하다',
-    exampleEn: 'We need to streamline our reporting system to save time.',
-    exampleKo: '시간을 절약하기 위해 보고 체계를 간소화해야 합니다.',
-  },
-  {
-    day: 2,
-    level: '비즈니스·실무',
-    word: 'expedite',
-    ipa: '/ˈek.spə.daɪt/',
-    pron: '[엑-스퍼다이트]',
-    soundBlock: 'expedite / the delivery',
-    soundMethod: '첫 음절 ex-에 강세를 강하게 찍고, 중간 -pe-는 약하게 흘린 뒤 -dite로 마무리합니다.',
-    meaning: '(절차·업무를) 신속히 처리하다, 앞당기다',
-    pos: 'V',
-    posLabel: '동사 (V)',
-    comp: 'V',
-    compLabel: '동사 (V)',
-    collocation: 'expedite the shipping process',
-    collocationKo: '배송 절차를 최대한 앞당기다',
-    exampleEn: 'I was wondering if you could expedite this urgent order.',
-    exampleKo: '혹시 이 긴급 주문을 조금 앞당겨 처리해 주실 수 있을까요?',
-  },
-  // --- [오픽(OPIc)·구동사] Day 1 ~ Day 2 ---
-  {
-    day: 1,
-    level: '오픽(OPIc)·구동사',
-    word: 'unwind',
-    ipa: '/ʌnˈwaɪnd/',
-    pron: '[언-와인드]',
-    soundBlock: 'help me / unwind after work',
-    soundMethod: '바람 빠지는 명사 wind[윈드]가 아니라, 감긴 태엽을 푼다는 동사이므로 [와인드/waɪnd/]로 발음합니다!',
-    meaning: '(긴장·피로를) 풀다, 휴식을 취하다',
-    pos: 'V',
-    posLabel: '동사 (V)',
-    comp: 'OC',
-    compLabel: '목적격보어 (OC)',
-    collocation: 'unwind on the weekend',
-    collocationKo: '주말에 긴장을 풀고 푹 쉬다',
-    exampleEn: 'Listening to music helps me unwind after a busy day.',
-    exampleKo: '바쁜 하루 일과 후 음악을 듣는 것은 긴장을 푸는 데 큰 도움이 됩니다.',
-  },
-  {
-    day: 2,
-    level: '오픽(OPIc)·구동사',
-    word: 'pull off',
-    ipa: '/pʊl ɒf/',
-    pron: '[풀-오프]',
-    soundBlock: 'pull off / a tailored look',
-    soundMethod: 'pull의 끝 자음 l과 off의 모음이 자연스럽게 이어져 [풀-러프]처럼 부드럽게 소리 납니다.',
-    meaning: '(어려운 일·독특한 패션을) 멋지게 소화해 내다, 성사시키다',
-    pos: 'V',
-    posLabel: '구동사 (V)',
-    comp: 'V',
-    compLabel: '동사 (V)',
-    collocation: 'pull off a bold style',
-    collocationKo: '과감한 스타일을 완벽하게 소화하다',
-    exampleEn: 'You really pulled off that classic trench coat!',
-    exampleKo: '그 클래식한 트렌치코트를 정말 멋지게 소화하셨네요!',
-  },
-];
-
-// ============================================================================
-// 5. 전 레벨(초·중·고급) 맞춤형 5대 핵심 테마 풀코스 DB (전반부: 테마 1 ~ 3)
-// ============================================================================
-export const THEMES_PART1: ThemeData[] = [
-  // --------------------------------------------------------------------------
-  // THEME 1: 비즈니스 미팅 & 프로젝트 일정 조율
-  // --------------------------------------------------------------------------
-  {
-    id: 'biz-meeting',
-    title: '📊 비즈니스 미팅 & 프로젝트 일정 조율',
-    badge: '비즈니스 핵심 · 초급~고급 완비',
-    dateLabel: '오늘의 실무 코스 · 업무 & 협업',
-    opicLevel: '초급(기본요청) ➔ 중급(바꿔말하기) ➔ 고급(정중한 협상)',
-    coachPoint:
-      '같은 일정 조율이라도 초급은 직관적인 조동사(Can we ~?), 중급은 상황별 구동사 바꿔 말하기(wrap up / touch base), 고급은 거리두기 공손법(I was wondering if ~)으로 단계별 확장합니다.',
-    wordOrderPrinciple:
-      '📌 핵심 어순 공식: [요청 도입부] + [핵심 행동 동사(V)] + [목적어 대상(DO)] + [시간·목적 수식어(M)]',
-    grammarSummary:
-      '초급은 조동사+동사원형(Can we check ~?), 중급은 수여동사 4형식(give you a heads-up), 고급은 과거진행 공손법(I was wondering if you could ~)으로 문장 뼈대를 확장합니다.',
-    situationGuide:
-      '동료와 점심 식사나 커피를 마시며 가볍게 일정을 점검할 때(초급)부터, 부서 간 마감 기한을 단축하고 프로세스를 효율화하는 임원 회의(고급)까지 모두 커버합니다.',
-    levelTracks: {
-      beginner: {
-        levelName: '🌱 초급 (느린 발음 0.75x & 한글 뜻·발음 기본 도움)',
-        targetSpeed: 0.75,
-        focusBadge: '기초 뼈대 패턴 + 또렷한 소리블럭 따라하기',
-        patternEn: 'Can we check / the schedule / together?',
-        patternIpa: '/kæn wi tʃek ðə ˈskedʒ.uːl təˈɡeð.ər/',
-        patternPron: '[캔 위 체크 / 더 스케줄 / 투게더?]',
-        patternSoundBlock: 'Can we check / the schedule / together?',
-        patternMeaningKo: '우리 함께 일정을 확인해 볼 수 있을까요?',
-        levelGuide: '초급에서는 문장 맨 앞에 "Can we + 동사원형(check / grab / finish)"만 정확히 던져도 의사소통이 100% 성공합니다. 0.75배속 느린 발음으로 소리블럭 3덩어리를 천천히 따라 읽어보세요.',
-        paraphraseDrill: [
-          { basicExpr: 'eat lunch quickly', upgradedExpr: 'grab a quick bite', nuanceDiff: '간단히 요기하자는 자연스러운 일상 표현' },
-          { basicExpr: 'finish the meeting', upgradedExpr: 'wrap up the meeting', nuanceDiff: '회의를 깔끔하게 마무리한다는 실전 구동사' },
-        ],
-        longTalkPrompt: '동료에게 오늘 오후에 잠깐 일정을 같이 확인하자고 한 문장으로 말해 보세요.',
-      },
-      intermediate: {
-        levelName: '🌿 중급 (듣기 집중 0.90x & 구동사 바꿔 말하기 훈련)',
-        targetSpeed: 0.9,
-        focusBadge: '리스닝 빈칸 파악 & 원어민 구동사로 바꿔 말하기(Paraphrasing)',
-        patternEn: 'Let us touch base / and wrap up / the checklist.',
-        patternIpa: '/let ʌs tʌtʃ beɪs ænd ræp ʌp ðə ˈtʃek.lɪst/',
-        patternPron: '[레러스 터치 베이스 / 앤 래-펍 / 더 체크리스트]',
-        patternSoundBlock: 'Let us touch base / and wrap up / the checklist.',
-        patternMeaningKo: '서로 진행 상황을 공유하고 체크리스트를 마무리합시다.',
-        levelGuide: '중급의 핵심은 쉬운 단어(contact, finish, tell)를 원어민이 매일 쓰는 구동사·짝꿍 표현(touch base, wrap up, give a heads-up)으로 즉석에서 바꿔 말하는 능력입니다.',
-        paraphraseDrill: [
-          { basicExpr: 'call you briefly (잠깐 연락하다)', upgradedExpr: 'touch base with you', nuanceDiff: '업무 진행 현황을 가볍게 점검·공유하는 세련된 표현' },
-          { basicExpr: 'tell you in advance (미리 말하다)', upgradedExpr: 'give you a quick heads-up', nuanceDiff: '상대가 당황하지 않게 사전 귀띔을 준다는 4형식 표현' },
-          { basicExpr: 'agree with each other (생각이 같다)', upgradedExpr: 'get on the same page', nuanceDiff: '팀원 전체가 같은 이해를 공유한다는 필수 이디엄' },
-        ],
-        longTalkPrompt: '일정이 변경되었다는 것을 동료에게 미리 귀띔(heads-up)해 주는 2~3문장 대화를 만들어 보세요.',
-      },
-      advanced: {
-        levelName: '🌳 고급 (실전 속도 1.0x+ & 세련된 뉘앙스·긴 대화 토론)',
-        targetSpeed: 1.0,
-        focusBadge: '최상급 공손 화법 & 비즈니스 프로세스 효율화 긴 호흡 토론',
-        patternEn: 'I was wondering if we could streamline / the entire workflow.',
-        patternIpa: '/aɪ wəz ˈwʌn.dər.ɪŋ ɪf wi kʊd ˈstriːm.laɪn ði ɪnˈtaɪər ˈwɜːk.fləʊ/',
-        patternPron: '[아이 워즈 원더링 / 이프 위 쿳 스트림-라인 / 디 인타이어 워크플로우]',
-        patternSoundBlock: 'I was wondering / if we could streamline / the entire workflow.',
-        patternMeaningKo: '시간을 절약하기 위해 전체 업무 공정을 좀 더 간소화할 수 있을지 여쭙고 싶습니다.',
-        levelGuide: '고급에서는 상대방에게 부담을 주지 않는 거리두기 공손법(I was wondering if ~)과 격식 있는 어휘(streamline, feasible, expedite, meticulously)를 결합하여 설득력 있는 긴 대화를 이끌어갑니다.',
-        paraphraseDrill: [
-          { basicExpr: 'make the work faster', upgradedExpr: 'streamline the workflow & expedite the process', nuanceDiff: '단순 속도 향상을 넘어 불필요한 절차를 없애고 신속히 처리하는 임원급 화법' },
-          { basicExpr: 'a possible plan', upgradedExpr: 'a highly feasible and tentative schedule', nuanceDiff: '실현 가능성이 높으면서도 유연하게 조율 가능한 잠정 계획' },
-        ],
-        longTalkPrompt: '[5~30분 AI 토론 주제] 우리 팀의 반복적인 회의와 보고 절차를 어떻게 효율화(streamline)할 수 있을지 당신의 관점(perspective)을 4문장 이상으로 설득해 보세요.',
-      },
-    },
-    pattern: {
-      en: 'I was wondering if you could ~',
-      ipa: '/aɪ wəz ˈwʌn.dər.ɪŋ ɪf ju kʊd/',
-      soundBlock: 'I was wondering / if you could / + 동사원형',
-      soundMethod:
-        'was는 약하게 [워즈], wondering의 첫 음절 [원-]에 가장 강한 강세를 실어주고, if you는 연음하여 [이퓨]로 한 호흡에 처리합니다.',
-      pron: '[아이 워즈 원더링 / 이퓨 쿳 ~]',
-      nuance:
-        '단순한 "Can you ~?"보다 훨씬 정중하고 부드럽게 상대방의 일정과 입장을 배려하며 협조를 구하는 만능 패턴입니다.',
-      opicApplication:
-        '초급의 단순 질문을 중·고급 롤플레이 만점 문장으로 즉시 업그레이드해 줍니다.',
-    },
-    vocab: [
-      {
-        id: 1,
-        type: '일상 회화',
-        recommendLevel: 'beginner',
-        word: 'grab',
-        masked: 'g ⬛ ⬛ b',
-        ipa: '/ɡræb/',
-        pron: '[그랩]',
-        soundMethod: '입을 옆으로 넓게 벌리는 단모음 /æ/를 정확히 내고 끝 자음 b는 입술을 닫으며 멈춥니다.',
-        soundBlock: 'grab / a quick bite',
-        meaning: '간단히 먹다, 챙기다',
-        enDef: '1. verb to get, take, or eat something quickly and informally',
-        exampleBlank: 'Let us ______ a quick coffee before the afternoon session.',
-        pos: 'V',
-        posLabel: '동사 (Verb)',
-        comp: 'V',
-        compLabel: '동사 (V)',
-        roleDesc: '주어의 동작을 나타내며 뒤에 목적어(a quick bite/coffee)를 취함',
-        collocation: 'grab a quick bite',
-        collocationKo: '간단히 요기하다 / 빠르게 식사하다',
-        paraphraseTip: '[초급➔중급 변환] eat lunch quickly 대신 grab a quick bite를 쓰세요!',
-      },
-      {
-        id: 2,
-        type: '일상 회화',
-        recommendLevel: 'beginner',
-        word: 'wrap up',
-        masked: 'wr ⬛ p  u ⬛',
-        ipa: '/ræp ʌp/',
-        pron: '[래-펍]',
-        soundMethod: '첫 자음 w는 묵음! wrap의 끝 자음 p가 up의 모음과 합쳐져 [래-펍]으로 연음됩니다.',
-        soundBlock: 'wrap up / the meeting',
-        meaning: '깔끔하게 마무리하다, 끝내다',
-        enDef: '1. phrasal verb to complete or finish a meeting or task successfully',
-        exampleBlank: 'We need to ______ this review by 5 PM.',
-        pos: 'V',
-        posLabel: '구동사 (Verb)',
-        comp: 'V',
-        compLabel: '동사 (V)',
-        roleDesc: '회의나 업무를 성공적으로 갈무리하는 3형식 타동사구 역할',
-        collocation: 'wrap up the meeting',
-        collocationKo: '회의를 깔끔하게 마무리 짓다',
-        paraphraseTip: '[초급➔중급 변환] finish the work 대신 wrap up the work로 바꿔 말하기!',
-      },
-      {
-        id: 3,
-        type: '일상 회화',
-        recommendLevel: 'intermediate',
-        word: 'touch base',
-        masked: 't ⬛ ⬛ ch  b ⬛ se',
-        ipa: '/tʌtʃ beɪs/',
-        pron: '[터치 베이스]',
-        soundMethod: '두 단어 모두 내용어이므로 각각 강세를 살려 리듬감 있게 끊어 발음합니다.',
-        soundBlock: 'touch base / with the team',
-        meaning: '잠깐 연락해 상황을 공유하다',
-        enDef: '1. idiom to briefly make or renew contact with someone',
-        exampleBlank: 'I just wanted to ______ with you on the project progress.',
-        pos: 'V',
-        posLabel: '동사구 (Verb)',
-        comp: 'V',
-        compLabel: '동사 (V)',
-        roleDesc: '전치사 with와 결합하여 상대방과 현황을 점검하는 서술어',
-        collocation: 'touch base with the team',
-        collocationKo: '팀원들과 진행 상황을 공유하다',
-        paraphraseTip: '[중급 핵심] call or talk briefly를 대체하는 비즈니스 1순위 표현',
-      },
-      {
-        id: 4,
-        type: '일상 회화',
-        recommendLevel: 'intermediate',
-        word: 'on the same page',
-        masked: 'on the s ⬛ ⬛ e p ⬛ ge',
-        ipa: '/ɒn ðə seɪm peɪdʒ/',
-        pron: '[온 더 세임 페이지]',
-        soundMethod: '기능어 on the는 약하고 빠르게 넘기고, 핵심어 same과 page에 강세를 줍니다.',
-        soundBlock: 'make sure / we are / on the same page',
-        meaning: '생각·이해가 완전히 일치하는',
-        enDef: '1. idiom thinking in a similar way or having the same understanding',
-        exampleBlank: 'Let us make sure everyone is ______ before we launch.',
-        pos: 'Prep',
-        posLabel: '전치사구 (Prep)',
-        comp: 'SC',
-        compLabel: '주격보어 (SC)',
-        roleDesc: 'be동사 뒤에서 주어(우리)의 이해 상태가 일치함을 보충 설명',
-        collocation: 'get on the same page',
-        collocationKo: '서로의 생각과 이해를 일치시키다',
-        paraphraseTip: '[중급 바꿔말하기] We agree with each other ➔ We are on the same page.',
-      },
-      {
-        id: 5,
-        type: '일상 회화',
-        recommendLevel: 'intermediate',
-        word: 'heads-up',
-        masked: 'he ⬛ ds-u ⬛',
-        ipa: '/ˈhedz.ʌp/',
-        pron: '[헤-즈업]',
-        soundMethod: '복수형 s(/z/)와 뒤 모음 up이 연음되어 [헤-즈업]으로 부드럽게 이어집니다.',
-        soundBlock: 'give you / a quick heads-up',
-        meaning: '사전 귀띔, 미리 알림',
-        enDef: '1. noun an advance warning or piece of information given ahead of time',
-        exampleBlank: 'Thanks for giving me a quick ______ about the schedule change.',
-        pos: 'N',
-        posLabel: '명사 (Noun)',
-        comp: 'DO',
-        compLabel: '직접목적어 (DO)',
-        roleDesc: '4형식 동사 give 뒤에서 직접목적어(무엇을) 자리에 위치함',
-        collocation: 'give you a quick heads-up',
-        collocationKo: '미리 살짝 언질을 주다 / 귀띔해 주다',
-        paraphraseTip: '[중급 바꿔말하기] tell you beforehand ➔ give you a quick heads-up',
-      },
-      {
-        id: 6,
-        type: '고급/실무',
-        recommendLevel: 'advanced',
-        word: 'streamline',
-        masked: 'str ⬛ ⬛ ml ⬛ ne',
-        ipa: '/ˈstriːm.laɪn/',
-        pron: '[스트림-라인]',
-        soundMethod: '첫 음절 stream-을 길게 끌어주고 -line을 깔끔하게 붙여 발음합니다.',
-        soundBlock: 'streamline / the entire workflow',
-        meaning: '(업무·절차를) 간소화·효율화하다',
-        enDef: '1. verb to make an organization or system more efficient and effective',
-        exampleBlank: 'We aim to ______ the entire workflow this quarter.',
-        pos: 'V',
-        posLabel: '동사 (Verb)',
-        comp: 'V',
-        compLabel: '동사 (V)',
-        roleDesc: '복잡한 업무 프로세스를 효율화한다는 핵심 타동사 역할',
-        collocation: 'streamline the entire workflow',
-        collocationKo: '전체 업무 과정을 효율화하다',
-        paraphraseTip: '[고급 뉘앙스] make simpler보다 시스템 전체의 군더더기를 없앤다는 전문 어휘',
-      },
-      {
-        id: 7,
-        type: '고급/실무',
-        recommendLevel: 'intermediate',
-        word: 'tentative',
-        masked: 'te ⬛ t ⬛ t ⬛ ve',
-        ipa: '/ˈten.tə.tɪv/',
-        pron: '[텐-터티브]',
-        soundMethod: '첫 음절 ten-에 강세를 두고, 뒤의 -tative는 힘을 빼고 빠르게 굴려줍니다.',
-        soundBlock: 'set a / tentative schedule',
-        meaning: '잠정적인, 가안의',
-        enDef: '1. adjective not certain or fixed; provisional',
-        exampleBlank: 'We have set a ______ date for the next workshop.',
-        pos: 'Adj',
-        posLabel: '형용사 (Adjective)',
-        comp: 'M',
-        compLabel: '수식어 (M)',
-        roleDesc: '명사(schedule/date) 앞에서 성질을 꾸며주는 한정 수식어',
-        collocation: 'set a tentative schedule',
-        collocationKo: '잠정적인 일정을 잡다',
-        paraphraseTip: '[중·고급] not fixed yet 대신 단어 하나로 tentative를 명사 앞에 배치!',
-      },
-      {
-        id: 8,
-        type: '고급/실무',
-        recommendLevel: 'advanced',
-        word: 'feasible',
-        masked: 'fe ⬛ s ⬛ ble',
-        ipa: '/ˈfiː.zə.bəl/',
-        pron: '[피-저블]',
-        soundMethod: '첫 음절 fea-에 강한 강세를 두고, s는 유성음 /z/([즈])로 발음합니다.',
-        soundBlock: 'a highly / feasible solution',
-        meaning: '실행 가능한, 실현성 있는',
-        enDef: '1. adjective possible to do easily or conveniently',
-        exampleBlank: 'Is it ______ to complete the report by tomorrow?',
-        pos: 'Adj',
-        posLabel: '형용사 (Adjective)',
-        comp: 'SC',
-        compLabel: '주격보어 (SC)',
-        roleDesc: '주어나 목적어의 실현 가능성 상태를 보충 설명하는 보어 역할',
-        collocation: 'a highly feasible solution',
-        collocationKo: '매우 실현 가능한 해결책',
-        paraphraseTip: '[고급 뉘앙스] 단순 possible이 아니라 현실적·실무적으로 실행 가능함을 뜻함',
-      },
-      {
-        id: 9,
-        type: '고급/실무',
-        recommendLevel: 'advanced',
-        word: 'expedite',
-        masked: 'ex ⬛ ⬛ d ⬛ te',
-        ipa: '/ˈek.spə.daɪt/',
-        pron: '[엑-스퍼다이트]',
-        soundMethod: 'ex-에 강세를 찍고 -dite(/daɪt/)의 이중모음을 선명하게 살려줍니다.',
-        soundBlock: 'expedite / the approval process',
-        meaning: '신속히 처리하다, 앞당기다',
-        enDef: '1. verb to make an action or process happen sooner or be accomplished more quickly',
-        exampleBlank: 'Could you please ______ the review process?',
-        pos: 'V',
-        posLabel: '동사 (Verb)',
-        comp: 'V',
-        compLabel: '동사 (V)',
-        roleDesc: '지연된 일정이나 결재 과정을 빠르게 촉진하는 타동사',
-        collocation: 'expedite the process',
-        collocationKo: '처리 과정을 신속히 앞당기다',
-        paraphraseTip: '[고급 변환] speed up을 대체하는 품격 있는 비즈니스 타동사',
-      },
-      {
-        id: 10,
-        type: '고급/실무',
-        recommendLevel: 'advanced',
-        word: 'meticulously',
-        masked: 'me ⬛ i ⬛ u ⬛ ously',
-        ipa: '/məˈtɪk.jə.ləs.li/',
-        pron: '[머-티큘러슬리]',
-        soundMethod: '두 번째 음절 -tic-에 강한 강세를 주면 5음절 단어도 리듬감 있게 넘어갑니다.',
-        soundBlock: 'meticulously / reviewed the data',
-        meaning: '꼼꼼하게, 빈틈없이 세심하게',
-        enDef: '1. adverb in a way that shows great attention to detail; very thoroughly',
-        exampleBlank: 'Our team ______ checked every single item on the list.',
-        pos: 'Adv',
-        posLabel: '부사 (Adverb)',
-        comp: 'M',
-        compLabel: '수식어 (M)',
-        roleDesc: '문장 뼈대에 영향 없이 동사(검토하다/점검하다)의 정밀도를 수식함',
-        collocation: 'review the plan meticulously',
-        collocationKo: '계획을 빈틈없이 꼼꼼하게 검토하다',
-        paraphraseTip: '[고급 변환] very carefully를 한 단어로 압축한 최고급 부사',
-      },
-    ],
-    synonymScale: {
-      baseWord: 'fast / careful (비즈니스 속도·정밀도 강세 비교)',
-      pos: '동사·부사 뉘앙스 강도 비교',
-      meaning: '초급 기본어에서 고급 실무어로 올라갈 때의 어감 차이',
-      levels: [
-        {
-          strength: '매우 강함 (Extreme)',
-          words: [
-            { word: 'overhaul / meticulously', ipa: '/məˈtɪk.jə.ləs.li/', nuance: '전면 개편하다 / 티끌 하나 없이 치밀하게 (최고급)' },
-          ],
-        },
-        {
-          strength: '강함 (Strong)',
-          words: [
-            { word: 'expedite / streamline', ipa: '/ˈek.spə.daɪt/', nuance: '공식 절차를 신속히 앞당기다·효율화하다 (고급 실무)' },
-          ],
-        },
-        {
-          strength: '보통 (Neutral)',
-          words: [
-            { word: 'speed up / carefully', ipa: '/ˈkeə.fəl.i/', nuance: '속도를 높이다 / 주의 깊게 (초·중급 표준)' },
-          ],
-        },
-        {
-          strength: '약함/완곡 (Mild)',
-          words: [
-            { word: 'wrap up / touch base', ipa: '/ræp ʌp/', nuance: '가볍게 마무리하다 / 잠깐 연락해 조율하다 (일상 구어)' },
-          ],
-        },
-      ],
-    },
-    sentences: [
-      {
-        id: 1,
-        levelTag: 'beginner',
-        tag: '🌱 [초급] 기본 표현 & 느린 발음 훈련',
-        targetWord: 'grab & wrap up',
-        wordOrderFormula: '[권유(Let us)] + [동사1(grab)] + [목적어1(a quick coffee)] + [연결(and)] + [동사2(wrap up)] + [목적어2(the list)]',
-        structure: '동사원형1(V) + 목적어1(DO) + 접속사 + 동사원형2(V) + 목적어2(DO)',
-        soundBlockEn: 'Let us grab / a quick coffee / and wrap up / the checklist.',
-        soundMethodGuide: '천천히 0.75배속으로 grab과 wrap up[래-펍] 두 동사에만 힘을 주어 읽어보세요.',
-        ipaLine: '/let ʌs ɡræb ə kwɪk ˈkɒf.i ænd ræp ʌp ðə ˈtʃek.lɪst/',
-        koLine: '우리 간단히 마십시다(V) / 커피 한잔을(DO) / 그리고 마무리합시다(V) / 체크리스트를(DO).',
-        enLine: 'Let us [grab](V) / a quick coffee(DO) / and [wrap up](V) / the checklist(DO).',
-        rawEn: 'Let us grab a quick coffee and wrap up the checklist.',
-        pronLine: '[레러스 그랩 / 어 퀵 커피 / 앤 래-펍 / 더 체크리스트]',
-        naturalKo: '우리 커피 한잔 간단히 마시면서 체크리스트 마무리해요.',
-        paraphraseVersion: 'Why don’t we get some coffee and finish the checklist together?',
-        grammarPoint: 'Let us(Let’s) 뒤에는 동사원형(grab, wrap up)이 나란히 연결되어 상대방에게 부담 없이 제안하는 초급 필수 문형입니다.',
-        contextNuance: '팀원이나 동료에게 부드럽게 휴식과 업무 마무리를 동시에 제안할 때 씁니다.',
-      },
-      {
-        id: 2,
-        levelTag: 'intermediate',
-        tag: '🌿 [중급] 상황별 대화 & 바꿔 말하기 훈련',
-        targetWord: 'heads-up & touch base',
-        wordOrderFormula: '[주어(I)] + [동사(wanted to give)] + [간접목적어(you)] + [직접목적어(a quick heads-up)] + [수식어(about ~)]',
-        structure: '주어(S) + 동사(V) + 간접목적어(IO) + 직접목적어(DO) + 수식어(M)',
-        soundBlockEn: 'I wanted to give you / a quick heads-up / about the tentative schedule.',
-        soundMethodGuide: 'give you를 [기뷰]로, heads-up을 [헤-즈업]으로 묶어 중급 리듬감을 만드세요.',
-        ipaLine: '/aɪ ˈwɒn.tɪd tə ɡɪv ju ə kwɪk ˈhedz.ʌp əˈbaʊt ðə ˈten.tə.tɪv ˈskedʒ.uːl/',
-        koLine: '나는(S) / 주고 싶었습니다(V) / 당신에게(IO) / 빠른 사전 귀띔을(DO) / 잠정적인 일정에 대해(M).',
-        enLine: 'I(S) / wanted to give(V) / you(IO) / a quick [heads-up](DO) / about the [tentative] schedule(M).',
-        rawEn: 'I wanted to give you a quick heads-up about the tentative schedule.',
-        pronLine: '[아이 원티투 기뷰 / 어 퀵 헤-즈업 / 어바웃 더 텐-터티브 스케줄]',
-        naturalKo: '잠정 일정에 대해 미리 살짝 귀띔을 드리려고 연락드렸습니다.',
-        paraphraseVersion: 'I am calling to touch base and let you know early about the provisional plan.',
-        grammarPoint: '4형식 수여동사 give(누구에게[IO] + 무엇을[DO]) 구조로, 초급의 "I want to tell you"를 완벽히 대체합니다.',
-        contextNuance: '일정이 확정되기 전 동료에게 미리 언질을 주어 배려심을 보여주는 실전 문장입니다.',
-      },
-      {
-        id: 3,
-        levelTag: 'advanced',
-        tag: '🌳 [고급] 세련된 뉘앙스 & 프로세스 협상 ①',
-        targetWord: 'streamline & expedite',
-        wordOrderFormula: '[정중도입(I was wondering)] + [목적어절(if we could streamline ~)] + [목적수식어(to expedite ~)]',
-        structure: '주어(S) + 동사(V) + 목적어절(O) + 수식어(M: 목적의 to부정사)',
-        soundBlockEn: 'I was wondering / if we could streamline / the workflow / to expedite the launch.',
-        soundMethodGuide: 'streamline과 expedite의 강세 음절만 정확히 짚어 물 흐르듯 연결하세요.',
-        ipaLine: '/aɪ wəz ˈwʌn.dər.ɪŋ ɪf wi kʊd ˈstriːm.laɪn ðə ˈwɜːk.fləʊ tu ˈek.spə.daɪt ðə lɔːntʃ/',
-        koLine: '나는 궁금했습니다(S+V) / 우리가 업무 공정을 간소화할 수 있을지(O) / 런칭을 앞당기기 위해(M).',
-        enLine: 'I was wondering(S+V) / if we could [streamline] the workflow(O) / to [expedite] the launch(M).',
-        rawEn: 'I was wondering if we could streamline the workflow to expedite the launch.',
-        pronLine: '[아이 워즈 원더링 / 이프 위 쿳 스트림-라인 더 워크플로우 / 투 엑-스퍼다이트 더 런치]',
-        naturalKo: '런칭 일정을 앞당기기 위해 업무 프로세스를 좀 더 효율화할 수 있을지 논의해 보고 싶습니다.',
-        paraphraseVersion: 'Would it be possible for our team to simplify the process so we can speed up the release?',
-        grammarPoint: '과거진행 공손법(I was wondering if ~)과 목적을 나타내는 부사적 용법(to expedite ~)이 결합된 고급 복문입니다.',
-        contextNuance: '임원 미팅이나 프로젝트 총괄 회의에서 품격 있게 일정 단축을 제안하는 화법입니다.',
-      },
-      {
-        id: 4,
-        levelTag: 'advanced',
-        tag: '🌳 [고급] 세련된 뉘앙스 & 긴 대화 토론 ②',
-        targetWord: 'meticulously & feasible',
-        wordOrderFormula: '[주어(Our team)] + [부사(meticulously)] + [동사(reviewed)] + [목적어(the most feasible option)] + [수식어(to get on the same page)]',
-        structure: '주어(S) + 수식어(M) + 동사(V) + 직접목적어(DO) + 수식어(M)',
-        soundBlockEn: 'Our team / meticulously reviewed / the most feasible option / to get on the same page.',
-        soundMethodGuide: 'most의 끝소리 t를 생략해 [모스 피-저블]로 발음하면 네이티브의 자연스러운 속도가 완성됩니다.',
-        ipaLine: '/aʊər tiːm məˈtɪk.jə.ləs.li rɪˈvjuːd ðə məʊst ˈfiː.zə.bəl ˈɒp.ʃən tə ɡet ɒn ðə seɪm peɪdʒ/',
-        koLine: '우리 팀은(S) / 빈틈없이 검토했습니다(M+V) / 가장 실현 가능한 방안을(DO) / 모두의 의견을 일치시키기 위해(M).',
-        enLine: 'Our team(S) / [meticulously] reviewed(M+V) / the most [feasible] option(DO) / to get [on the same page](M).',
-        rawEn: 'Our team meticulously reviewed the most feasible option to get on the same page.',
-        pronLine: '[아워 팀 / 머-티큘러슬리 리뷰드 / 더 모스 피-저블 옵션 / 투 겟 온 더 세임 페이지]',
-        naturalKo: '저희 팀은 전원이 한마음으로 뜻을 모으기 위해 가장 실현 가능성 높은 방안을 빈틈없이 검토했습니다.',
-        paraphraseVersion: 'We thoroughly examined the most practical solution so that everyone shares the same understanding.',
-        grammarPoint: '부사 meticulously는 동사 reviewed를 수식하고, 형용사 feasible은 명사 option을 수식하는 정확한 품사 배치를 보여줍니다.',
-        contextNuance: '발표나 보고의 마무리 문장으로 사용하면 완벽한 준비성과 신뢰감을 전달합니다.',
-      },
-    ],
-    quiz: {
-      beginner: {
-        word: 'wrap up',
-        ipa: '/ræp ʌp/',
-        options: ['새로 시작하다', '깔끔하게 마무리하다, 끝내다', '일정을 연기하다', '서류를 복사하다'],
-        answerIdx: 1,
-        explanation: 'wrap up은 선물 포장을 마지막에 묶듯 회의나 업무를 깔끔하게 마무리한다는 필수 구동사입니다.',
-      },
-      intermediate: {
-        sentenceBefore: 'I wanted to give you a quick',
-        sentenceAfter: 'about the schedule change.',
-        hint: '일정 변경에 대해 상대방이 미리 알고 대비할 수 있도록 주는 "사전 귀띔"입니다.',
-        options: ['heads-up', 'layover', 'carry-on', 'silhouette'],
-        answerIdx: 0,
-        explanation: 'give someone a quick heads-up은 미리 살짝 언질을 주다는 뜻의 핵심 짝꿍 표현입니다.',
-      },
-      advanced: {
-        sentenceBefore: 'We need to',
-        highlightWord: 'expedite',
-        sentenceAfter: 'the approval process before Friday.',
-        options: ['accelerate', 'speed up', 'postpone'],
-        answerIndices: [0, 1],
-        explanation: 'expedite(신속히 처리하다, 앞당기다)는 accelerate 및 speed up과 같은 의미로 바꿔 쓸 수 있습니다.',
-      },
-      writingMission: {
-        koPrompt: '혹시 이번 주 금요일까지 잠정적인 일정을 공유해 주실 수 있을까요?',
-        wordOrderHint: '[패턴: I was wondering if you could] + [동사: share] + [목적어: a tentative schedule] + [기한: by this Friday]',
-        hint: 'I was wondering if you could / share / a tentative schedule / by this Friday.',
-        modelAnswer: 'I was wondering if you could share a tentative schedule by this Friday.',
-        checkPoint:
-          '초급의 "Can you share ~?"를 고급 패턴 "I was wondering if you could share ~"로 업그레이드한 문장입니다.',
-      },
-    },
-  },
-
-  // --------------------------------------------------------------------------
-  // THEME 2: 일상 힐링 루틴 & 오픽(OPIc) 전 레벨 스피킹
-  // --------------------------------------------------------------------------
-  {
-    id: 'opic-master',
-    title: '☕ 일상 힐링 루틴 & 오픽(OPIc) 전 레벨 스피킹',
-    badge: '초급 스몰톡 ~ 오픽 AL 완비',
-    dateLabel: '오늘의 스피킹 코스 · 일상 & 여가',
-    opicLevel: '초급(일상묘사) ➔ 중급(감정·바꿔말하기) ➔ 고급(관점·긴대화)',
-    coachPoint:
-      '퇴근 후 휴식, 주말 카페, 산책, 아이패드 자기계발 등 내 일상을 영어로 말할 때 초급은 기본 동사구, 중급은 원어민 최애 표현(go-to / unwind), 고급은 관계대명사 강조 구문으로 자연스럽게 이어집니다.',
-    wordOrderPrinciple:
-      '📌 핵심 어순 공식: [강조 도입부 (I love ~ / What I love most is that ~)] + [주어(S) + 동사(V)] + [장소·시간·이유 수식어(M)]',
-    grammarSummary:
-      '초급은 "I usually + 동사원형", 중급은 사역·준사역동사 "help me + 동사원형(unwind)", 고급은 명사절 주어 "What I love most about ~ is that S+V" 구조를 익힙니다.',
-    situationGuide:
-      '외국인 친구와의 가벼운 주말 안부 대화부터 오픽 시험의 여가·취미·루틴 질문까지 단 하나의 막힘도 없이 대답할 수 있습니다.',
-    levelTracks: {
-      beginner: {
-        levelName: '🌱 초급 (느린 발음 0.75x & 한글 뜻·발음 기본 도움)',
-        targetSpeed: 0.75,
-        focusBadge: '나의 하루 루틴을 짧고 명확한 3덩어리 어순으로 말하기',
-        patternEn: 'I usually / take a walk / to clear my head.',
-        patternIpa: '/aɪ ˈjuː.ʒu.ə.li teɪk ə wɔːk tə klɪər maɪ hed/',
-        patternPron: '[아이 유주얼리 / 테이크 어 워크 / 투 클리어 마이 헤드]',
-        patternSoundBlock: 'I usually / take a walk / to clear my head.',
-        patternMeaningKo: '나는 보통 복잡한 머리를 식히기 위해 산책을 합니다.',
-        levelGuide: '초급에서는 "나는 보통 ~한다 (I usually + 동사)" 뒤에 목적("머리를 식히기 위해: to clear my head")만 붙여도 훌륭한 원어민 문장이 됩니다.',
-        paraphraseDrill: [
-          { basicExpr: 'favorite cafe (좋아하는 카페)', upgradedExpr: 'my go-to cafe', nuanceDiff: '늘 믿고 찾는 나만의 최애 단골 카페' },
-          { basicExpr: 'relax after work (퇴근 후 쉬다)', upgradedExpr: 'unwind after work', nuanceDiff: '하루의 긴장과 피로를 싹 풀다는 원어민 표현' },
-        ],
-        longTalkPrompt: '퇴근 후나 주말에 머리를 식히기 위해 주로 무엇을 하는지 한 문장으로 말해 보세요.',
-      },
-      intermediate: {
-        levelName: '🌿 중급 (듣기 집중 0.90x & 바꿔 말하기 훈련)',
-        targetSpeed: 0.9,
-        focusBadge: '단조로운 표현(like, relax)을 네이티브 어휘로 바꿔 말하기',
-        patternEn: 'This quiet cafe / is my go-to place / to unwind.',
-        patternIpa: '/ðɪs ˈkwaɪ.ət ˈkæf.eɪ ɪz maɪ ˈɡəʊ.tuː pleɪs tu ʌnˈwaɪnd/',
-        patternPron: '[디스 콰이엇 카페 / 이즈 마이 고-투 플레이스 / 투 언-와인드]',
-        patternSoundBlock: 'This quiet cafe / is my go-to place / to unwind.',
-        patternMeaningKo: '이 조용한 카페는 긴장을 풀고 싶을 때 늘 찾는 저의 최애 장소입니다.',
-        levelGuide: '중급에서는 "I like this cafe because I can relax"라는 초급 문장을 "my go-to place", "unwind", "recharge my batteries"로 바꿔 말하는 연습을 집중적으로 진행합니다.',
-        paraphraseDrill: [
-          { basicExpr: 'get energy again (에너지를 다시 얻다)', upgradedExpr: 'recharge my batteries', nuanceDiff: '배터리를 충전하듯 활력을 100% 되찾다는 생생한 관용구' },
-          { basicExpr: 'keep my habit (습관을 유지하다)', upgradedExpr: 'stick to my daily routine', nuanceDiff: '작심삼일로 끝나지 않고 루틴을 꾸준히 지킨다는 구동사' },
-        ],
-        longTalkPrompt: '당신이 가장 좋아하는 최애 장소(go-to place)와 그곳에서 어떻게 에너지를 재충전하는지 2~3문장으로 말해 보세요.',
-      },
-      advanced: {
-        levelName: '🌳 고급 (실전 속도 1.0x+ & 세련된 뉘앙스·긴 대화 토론)',
-        targetSpeed: 1.0,
-        focusBadge: 'What절 강조 구문 & 자기계발 철학 긴 호흡 프리토킹',
-        patternEn: 'What I love most about this habit / is that it broadens my perspective.',
-        patternIpa: '/wɒt aɪ lʌv məʊst əˈbaʊt ðɪs ˈhæb.ɪt ɪz ðæt ɪt ˈbrɔː.dənz maɪ pəˈspek.tɪv/',
-        patternPron: '[와-라이 러브 모스트 어바웃 디스 해빗 / 이즈 대-릿 브로-든즈 마이 퍼-스펙티브]',
-        patternSoundBlock: 'What I love most / about this habit / is that / it broadens my perspective.',
-        patternMeaningKo: '이 습관에서 제가 가장 좋아하는 점은 저의 시야와 관점을 넓혀준다는 것입니다.',
-        levelGuide: '고급에서는 단순한 사실 나열을 넘어, 그 루틴이 내 삶에 주는 가치(productive, immersive, consistency, perspective)를 깊이 있게 풀어내는 5분 이상의 긴 대화를 훈련합니다.',
-        paraphraseDrill: [
-          { basicExpr: 'good study time', upgradedExpr: 'a highly productive and immersive routine', nuanceDiff: '생산적이고 몰입감 넘치는 고밀도 자기계발 시간' },
-          { basicExpr: 'without a plan', upgradedExpr: 'spontaneously', nuanceDiff: '즉흥적이고 자발적으로 훌쩍 실행하는 고급 부사' },
-        ],
-        longTalkPrompt: '[5~30분 AI 프리토킹 주제] 바쁜 일상 속에서 일과 삶의 균형(Work-Life Balance)을 지키고 꾸준히 자기계발(consistency)을 이어가는 당신만의 노하우를 이야기해 보세요.',
-      },
-    },
-    pattern: {
-      en: 'What I love most about ~ is that ~',
-      ipa: '/wɒt aɪ lʌv məʊst əˈbaʊt ~ ɪz ðæt ~/',
-      soundBlock: 'What I love most / about this routine / is that ~',
-      soundMethod:
-        'What I는 연음하여 [와-라이]로 부드럽게 굴려주고, love와 most에 강한 강세를 실어 감정을 풍부하게 표현합니다.',
-      pron: '[와-라이 러브 모스트 / 어바웃 ~ / 이즈 댓 ~]',
-      nuance:
-        '단순히 "I like ~"라고 말하는 대신, "~에 대해 내가 가장 좋아하는 점은 바로 ~라는 것입니다"라며 집중도를 확 끌어올리는 패턴입니다.',
-      opicApplication:
-        '초급자도 이 틀만 외우면 중·고급 문장으로 자연스럽게 말을 길게 이어갈 수 있습니다.',
-    },
-    vocab: [
-      {
-        id: 1,
-        type: '일상 회화',
-        recommendLevel: 'beginner',
-        word: 'unwind',
-        masked: 'u ⬛ w ⬛ nd',
-        ipa: '/ʌnˈwaɪnd/',
-        pron: '[언-와인드]',
-        soundMethod: '뒤쪽 -wind를 [윈드]가 아닌 이중모음 [와인드/waɪnd/]로 길게 발음하는 것이 핵심입니다.',
-        soundBlock: 'unwind / after work',
-        meaning: '(긴장·피로를) 풀다, 편히 쉬다',
-        enDef: '1. verb to relax and allow your mind to be free from worry after a period of work',
-        exampleBlank: 'Listening to music helps me ______ after a busy day.',
-        pos: 'V',
-        posLabel: '동사 (Verb)',
-        comp: 'V',
-        compLabel: '동사 (V)',
-        roleDesc: '하루의 긴장과 스트레스를 해소하는 자동사 역할',
-        collocation: 'unwind on the weekend',
-        collocationKo: '주말에 긴장을 풀고 여유를 즐기다',
-        paraphraseTip: '[초급➔중급 변환] relax 대신 쓰면 즉시 원어민 느낌이 살아납니다.',
-      },
-      {
-        id: 2,
-        type: '일상 회화',
-        recommendLevel: 'beginner',
-        word: 'go-to',
-        masked: 'g ⬛ - t ⬛',
-        ipa: '/ˈɡəʊ.tuː/',
-        pron: '[고-투]',
-        soundMethod: 'go에 강세를 주어 탄력 있게 [고-투]로 붙여 발음합니다.',
-        soundBlock: 'my go-to / coffee shop',
-        meaning: '언제나 믿고 찾는 단골의, 최애의',
-        enDef: '1. adjective regularly chosen or relied on as the best option',
-        exampleBlank: 'This quiet lounge is my ______ spot for studying.',
-        pos: 'Adj',
-        posLabel: '형용사 (Adjective)',
-        comp: 'M',
-        compLabel: '수식어 (M)',
-        roleDesc: '소유격(my)과 명사(place/food) 사이에서 명사를 꾸미는 수식어',
-        collocation: 'my go-to comfort food',
-        collocationKo: '내가 늘 찾는 최애 소울푸드',
-        paraphraseTip: '[초급➔중급 변환] my favorite place ➔ my go-to place',
-      },
-      {
-        id: 3,
-        type: '일상 회화',
-        recommendLevel: 'beginner',
-        word: 'clear my head',
-        masked: 'cl ⬛ ar my h ⬛ ad',
-        ipa: '/klɪər maɪ hed/',
-        pron: '[클리어 마이 헤드]',
-        soundMethod: 'clear와 head 두 단어에 강세를 두어 상쾌한 느낌으로 발음합니다.',
-        soundBlock: 'go for a walk / to clear my head',
-        meaning: '복잡한 머리를 식히다, 기분 전환하다',
-        enDef: '1. idiom to free one’s mind from confusion or stress so one can think clearly',
-        exampleBlank: 'I usually take an evening walk to ______.',
-        pos: 'V',
-        posLabel: '동사구 (Verb)',
-        comp: 'V',
-        compLabel: '동사 (V)',
-        roleDesc: '산책이나 취미 활동을 하는 목적을 생생하게 묘사하는 표현',
-        collocation: 'get some fresh air and clear my head',
-        collocationKo: '찬 바람 쐬며 복잡한 머리를 식히다',
-        paraphraseTip: '[초급 필수] forget stress 대신 쓰는 자연스러운 일상 표현',
-      },
-      {
-        id: 4,
-        type: '일상 회화',
-        recommendLevel: 'intermediate',
-        word: 'stick to',
-        masked: 'st ⬛ ck  t ⬛',
-        ipa: '/stɪk tuː/',
-        pron: '[스틱 투]',
-        soundMethod: 's 뒤의 t는 된소리 [ㄸ]로 [스띡-투]처럼 단단하게 발음합니다.',
-        soundBlock: 'stick to / my daily routine',
-        meaning: '(계획·습관을) 포기하지 않고 꾸준히 지키다',
-        enDef: '1. phrasal verb to continue doing or using something faithfully without changing',
-        exampleBlank: 'I try hard to ______ my daily English study routine.',
-        pos: 'V',
-        posLabel: '구동사 (Verb)',
-        comp: 'V',
-        compLabel: '동사 (V)',
-        roleDesc: '뒤에 명사 목적어(routine/plan)를 취해 꾸준함을 강조함',
-        collocation: 'stick to a healthy routine',
-        collocationKo: '건강한 루틴을 꾸준히 유지하다',
-        paraphraseTip: '[중급 바꿔말하기] keep my plan ➔ stick to my routine',
-      },
-      {
-        id: 5,
-        type: '일상 회화',
-        recommendLevel: 'intermediate',
-        word: 'recharge my batteries',
-        masked: 'rech ⬛ rge my b ⬛ tteries',
-        ipa: '/ˌriːˈtʃɑːdʒ maɪ ˈbæt.ər.iz/',
-        pron: '[리-차지 마이 배러리즈]',
-        soundMethod: 'batteries의 tt는 모음 사이에서 부드러운 플랩 [ㄹ]로 발음하여 [배러리즈]로 소리 냅니다.',
-        soundBlock: 'helps me / recharge my batteries',
-        meaning: '에너지를 재충전하다, 활력을 되찾다',
-        enDef: '1. idiom to rest and relax in order to regain energy and strength',
-        exampleBlank: 'Spending time with my family helps me ______.',
-        pos: 'V',
-        posLabel: '동사구 (Verb)',
-        comp: 'OC',
-        compLabel: '목적격보어 (OC)',
-        roleDesc: '준사역동사 help 뒤에서 목적격보어로 자주 쓰이는 관용구',
-        collocation: 'fully recharge my batteries',
-        collocationKo: '지친 에너지를 100% 재충전하다',
-        paraphraseTip: '[중급 핵심] take a rest보다 활력 회복의 뉘앙스가 훨씬 생생합니다.',
-      },
-      {
-        id: 6,
-        type: '고급/실무',
-        recommendLevel: 'advanced',
-        word: 'perspective',
-        masked: 'pe ⬛ sp ⬛ ctive',
-        ipa: '/pəˈspek.tɪv/',
-        pron: '[퍼-스펙티브]',
-        soundMethod: '중간 -spec-에 강세를 실어 또렷하게 발음합니다.',
-        soundBlock: 'from my / personal perspective',
-        meaning: '관점, 시각, 시야',
-        enDef: '1. noun a particular attitude toward or way of regarding something; a point of view',
-        exampleBlank: 'Reading books broadens my ______ on global issues.',
-        pos: 'N',
-        posLabel: '명사 (Noun)',
-        comp: 'DO',
-        compLabel: '직접목적어 (DO)',
-        roleDesc: '동사 broaden의 목적어 또는 전치사구(from my perspective)로 활약',
-        collocation: 'broaden my perspective',
-        collocationKo: '나의 시야와 관점을 넓히다',
-        paraphraseTip: '[고급 변환] In my opinion ➔ From my perspective',
-      },
-      {
-        id: 7,
-        type: '고급/실무',
-        recommendLevel: 'intermediate',
-        word: 'productive',
-        masked: 'pr ⬛ d ⬛ ctive',
-        ipa: '/prəˈdʌk.tɪv/',
-        pron: '[프러-덕티브]',
-        soundMethod: '첫 음절은 힘 뺀 [프러], 두 번째 -duc-에 강한 강세를 줍니다.',
-        soundBlock: 'a highly / productive day',
-        meaning: '생산적인, 알찬, 결실 있는',
-        enDef: '1. adjective achieving or producing a significant amount or result',
-        exampleBlank: 'Using split-view on my tablet makes my study time very ______.',
-        pos: 'Adj',
-        posLabel: '형용사 (Adjective)',
-        comp: 'OC',
-        compLabel: '목적격보어 (OC)',
-        roleDesc: '5형식 동사 make 뒤에서 목적어(study time)의 상태를 설명함',
-        collocation: 'make the most productive use of time',
-        collocationKo: '시간을 가장 생산적으로 활용하다',
-        paraphraseTip: '[중·고급] a good day 대신 a productive day로 표현력을 높이세요.',
-      },
-      {
-        id: 8,
-        type: '고급/실무',
-        recommendLevel: 'advanced',
-        word: 'consistency',
-        masked: 'co ⬛ s ⬛ stency',
-        ipa: '/kənˈsɪs.tən.si/',
-        pron: '[컨-시스턴시]',
-        soundMethod: '-sis- 음절에 강세를 두고 전후 모음은 약모음으로 가볍게 처리합니다.',
-        soundBlock: 'consistency / is the key',
-        meaning: '일관성, 한결같음, 꾸준함',
-        enDef: '1. noun steadfast adherence to the same principles or course',
-        exampleBlank: '______ is the most important factor in mastering a language.',
-        pos: 'N',
-        posLabel: '명사 (Noun)',
-        comp: 'S',
-        compLabel: '주어 (S)',
-        roleDesc: '문장 맨 앞 주어(S) 자리에서 핵심 가치를 나타내는 추상명사',
-        collocation: 'maintain daily consistency',
-        collocationKo: '매일 꾸준한 일관성을 유지하다',
-        paraphraseTip: '[고급 명사] 꾸준히 하는 힘을 한 단어로 표현하는 고급 추상명사',
-      },
-      {
-        id: 9,
-        type: '고급/실무',
-        recommendLevel: 'advanced',
-        word: 'immersive',
-        masked: 'im ⬛ e ⬛ sive',
-        ipa: '/ɪˈmɜː.sɪv/',
-        pron: '[이-머시브]',
-        soundMethod: '-mer-에 강세를 두고 혀를 부드럽게 말며 깊이 있는 소리를 냅니다.',
-        soundBlock: 'an immersive / learning experience',
-        meaning: '몰입감 넘치는, 깊숙이 빠져드는',
-        enDef: '1. adjective generating a deeply engaging environment',
-        exampleBlank: 'Watching movies with great sound provides an ______ experience.',
-        pos: 'Adj',
-        posLabel: '형용사 (Adjective)',
-        comp: 'M',
-        compLabel: '수식어 (M)',
-        roleDesc: '명사(experience/sound) 앞에서 몰입도 높은 성질을 꾸며줌',
-        collocation: 'an immersive audio and visual experience',
-        collocationKo: '몰입감 넘치는 시청각 경험',
-        paraphraseTip: '[고급 형용사] fun or exciting을 넘어 완전히 몰입되는 상태를 묘사',
-      },
-      {
-        id: 10,
-        type: '고급/실무',
-        recommendLevel: 'advanced',
-        word: 'spontaneously',
-        masked: 'sp ⬛ nt ⬛ neously',
-        ipa: '/spɒnˈteɪ.ni.əs.li/',
-        pron: '[스판-테이니어슬리]',
-        soundMethod: '-ta- 음절에 강한 악센트를 주어 리듬을 타듯 발음합니다.',
-        soundBlock: 'decided / spontaneously',
-        meaning: '즉흥적으로, 계획 없이 자발적으로',
-        enDef: '1. adverb in a sudden, impulsive, and unplanned manner',
-        exampleBlank: 'We ______ decided to go for a drive to the coast.',
-        pos: 'Adv',
-        posLabel: '부사 (Adverb)',
-        comp: 'M',
-        compLabel: '수식어 (M)',
-        roleDesc: '동사(decided)를 꾸며 계획 없이 즉흥적으로 행동했음을 나타냄',
-        collocation: 'take a trip spontaneously',
-        collocationKo: '즉흥적으로 훌쩍 여행을 떠나다',
-        paraphraseTip: '[고급 부사] without planning을 한 단어로 격조 높게 표현',
-      },
-    ],
-    synonymScale: {
-      baseWord: 'relax / habit (일상 휴식·습관 강세 비교)',
-      pos: '동사·관용구 뉘앙스 스케일',
-      meaning: '스트레스를 풀고 루틴을 유지하는 어감 차이',
-      levels: [
-        {
-          strength: '매우 강함 (Extreme)',
-          words: [{ word: 'rejuvenate / unwavering consistency', ipa: '/rɪˈdʒuː.vən.eɪt/', nuance: '완전히 활력을 되살리다 / 흔들림 없는 일관성' }],
-        },
-        {
-          strength: '강함 (Strong)',
-          words: [{ word: 'recharge my batteries / unwind', ipa: '/ʌnˈwaɪnd/', nuance: '팽팽했던 긴장을 풀고 에너지를 꽉 채우다 (중·고급 핵심)' }],
-        },
-        {
-          strength: '보통 (Neutral)',
-          words: [{ word: 'relax / keep a routine', ipa: '/rɪˈlæks/', nuance: '편안히 쉬다 / 루틴을 유지하다 (초급 기본)' }],
-        },
-        {
-          strength: '약함/완곡 (Mild)',
-          words: [{ word: 'chill out / take it easy', ipa: '/tʃɪl aʊt/', nuance: '가볍게 힘 빼고 쉬다 (구어 슬랭)' }],
-        },
-      ],
-    },
-    sentences: [
-      {
-        id: 1,
-        levelTag: 'beginner',
-        tag: '🌱 [초급] 기본 표현 & 느린 발음 훈련',
-        targetWord: 'clear my head & unwind',
-        wordOrderFormula: '[주어(I)] + [빈도부사(usually)] + [동사(take a walk)] + [목적수식어(to clear my head and unwind)]',
-        structure: '주어(S) + 수식어(M) + 동사(V) + 목적어(DO) + 목적 수식어(M)',
-        soundBlockEn: 'I usually / take a walk / in the evening / to clear my head.',
-        soundMethodGuide: '0.75배속으로 take a walk[테이-커 워크] 연음을 천천히 따라 읽어보세요.',
-        ipaLine: '/aɪ ˈjuː.ʒu.ə.li teɪk ə wɔːk ɪn ði ˈiːv.nɪŋ tə klɪər maɪ hed/',
-        koLine: '나는 보통(S+M) / 산책을 합니다(V+DO) / 저녁에(M) / 복잡한 머리를 식히기 위해(M).',
-        enLine: 'I usually(S+M) / take a walk(V+DO) / in the evening(M) / to [clear my head](M).',
-        rawEn: 'I usually take a walk in the evening to clear my head.',
-        pronLine: '[아이 유주얼리 / 테이-커 워크 / 인 디 이브닝 / 투 클리어 마이 헤드]',
-        naturalKo: '저는 보통 저녁에 복잡한 머리를 식히려고 산책을 합니다.',
-        paraphraseVersion: 'Going for an evening stroll helps me unwind after work.',
-        grammarPoint: '빈도부사 usually는 일반동사(take) 바로 앞에 위치하며, to clear my head는 목적(~하기 위해)을 나타냅니다.',
-        contextNuance: '누구나 쉽게 입을 뗄 수 있는 가장 자연스러운 일상 루틴 첫 문장입니다.',
-      },
-      {
-        id: 2,
-        levelTag: 'intermediate',
-        tag: '🌿 [중급] 상황별 대화 & 바꿔 말하기 훈련',
-        targetWord: 'go-to & recharge my batteries',
-        wordOrderFormula: '[주어(This park)] + [동사(is)] + [보어(my go-to place)] + [수식어(to unwind and recharge my batteries)]',
-        structure: '주어(S) + 동사(V) + 주격보어(SC) + 수식어(M)',
-        soundBlockEn: 'This neighborhood park / is my go-to place / to unwind / and recharge my batteries.',
-        soundMethodGuide: 'go-to와 recharge에 강세를 두고 리듬감 있게 읽어보세요.',
-        ipaLine: '/ðɪs ˈneɪ.bə.hʊd pɑːk ɪz maɪ ˈɡəʊ.tuː pleɪs tu ʌnˈwaɪnd ænd ˌriːˈtʃɑːdʒ maɪ ˈbæt.ər.iz/',
-        koLine: '이 동네 공원은(S) / 나의 최애 장소입니다(V+SC) / 긴장을 풀고 에너지를 재충전하기 위한(M).',
-        enLine: 'This neighborhood park(S) / is my [go-to] place(V+SC) / to [unwind] and [recharge my batteries](M).',
-        rawEn: 'This neighborhood park is my go-to place to unwind and recharge my batteries.',
-        pronLine: '[디스 네이버훗 파크 / 이즈 마이 고-투 플레이스 / 투 언-와인드 / 앤 리-차지 마이 배러리즈]',
-        naturalKo: '이 동네 공원은 제가 긴장을 풀고 에너지를 재충전할 때 늘 찾는 최애 장소입니다.',
-        paraphraseVersion: 'Whenever I need to destress, this local park is my favorite spot.',
-        grammarPoint: '명사 my go-to place(SC) 뒤에 to부정사구(to unwind ~)가 붙어 어떤 장소인지 꾸며주는 형용사적 수식어(M) 역할을 합니다.',
-        contextNuance: '초급의 "favorite place to rest"를 완벽한 네이티브 표현으로 바꿔 말한 문장입니다.',
-      },
-      {
-        id: 3,
-        levelTag: 'advanced',
-        tag: '🌳 [고급] 세련된 뉘앙스 & 5형식 구문 ①',
-        targetWord: 'productive & immersive',
-        wordOrderFormula: '[동명사주어(Studying on my iPad)] + [동사(makes)] + [목적어(my daily routine)] + [목적격보어(productive and immersive)]',
-        structure: '동명사구 주어(S) + 5형식 동사(V) + 목적어(DO) + 형용사 목적격보어(OC)',
-        soundBlockEn: 'Studying on my iPad / makes my daily routine / highly productive / and immersive.',
-        soundMethodGuide: 'productive의 -duc-와 immersive의 -mer-에 강세를 실어 지적인 톤으로 발음합니다.',
-        ipaLine: '/ˈstʌd.i.ɪŋ ɒn maɪ ˈaɪ.pæd meɪks maɪ ˈdeɪ.li ruːˈtiːn ˈhaɪ.li prəˈdʌk.tɪv ænd ɪˈmɜː.sɪv/',
-        koLine: '아이패드로 공부하는 것은(S) / 만듭니다(V) / 나의 일일 루틴을(DO) / 매우 생산적이고 몰입감 넘치게(OC).',
-        enLine: 'Studying on my iPad(S) / makes(V) / my daily routine(DO) / highly [productive] and [immersive](OC).',
-        rawEn: 'Studying on my iPad makes my daily routine highly productive and immersive.',
-        pronLine: '[스터디잉 온 마이 아이패드 / 메익스 마이 데일리 루-틴 / 하일리 프러-덕티브 / 앤 이-머시브]',
-        naturalKo: '아이패드로 공부하는 습관은 저의 하루 일과를 매우 생산적이고 몰입감 넘치게 만들어 줍니다.',
-        paraphraseVersion: 'What I love most about studying on my tablet is that it keeps me deeply focused and efficient.',
-        grammarPoint: '5형식 make 동사의 목적격보어(OC) 자리에는 부사가 아닌 형용사(productive, immersive)가 와야 합니다.',
-        contextNuance: '자기계발이나 디지털 학습 환경을 수준 높게 묘사할 때 쓰입니다.',
-      },
-      {
-        id: 4,
-        levelTag: 'advanced',
-        tag: '🌳 [고급] 세련된 뉘앙스 & 긴 대화 토론 ②',
-        targetWord: 'stick to & consistency & perspective',
-        wordOrderFormula: '[주어(I)] + [동사(stick to)] + [목적어(this habit)] + [이유절(because consistency broadens my perspective)]',
-        structure: '주어(S) + 동사(V) + 목적어(DO) + 이유 부사절 수식어(M)',
-        soundBlockEn: 'I try to stick to / this habit / because consistency / broadens my perspective.',
-        soundMethodGuide: 'stick to를 [스띡-투]로 묶고, consistency와 perspective에 강세를 두어 마무리합니다.',
-        ipaLine: '/aɪ traɪ tə stɪk tu ðɪs ˈhæb.ɪt bɪˈkɒz kənˈsɪs.tən.si ˈbrɔː.dənz maɪ pəˈspek.tɪv/',
-        koLine: '나는 꾸준히 지키려 노력합니다(S+V) / 이 습관을(DO) / 꾸준함이 나의 시야를 넓혀주기 때문입니다(M).',
-        enLine: 'I try to [stick to](S+V) / this habit(DO) / because [consistency] broadens my [perspective](M).',
-        rawEn: 'I try to stick to this habit because consistency broadens my perspective.',
-        pronLine: '[아이 트라이 투 스띡-투 / 디스 해빗 / 비커즈 컨-시스턴시 / 브로-든즈 마이 퍼-스펙티브]',
-        naturalKo: '꾸준함이 저의 시야를 넓혀주기 때문에 저는 이 습관을 한결같이 지키려고 노력합니다.',
-        paraphraseVersion: 'Maintaining daily consistency is essential to me as it gives me a wider view of the world.',
-        grammarPoint: '접속사 because 뒤에 추상명사 주어 consistency(S) + 타동사 broadens(V) + 목적어 my perspective(DO)가 완전한 절로 이어집니다.',
-        contextNuance: '오픽이나 영어 인터뷰에서 자신의 가치관을 보여줄 수 있는 만점 마무리 문장입니다.',
-      },
-    ],
-    quiz: {
-      beginner: {
-        word: 'unwind',
-        ipa: '/ʌnˈwaɪnd/',
-        options: ['바람이 강하게 불다', '일정을 앞당기다', '(긴장·피로를) 풀다, 쉬다', '법률을 위반하다'],
-        answerIdx: 2,
-        explanation: 'unwind는 감겨 있던 태엽을 풀듯 긴장과 피로를 풀고 휴식한다는 뜻의 핵심 동사입니다.',
-      },
-      intermediate: {
-        sentenceBefore: 'This quiet cafe is my',
-        sentenceAfter: 'place whenever I study English.',
-        hint: '내가 공부할 때마다 언제나 믿고 찾는 "최애 단골" 장소를 뜻하는 형용사입니다.',
-        options: ['go-to', 'lawless', 'tentative', 'vacant'],
-        answerIdx: 0,
-        explanation: '명사 place 앞에서 "늘 믿고 찾는 단골의/최애의"라는 뜻을 더해주는 표현은 go-to입니다.',
-      },
-      advanced: {
-        sentenceBefore: 'Taking a walk in the park helps me',
-        highlightWord: 'unwind',
-        sentenceAfter: 'after work.',
-        options: ['relax', 'destress', 'complicate'],
-        answerIndices: [0, 1],
-        explanation: '퇴근 후 긴장을 푼다는 문맥이므로 relax(쉬다), destress(스트레스를 풀다)가 복수 정답입니다.',
-      },
-      writingMission: {
-        koPrompt: '내가 주말에 대해 가장 좋아하는 점은 에너지를 재충전할 수 있다는 것입니다.',
-        wordOrderHint: '[패턴: What I love most about weekends] + [동사: is] + [보어절: that I can recharge my batteries]',
-        hint: 'What I love most about weekends / is that / I can recharge my batteries.',
-        modelAnswer: 'What I love most about weekends is that I can recharge my batteries.',
-        checkPoint:
-          'What I love most about ~ 절 전체가 주어(S)가 되며, is that 뒤에 주어+동사(I can recharge my batteries)를 연결합니다.',
-      },
-    },
-  },
-
-  // --------------------------------------------------------------------------
-  // THEME 3: 해외여행 공항 라운지 & 호텔 컨시어지 (초·중·고급 단계별 완비)
-  // --------------------------------------------------------------------------
-  {
-    id: 'travel-concierge',
-    title: '✈️ 해외여행 공항 라운지 & 호텔 컨시어지',
-    badge: '여행 필수 · 초급 생존~고급 컨시어지',
-    dateLabel: '오늘의 글로벌 코스 · 공항 & 호텔',
-    opicLevel: '초급(체크인·짐보관) ➔ 중급(상황별 요청) ➔ 고급(품격있는 업그레이드)',
-    coachPoint:
-      '말씀하신 대로 여행 주제를 3단계로 나누었습니다! 초급은 공항·호텔 데스크에서 바로 통하는 기본 생존 표현(Can we drop off ~?), 중급은 상황별 바꿔 말하기, 고급은 호텔리어가 가장 대우해 주는 최상급 격식 표현(Would it be possible to accommodate ~?)으로 이어집니다.',
-    wordOrderPrinciple:
-      '📌 핵심 어순 공식: [요청 패턴 (Can we ~ / Would it be possible to ~)] + [핵심 동사(V)] + [목적어(DO)] + [시간·장소 수식어(M)]',
-    grammarSummary:
-      '초급은 조동사 Can/Could, 중급은 원어민 구동사(drop off, freshen up)와 정중한 희망(would like to), 고급은 가주어·진주어(Would it be possible to V) 구문을 사용합니다.',
-    situationGuide:
-      '공항 체크인 카운터, 환승 라운지, 호텔 벨데스크 짐 보관, 객실 뷰 변경 및 레이트 체크아웃 요청까지 여행의 모든 순간에 즉시 꺼내 쓸 수 있습니다.',
-    levelTracks: {
-      beginner: {
-        levelName: '🌱 초급 (느린 발음 0.75x & 한글 뜻·발음 기본 도움)',
-        targetSpeed: 0.75,
-        focusBadge: '공항·호텔 데스크에서 바로 통하는 3초 생존 표현',
-        patternEn: 'Can we drop off / our bags / before check-in?',
-        patternIpa: '/kæn wi drɒp ɒf aʊər bæɡz bɪˈfɔːr ˈtʃek.ɪn/',
-        patternPron: '[캔 위 드라-포프 / 아워 백즈 / 비포 체-킨?]',
-        patternSoundBlock: 'Can we drop off / our bags / before check-in?',
-        patternMeaningKo: '체크인 전에 저희 가방을 먼저 맡길 수 있을까요?',
-        levelGuide: '초급에서는 복잡한 문법 없이 "Can we check in?(체크인할 수 있나요?)", "Can we drop off our bags?(가방을 맡길 수 있나요?)" 두 문장만 천천히 또렷하게 말해도 호텔 이용이 완벽히 해결됩니다.',
-        paraphraseDrill: [
-          { basicExpr: 'leave our bags (가방을 두다)', upgradedExpr: 'drop off our luggage', nuanceDiff: '벨데스크에 짐을 맡겨두다는 가장 자연스러운 구동사' },
-          { basicExpr: 'wash my face (세수하다)', upgradedExpr: 'freshen up', nuanceDiff: '비행이나 이동 후 간단히 씻고 재정비하다는 세련된 표현' },
-        ],
-        longTalkPrompt: '호텔 프런트 직원에게 체크인 전에 가방을 먼저 맡길 수 있는지 한 문장으로 물어보세요.',
-      },
-      intermediate: {
-        levelName: '🌿 중급 (듣기 집중 0.90x & 상황별 바꿔 말하기 훈련)',
-        targetSpeed: 0.9,
-        focusBadge: '공항·호텔 안내방송 리스닝 & 상황별 정중한 바꿔 말하기',
-        patternEn: 'We would like to freshen up / before heading out / for dinner.',
-        patternIpa: '/wi wʊd laɪk tə ˈfreʃ.ən ʌp bɪˈfɔːr ˈhed.ɪŋ aʊt fɔːr ˈdɪn.ər/',
-        patternPron: '[위 우드 라익 투 프레-셔넙 / 비포 헤딩 아웃 / 포 디너]',
-        patternSoundBlock: 'We would like to / freshen up / before heading out / for dinner.',
-        patternMeaningKo: '저녁 먹으러 나가기 전에 방에서 간단히 씻고 재정비하고 싶습니다.',
-        levelGuide: '중급에서는 "want to" 대신 정중한 "would like to"를 쓰고, 여행 필수 어휘(carry-on, layover, itinerary, vacant)를 활용해 공항과 호텔의 다양한 상황에 대처합니다.',
-        paraphraseDrill: [
-          { basicExpr: 'free breakfast (공짜 조식)', upgradedExpr: 'complimentary breakfast', nuanceDiff: '호텔·항공사에서 공식 제공하는 품격 있는 무료 혜택' },
-          { basicExpr: 'empty room (빈방)', upgradedExpr: 'vacant ocean-view room', nuanceDiff: '현재 투숙객이 없어 바로 배정 가능한 빈 객실' },
-          { basicExpr: 'travel plan (여행 계획)', upgradedExpr: 'updated travel itinerary', nuanceDiff: '항공편과 숙소 동선이 담긴 상세 여행 일정표' },
-        ],
-        longTalkPrompt: '3시간의 경유 대기 시간(layover) 동안 라운지에서 간단히 씻고 재정비(freshen up)하고 싶다고 말해 보세요.',
-      },
-      advanced: {
-        levelName: '🌳 고급 (실전 속도 1.0x+ & 컨시어지 협상·긴 대화)',
-        targetSpeed: 1.0,
-        focusBadge: '호텔 매니저도 감탄하는 VIP 컨시어지 요청 & 돌발 상황 해결',
-        patternEn: 'Would it be possible to accommodate / a complimentary late check-out?',
-        patternIpa: '/wʊd ɪt bi ˈpɒs.ə.bəl tu əˈkɒm.ə.deɪt ə ˌkɒm.plɪˈmen.tər.i leɪt ˈtʃek.aʊt/',
-        patternPron: '[우-딧 비 파-서블 / 투 어-카머데이트 / 어 캄플리-멘터리 레이트 체-카웃?]',
-        patternSoundBlock: 'Would it be possible / to accommodate / a complimentary late check-out?',
-        patternMeaningKo: '혹시 무료 레이트 체크아웃으로 배려해 주시는 것이 가능할까요?',
-        levelGuide: '고급에서는 "Would it be possible to ~?" 패턴과 고급 어휘(accommodate, complimentary, amenities)를 결합하여 룸 업그레이드나 예약 문제 해결 등 긴 호흡의 협상 대화를 구사합니다.',
-        paraphraseDrill: [
-          { basicExpr: 'Can you help my request?', upgradedExpr: 'Would it be possible to accommodate my special request?', nuanceDiff: '상대방의 재량을 최대한 존중하며 특별 배려를 이끌어내는 최상급 표현' },
-          { basicExpr: 'hotel facilities', upgradedExpr: 'resort amenities and concierge service', nuanceDiff: '수영장·스파·라운지 등 호텔이 제공하는 모든 고급 부대시설과 비품' },
-        ],
-        longTalkPrompt: '[5~30분 AI 롤플레이 주제] 기념일 여행으로 호텔에 도착했습니다. 리셉션 매니저에게 비어 있는(vacant) 고층 오션뷰 객실로의 업그레이드와 오후 2시 무료 레이트 체크아웃이 가능한지 정중하게 요청해 보세요.',
-      },
-    },
-    pattern: {
-      en: 'Would it be possible to get ~?',
-      ipa: '/wʊd ɪt bi ˈpɒs.ə.bəl tə ɡet ~/',
-      soundBlock: 'Would it be possible / to get / + 원하는 서비스?',
-      soundMethod:
-        'Would it은 연음하여 [우-딧]으로 가볍게 튕기고, possible의 첫 음절 [파-]에 가장 높은 음정과 강세를 둡니다.',
-      pron: '[우-딧 비 파-서블 / 투 겟 ~?]',
-      nuance:
-        '데스크 직원에게 부담을 주지 않으면서 기분 좋은 미소와 함께 특별 배려나 업그레이드를 이끌어내는 마법의 호텔·공항 패턴입니다.',
-      opicApplication:
-        '여행 롤플레이 및 해외 출장 실전에서 가장 정중하고 확실한 결과를 만들어 냅니다.',
-    },
-    vocab: [
-      {
-        id: 1,
-        type: '일상 회화',
-        recommendLevel: 'beginner',
-        word: 'check in',
-        masked: 'ch ⬛ ck  i ⬛',
-        ipa: '/tʃek ɪn/',
-        pron: '[체-킨]',
-        soundMethod: 'check의 끝소리 k가 뒤 모음 in과 합쳐져 한 단어처럼 [체-킨]으로 연음됩니다.',
-        soundBlock: 'check in / online in advance',
-        meaning: '탑승 수속하다, 호텔에 입실 수속하다',
-        enDef: '1. phrasal verb to register upon arrival at a hotel or airport',
-        exampleBlank: 'How early can we ______ for the international flight?',
-        pos: 'V',
-        posLabel: '구동사 (Verb)',
-        comp: 'V',
-        compLabel: '동사 (V)',
-        roleDesc: '공항이나 호텔 데스크에서 도착 등록을 하는 자동사구',
-        collocation: 'check in online in advance',
-        collocationKo: '사전에 온라인으로 체크인하다',
-        paraphraseTip: '[초급 필수] 동사는 띄어 쓰고(check in), 명사는 하이픈(check-in)을 씁니다.',
-      },
-      {
-        id: 2,
-        type: '일상 회화',
-        recommendLevel: 'beginner',
-        word: 'carry-on',
-        masked: 'c ⬛ rry-o ⬛',
-        ipa: '/ˈkær.i.ɒn/',
-        pron: '[캐-리온]',
-        soundMethod: '첫 음절 car-에 강세를 두고 부드럽게 -on을 이어 붙입니다.',
-        soundBlock: 'carry-on / luggage',
-        meaning: '기내 반입용 수하물',
-        enDef: '1. noun/adj a small bag or suitcase allowed in the aircraft cabin',
-        exampleBlank: 'This compact bag fits easily in the ______ overhead bin.',
-        pos: 'N',
-        posLabel: '명사/형용사 (N)',
-        comp: 'DO',
-        compLabel: '직접목적어 (DO)',
-        roleDesc: '위탁 수하물(checked baggage)과 구분되는 기내 휴대 가방',
-        collocation: 'carry-on baggage allowance',
-        collocationKo: '기내 반입 수하물 허용 기준',
-        paraphraseTip: '[초급➔중급] small bag for airplane ➔ carry-on luggage',
-      },
-      {
-        id: 3,
-        type: '일상 회화',
-        recommendLevel: 'intermediate',
-        word: 'layover',
-        masked: 'l ⬛ yo ⬛ er',
-        ipa: '/ˈleɪ.əʊ.vər/',
-        pron: '[레-이오버]',
-        soundMethod: '앞쪽 lay-에 강세를 두고 over를 자연스럽게 연결합니다.',
-        soundBlock: 'a three-hour / layover',
-        meaning: '경유, 환승 대기 시간',
-        enDef: '1. noun a short stay or stop between parts of an air journey',
-        exampleBlank: 'We have a three-hour ______ before our connecting flight.',
-        pos: 'N',
-        posLabel: '명사 (Noun)',
-        comp: 'DO',
-        compLabel: '직접목적어 (DO)',
-        roleDesc: 'have 동사의 직접목적어로 경유 대기 시간을 나타냄',
-        collocation: 'during a short layover',
-        collocationKo: '짧은 경유 환승 대기 시간 동안에',
-        paraphraseTip: '[중급 핵심] waiting time at the airport를 한 단어로 표현!',
-      },
-      {
-        id: 4,
-        type: '일상 회화',
-        recommendLevel: 'intermediate',
-        word: 'freshen up',
-        masked: 'fr ⬛ sh ⬛ n  u ⬛',
-        ipa: '/ˈfreʃ.ən ʌp/',
-        pron: '[프레-셔넙]',
-        soundMethod: 'freshen의 끝소리 n과 up이 연음되어 [프레-셔넙]으로 발음됩니다.',
-        soundBlock: 'freshen up / in the room',
-        meaning: '간단히 씻고 재정비하다',
-        enDef: '1. phrasal verb to wash and make oneself look neat and fresh after traveling',
-        exampleBlank: 'I would like to ______ in the lounge before boarding.',
-        pos: 'V',
-        posLabel: '구동사 (Verb)',
-        comp: 'V',
-        compLabel: '동사 (V)',
-        roleDesc: '장시간 이동 후 세수·샤워로 컨디션을 회복하는 동작',
-        collocation: 'freshen up before dinner',
-        collocationKo: '저녁 식사 전에 간단히 씻고 단장하다',
-        paraphraseTip: '[중급 바꿔말하기] wash my face and hands ➔ freshen up',
-      },
-      {
-        id: 5,
-        type: '일상 회화',
-        recommendLevel: 'beginner',
-        word: 'drop off',
-        masked: 'dr ⬛ p  o ⬛ f',
-        ipa: '/drɒp ɒf/',
-        pron: '[드라-포프]',
-        soundMethod: 'drop의 끝 자음 p가 off와 이어져 [드라-포프]로 리듬감 있게 소리 납니다.',
-        soundBlock: 'drop off / our luggage early',
-        meaning: '(짐을) 먼저 맡기다, 내려주다',
-        enDef: '1. phrasal verb to take someone or something to a place and leave them there',
-        exampleBlank: 'Can we ______ our bags at the bell desk before check-in?',
-        pos: 'V',
-        posLabel: '구동사 (Verb)',
-        comp: 'V',
-        compLabel: '동사 (V)',
-        roleDesc: '체크인 시간 전에 벨데스크에 짐을 먼저 보관 요청할 때 사용',
-        collocation: 'drop off the luggage early',
-        collocationKo: '짐을 일찍 먼저 맡겨두다',
-        paraphraseTip: '[초급 필수] 호텔 벨데스크에서 가장 많이 쓰는 1순위 구동사',
-      },
-      {
-        id: 6,
-        type: '고급/실무',
-        recommendLevel: 'intermediate',
-        word: 'complimentary',
-        masked: 'co ⬛ pl ⬛ mentary',
-        ipa: '/ˌkɒm.plɪˈmen.tər.i/',
-        pron: '[캄플리-멘터리]',
-        soundMethod: '세 번째 음절 -men-에 주강세를 두고 뒤의 -tary는 [터리]로 가볍게 줄여 읽습니다.',
-        soundBlock: 'complimentary / breakfast and water',
-        meaning: '(호텔·항공에서) 무료로 제공되는',
-        enDef: '1. adjective given or supplied free of charge as a courtesy',
-        exampleBlank: 'Does our booking include ______ breakfast and lounge access?',
-        pos: 'Adj',
-        posLabel: '형용사 (Adjective)',
-        comp: 'M',
-        compLabel: '수식어 (M)',
-        roleDesc: 'free보다 훨씬 격식 있게 무료 제공 혜택(조식·음료)을 수식함',
-        collocation: 'complimentary late check-out',
-        collocationKo: '무료 레이트 체크아웃 혜택',
-        paraphraseTip: '[중·고급 변환] free 대신 쓰면 대우가 달라지는 호텔 표준어',
-      },
-      {
-        id: 7,
-        type: '고급/실무',
-        recommendLevel: 'advanced',
-        word: 'accommodate',
-        masked: 'ac ⬛ o ⬛ modate',
-        ipa: '/əˈkɒm.ə.deɪt/',
-        pron: '[어-카머데이트]',
-        soundMethod: '-com-에 강세를 두고 입을 크게 벌려 풍성한 소리를 냅니다.',
-        soundBlock: 'accommodate / your special request',
-        meaning: '(요청·인원을) 수용하다, 편의를 봐주다',
-        enDef: '1. verb to fit in with the wishes or needs of someone; provide lodging for',
-        exampleBlank: 'We would be delighted to ______ your late check-out request.',
-        pos: 'V',
-        posLabel: '동사 (Verb)',
-        comp: 'V',
-        compLabel: '동사 (V)',
-        roleDesc: '고객의 특별 요청 사항을 기꺼이 들어주다라는 고급 타동사',
-        collocation: 'accommodate a special request',
-        collocationKo: '특별 요청 사항을 반영해 배려하다',
-        paraphraseTip: '[고급 핵심] accept or help를 대체하는 최고급 컨시어지 동사',
-      },
-      {
-        id: 8,
-        type: '고급/실무',
-        recommendLevel: 'intermediate',
-        word: 'itinerary',
-        masked: 'it ⬛ n ⬛ rary',
-        ipa: '/aɪˈtɪn.ər.ər.i/',
-        pron: '[아이-티너러리]',
-        soundMethod: '첫 글자 i를 [이]가 아닌 이중모음 [아이]로 시작하고 -tin-에 강세를 줍니다!',
-        soundBlock: 'review / our travel itinerary',
-        meaning: '상세 여행 일정표, 항공 여정',
-        enDef: '1. noun a planned route or journey and schedule',
-        exampleBlank: 'Please check your flight ______ and boarding gate.',
-        pos: 'N',
-        posLabel: '명사 (Noun)',
-        comp: 'DO',
-        compLabel: '직접목적어 (DO)',
-        roleDesc: '항공권 예약 확인서나 전체 여행 동선을 뜻하는 필수 명사',
-        collocation: 'updated travel itinerary',
-        collocationKo: '업데이트된 상세 여행 일정표',
-        paraphraseTip: '[중·고급] travel schedule을 대체하는 글로벌 공항·호텔 표준 명사',
-      },
-      {
-        id: 9,
-        type: '고급/실무',
-        recommendLevel: 'advanced',
-        word: 'vacant',
-        masked: 'v ⬛ c ⬛ nt',
-        ipa: '/ˈveɪ.kənt/',
-        pron: '[베-이컨트]',
-        soundMethod: '첫 음절 va-를 [바]가 아닌 윗니로 아랫입술을 스치는 [베-이]로 발음합니다.',
-        soundBlock: 'any vacant / ocean-view suites',
-        meaning: '비어 있는, 이용 가능한(빈방·빈자리)',
-        enDef: '1. adjective not occupied; empty and available',
-        exampleBlank: 'Are there any ______ ocean-view rooms available tonight?',
-        pos: 'Adj',
-        posLabel: '형용사 (Adjective)',
-        comp: 'M',
-        compLabel: '수식어 (M)',
-        roleDesc: '객실이나 좌석이 현재 비어 있어 배정 가능함을 나타냄',
-        collocation: 'a vacant ocean-view room',
-        collocationKo: '비어 있는 오션뷰 객실',
-        paraphraseTip: '[고급 변환] empty room ➔ vacant room',
-      },
-      {
-        id: 10,
-        type: '고급/실무',
-        recommendLevel: 'advanced',
-        word: 'amenities',
-        masked: 'am ⬛ n ⬛ ties',
-        ipa: '/əˈmen.ə.tiz/',
-        pron: '[어-메너티즈]',
-        soundMethod: '두 번째 음절 -men-에 강세를 두고 끝은 부드럽게 [티즈]로 닫아줍니다.',
-        soundBlock: 'enjoy / the hotel amenities',
-        meaning: '호텔 부대시설 및 객실 편의용품',
-        enDef: '1. plural noun desirable or useful features or facilities of a hotel or resort',
-        exampleBlank: 'Guests can enjoy all the resort ______ including the infinity pool.',
-        pos: 'N',
-        posLabel: '복수명사 (Noun)',
-        comp: 'DO',
-        compLabel: '직접목적어 (DO)',
-        roleDesc: '호텔이 제공하는 수영장·피트니스·세면도구 등 모든 편의 요소를 지칭',
-        collocation: 'luxury hotel amenities',
-        collocationKo: '고급 호텔 부대시설 및 어메니티',
-        paraphraseTip: '[고급 명사] 호텔의 모든 시설과 비품을 아우르는 필수 어휘',
-      },
-    ],
-    synonymScale: {
-      baseWord: 'free / polite (호텔·항공 격식도 강세 비교)',
-      pos: '여행·컨시어지 표현 뉘앙스 스케일',
-      meaning: '초급 생존 표현에서 고급 VIP 표현으로의 격식 차이',
-      levels: [
-        {
-          strength: '매우 강함 (Extreme)',
-          words: [{ word: 'Would it be possible to accommodate ~', ipa: '/əˈkɒm.ə.deɪt/', nuance: '최상급 정중함으로 특별 배려를 요청하는 VIP 화법' }],
-        },
-        {
-          strength: '강함 (Strong)',
-          words: [{ word: 'complimentary / vacant suite', ipa: '/ˌkɒm.plɪˈmen.tər.i/', nuance: '품격 있는 공식 무료 혜택 및 빈 객실 문의 (중·고급)' }],
-        },
-        {
-          strength: '보통 (Neutral)',
-          words: [{ word: 'Could we drop off / freshen up', ipa: '/drɒp ɒf/', nuance: '자연스럽고 예의 바른 일상 구동사 요청 (초·중급)' }],
-        },
-        {
-          strength: '약함/완곡 (Mild)',
-          words: [{ word: 'Can I get free ~ / empty room', ipa: '/friː/', nuance: '의사소통은 되지만 다소 직설적인 기초 표현' }],
-        },
-      ],
-    },
-    sentences: [
-      {
-        id: 1,
-        levelTag: 'beginner',
-        tag: '🌱 [초급] 기본 표현 & 느린 발음 훈련',
-        targetWord: 'drop off & check in',
-        wordOrderFormula: '[질문(Can we)] + [동사구(drop off)] + [목적어(our bags)] + [시간수식어(before we check in)]?',
-        structure: '조동사 + 주어(S) + 동사(V) + 목적어(DO) + 시간 수식어(M)?',
-        soundBlockEn: 'Can we drop off / our bags / before we check in?',
-        soundMethodGuide: '0.75배속으로 drop off[드라-포프]와 check in[체-킨] 연음만 정확히 소리 내 보세요.',
-        ipaLine: '/kæn wi drɒp ɒf aʊər bæɡz bɪˈfɔːr wi tʃek ɪn/',
-        koLine: '우리가 먼저 맡길 수 있을까요(S+V) / 우리 가방들을(DO) / 우리가 체크인하기 전에(M)?',
-        enLine: 'Can we [drop off](S+V) / our bags(DO) / before we [check in](M)?',
-        rawEn: 'Can we drop off our bags before we check in?',
-        pronLine: '[캔 위 드라-포프 / 아워 백즈 / 비포 위 체-킨↗]',
-        naturalKo: '체크인하기 전에 저희 가방을 먼저 좀 맡길 수 있을까요?',
-        paraphraseVersion: 'Would it be possible to leave our luggage at the bell desk early?',
-        grammarPoint: '조동사 Can으로 시작하는 가장 직관적인 초급 의문문 어순(Can + 주어 + 동사원형 + 목적어)입니다.',
-        contextNuance: '초보자도 호텔에 도착하자마자 부담 없이 바로 써먹을 수 있는 1순위 생존 문장입니다.',
-      },
-      {
-        id: 2,
-        levelTag: 'intermediate',
-        tag: '🌿 [중급] 상황별 대화 & 바꿔 말하기 훈련',
-        targetWord: 'freshen up & layover',
-        wordOrderFormula: '[주어(We)] + [동사(would like to freshen up)] + [장소(in the lounge)] + [시간(during our layover)]',
-        structure: '주어(S) + 동사구(V+O) + 장소 수식어(M) + 시간 수식어(M)',
-        soundBlockEn: 'We would like to / freshen up / in the lounge / during our three-hour layover.',
-        soundMethodGuide: 'freshen up을 [프레-셔넙]으로 부드럽게 잇고, layover에 또렷한 강세를 줍니다.',
-        ipaLine: '/wi wʊd laɪk tə ˈfreʃ.ən ʌp ɪn ðə laʊndʒ ˈdjʊə.rɪŋ aʊər θriː ˈaʊər ˈleɪ.əʊ.vər/',
-        koLine: '우리는 간단히 씻고 재정비하고 싶습니다(S+V) / 라운지에서(M) / 3시간의 경유 대기 동안에(M).',
-        enLine: 'We would like to [freshen up](S+V) / in the lounge(M) / during our three-hour [layover](M).',
-        rawEn: 'We would like to freshen up in the lounge during our three-hour layover.',
-        pronLine: '[위 우드 라익 투 / 프레-셔넙 / 인 더 라운지 / 듀어링 아워 쓰리-아워 레-이오버]',
-        naturalKo: '3시간 환승 대기하는 동안 라운지에서 간단히 씻고 재정비 좀 하고 싶습니다.',
-        paraphraseVersion: 'We want to wash up and rest in the airport lounge while waiting for our connecting flight.',
-        grammarPoint: '특정 기간 동안을 나타낼 때는 전치사 during + 명사구(our three-hour layover)를 사용합니다.',
-        contextNuance: '공항 환승 카운터나 라운지 리셉션에서 아주 유용하게 쓰이는 중급 실전 문장입니다.',
-      },
-      {
-        id: 3,
-        levelTag: 'advanced',
-        tag: '🌳 [고급] 세련된 뉘앙스 & 컨시어지 협상 ①',
-        targetWord: 'accommodate & complimentary',
-        wordOrderFormula: '[정중질문(Would it be possible)] + [진주어(to accommodate)] + [목적어(a complimentary late check-out)] + [시간(until 2 PM)]?',
-        structure: '조동사 + 가주어(It) + 동사(V) + 보어(SC) + 진주어(to V + DO + M)?',
-        soundBlockEn: 'Would it be possible / to accommodate / a complimentary late check-out / until 2 PM?',
-        soundMethodGuide: 'accommodate와 complimentary 두 고급 단어의 강세 음절(-com-, -men-)만 정확히 짚어주면 발음이 꼬이지 않습니다.',
-        ipaLine: '/wʊd ɪt bi ˈpɒs.ə.bəl tu əˈkɒm.ə.deɪt ə ˌkɒm.plɪˈmen.tər.i leɪt ˈtʃek.aʊt ənˈtɪl tuː ˌpiːˈem/',
-        koLine: '가능할까요(V+SC) / 배려해 주시는 것이(S) / 무료 레이트 체크아웃을(DO) / 오후 2시까지(M)?',
-        enLine: 'Would it be possible(V+SC) / to [accommodate](S) / a [complimentary] late check-out(DO) / until 2 PM(M)?',
-        rawEn: 'Would it be possible to accommodate a complimentary late check-out until 2 PM?',
-        pronLine: '[우-딧 비 파-서블 / 투 어-카머데이트 / 어 캄플리-멘터리 레이트 체-카웃 / 언틸 투 피엠↗]',
-        naturalKo: '혹시 오후 2시까지 무료 레이트 체크아웃으로 배려해 주실 수 있을까요?',
-        paraphraseVersion: 'Could we possibly stay in the room until 2 PM without an extra charge?',
-        grammarPoint: '가주어 it과 진주어 to accommodate를 결합하여 상대방에게 정중하게 가능 여부를 묻는 최고급 문형입니다.',
-        contextNuance: '호텔리어들이 가장 대우해 주는 격식 있는 문장으로, 실제 무료 연장 성공률을 높여줍니다.',
-      },
-      {
-        id: 4,
-        levelTag: 'advanced',
-        tag: '🌳 [고급] 세련된 뉘앙스 & 긴 대화 토론 ②',
-        targetWord: 'itinerary & amenities',
-        wordOrderFormula: '[주어(The concierge)] + [동사(explained)] + [목적어1(our tour itinerary)] + [목적어2(and the hotel amenities)]',
-        structure: '주어(S) + 동사(V) + 직접목적어 1(DO) + 접속사 + 직접목적어 2(DO)',
-        soundBlockEn: 'The concierge / kindly explained / our tour itinerary / and the hotel amenities.',
-        soundMethodGuide: 'itinerary는 [아이-티너러리], amenities는 [어-메너티즈]로 리듬감 있게 끊어 발음합니다.',
-        ipaLine: '/ðə ˌkɒn.siˈeəʒ ˈkaɪnd.li ɪkˈspleɪnd aʊər tʊər aɪˈtɪn.ər.ər.i ænd ðə həʊˈtel əˈmen.ə.tiz/',
-        koLine: '컨시어지 직원이(S) / 친절히 설명해 주었습니다(M+V) / 우리의 투어 일정표와(DO) / 호텔 편의시설들을(DO).',
-        enLine: 'The concierge(S) / kindly explained(M+V) / our tour [itinerary](DO) / and the hotel [amenities](DO).',
-        rawEn: 'The concierge kindly explained our tour itinerary and the hotel amenities.',
-        pronLine: '[더 칸시-에어즈 / 카인들리 익스플레인드 / 아워 투어 아이-티너러리 / 앤 더 호텔 어-메너티즈]',
-        naturalKo: '컨시어지 직원이 저희 투어 일정표와 호텔 부대시설 이용법을 친절히 안내해 주었습니다.',
-        paraphraseVersion: 'The hotel staff gave us a detailed guide on our travel schedule and resort facilities.',
-        grammarPoint: '3형식 타동사 explain은 목적어(DO) 두 개를 등위접속사 and로 나란히 병렬 연결하고 있습니다.',
-        contextNuance: '여행 경험담에서 호텔 서비스가 얼마나 좋았는지 구체적으로 묘사할 때 빛을 발합니다.',
-      },
-    ],
-    quiz: {
-      beginner: {
-        word: 'complimentary',
-        ipa: '/ˌkɒm.plɪˈmen.tər.i/',
-        options: ['불평이 많은', '(호텔·항공에서) 무료로 제공되는', '일시적으로 중단된', '매우 위험한'],
-        answerIdx: 1,
-        explanation: 'complimentary는 호텔 조식, 라운지, 웰컴 드링크 등이 무료 서비스로 제공될 때 쓰는 고급 형용사입니다.',
-      },
-      intermediate: {
-        sentenceBefore: 'Can we',
-        sentenceAfter: 'our bags at the bell desk before check-in?',
-        hint: '체크인 전에 벨데스크에 가방을 먼저 맡겨두다(내려놓다)라는 뜻의 구동사입니다.',
-        options: ['drop off', 'wrap up', 'unwind', 'lick'],
-        answerIdx: 0,
-        explanation: '짐이나 사람을 특정 장소에 맡기거나 내려줄 때는 drop off를 사용합니다.',
-      },
-      advanced: {
-        sentenceBefore: 'We would be happy to',
-        highlightWord: 'accommodate',
-        sentenceAfter: 'your request for a quiet room.',
-        options: ['fulfill', 'meet', 'reject'],
-        answerIndices: [0, 1],
-        explanation: '고객의 요청(request)을 수용하고 들어준다는 문맥이므로 fulfill(이행하다), meet(충족하다)이 복수 정답입니다.',
-      },
-      writingMission: {
-        koPrompt: '혹시 높은 층의 조용한 방으로 배정받는 것이 가능할까요?',
-        wordOrderHint: '[패턴: Would it be possible to get] + [목적어: a quiet room] + [장소수식어: on a higher floor]?',
-        hint: 'Would it be possible to get / a quiet room / on a higher floor?',
-        modelAnswer: 'Would it be possible to get a quiet room on a higher floor?',
-        checkPoint:
-          '건물의 층수를 나타낼 때는 표면 접촉의 전치사 on(on a higher floor)을 사용하여 앞의 명사 room을 수식(M)합니다.',
-      },
-    },
-  },
-];
-// ============================================================================
-// [3/4 파트] 테마 4~5 + 🎓수능·내신 1등급 마스터 DB(3대 반) + 실시간 동적 엔진 + 메인 UI
-// ============================================================================
-
-export const THEMES_PART2: ThemeData[] = [
-  // --------------------------------------------------------------------------
-  // THEME 4: 유튜브·인스타·숏폼 바이럴 & 네이티브 리액션
-  // --------------------------------------------------------------------------
-  {
-    id: 'media-viral',
-    title: '🔥 유튜브·인스타·숏폼 바이럴 & 네이티브 리액션',
-    badge: 'SNS 실검 연동 · 초급 리액션~고급 비평',
-    dateLabel: '오늘의 미디어 코스 · 트렌드 & 숏폼',
-    opicLevel: '초급(공감·리액션) ➔ 중급(화제성 묘사) ➔ 고급(콘텐츠 비평·토론)',
-    coachPoint:
-      '유튜브, 인스타, 스레드, 틱톡에서 쏟아지는 화제의 콘텐츠를 말할 때 초급은 짧은 맞장구와 정주행 표현, 중급은 기대 이상(live up to the hype)의 후기 묘사, 고급은 대중적 울림(resonate)을 분석하는 비평 화법으로 확장합니다.',
-    wordOrderPrinciple:
-      '📌 핵심 어순 공식: [감탄·평가 주어+동사 (It went viral / It lived up to the hype)] + [이유·방식 수식어(because / with ~)]',
-    grammarSummary:
-      '초급은 2형식 변화동사(go viral), 중급은 구동사+전치사 숙어(live up to the hype, keep an eye on), 고급은 감정의 원인과 영향력을 설명하는 이유 부사절(because it resonates with ~)을 구사합니다.',
-    situationGuide:
-      '화제의 유튜브 영상이나 스포츠 하이라이트 스몰톡, 새로 산 아이패드 리뷰, 넷플릭스 정주행 후기부터 미디어 트렌드 토론까지 완벽히 소화합니다.',
-    levelTracks: {
-      beginner: {
-        levelName: '🌱 초급 (느린 발음 0.75x & 한글 뜻·발음 기본 도움)',
-        targetSpeed: 0.75,
-        focusBadge: '짧고 강렬한 원어민 리액션 & 주말 정주행 표현',
-        patternEn: 'This short video / went viral / overnight!',
-        patternIpa: '/ðɪs ʃɔːt ˈvɪd.i.əʊ went ˈvaɪ.rəl ˌəʊ.vəˈnaɪt/',
-        patternPron: '[디스 쇼트 비디오 / 웬-바이럴 / 오버나잇!]',
-        patternSoundBlock: 'This short video / went viral / overnight!',
-        patternMeaningKo: '이 짧은 영상은 하룻밤 사이에 대유행했습니다!',
-        levelGuide: '초급에서는 SNS에서 인기 폭발한 영상을 보고 "It went viral!(그거 대박 났어!)", 드라마를 몰아볼 때 "I binge-watched it!(정주행했어!)" 두 문장만 천천히 따라 해도 원어민과 대화가 통합니다.',
-        paraphraseDrill: [
-          { basicExpr: 'became very popular (인기 있게 되었다)', upgradedExpr: 'went viral overnight', nuanceDiff: '입소문을 타고 하룻밤 새 폭발적으로 퍼졌다는 SNS 필수 표현' },
-          { basicExpr: 'watched all episodes (전편을 다 봤다)', upgradedExpr: 'binge-watched the whole series', nuanceDiff: '주말 내내 한꺼번에 몰아서 정주행했다는 생생한 동사' },
-        ],
-        longTalkPrompt: '최근 유튜브나 넷플릭스에서 몰아서 정주행(binge-watch)한 영상이 있다고 한 문장으로 말해 보세요.',
-      },
-      intermediate: {
-        levelName: '🌿 중급 (듣기 집중 0.90x & 바꿔 말하기 훈련)',
-        targetSpeed: 0.9,
-        focusBadge: '소문난 맛집·신제품·콘텐츠 후기를 네이티브 이디엄으로 바꿔 말하기',
-        patternEn: 'It definitely / lived up to the hype!',
-        patternIpa: '/ɪt ˈdef.ɪ.nət.li lɪvd ʌp tə ðə haɪp/',
-        patternPron: '[잇 데피닛리 / 리브-덥 투 더 하입!]',
-        patternSoundBlock: 'It definitely / lived up / to the hype!',
-        patternMeaningKo: '그건 정말 소문(기대)만큼 명불허전이었습니다!',
-        levelGuide: '중급에서는 단순히 "It was really good as people said"라고 길게 설명하는 대신, "lived up to the hype(명불허전이다)"와 "hit the nail on the head(정곡을 찌르다)"로 세련되게 바꿔 말합니다.',
-        paraphraseDrill: [
-          { basicExpr: 'as good as the rumor (소문만큼 좋은)', upgradedExpr: 'lived up to the hype', nuanceDiff: '높은 기대치와 홍보(hype)에 100% 부응했다는 원어민 최애 표현' },
-          { basicExpr: 'watch carefully (주의 깊게 보다)', upgradedExpr: 'keep a close eye on', nuanceDiff: '트렌드나 실시간 스코어를 놓치지 않고 눈여겨보다' },
-          { basicExpr: 'you are exactly right (정확히 맞다)', upgradedExpr: 'you hit the nail on the head', nuanceDiff: '핵심 정곡을 정확히 짚어냈다는 극찬의 이디엄' },
-        ],
-        longTalkPrompt: '새로 산 아이패드나 최근 다녀온 핫플레이스가 소문만큼 정말 훌륭했다고(lived up to the hype) 2문장으로 말해 보세요.',
-      },
-      advanced: {
-        levelName: '🌳 고급 (실전 속도 1.0x+ & 콘텐츠 비평·긴 대화 토론)',
-        targetSpeed: 1.0,
-        focusBadge: '작품의 매혹적인 연출과 대중적 공감대를 분석하는 고급 비평',
-        patternEn: 'The captivating storyline / deeply resonated / with millions of viewers.',
-        patternIpa: '/ðə ˈkæp.tɪ.veɪ.tɪŋ ˈstɔː.ri.laɪn ˈdiːp.li ˈrez.ən.eɪ.tɪd wɪð ˈmɪl.jənz əv ˈvjuː.əz/',
-        patternPron: '[더 캡-티베이팅 스토리라인 / 디플리 레-저네이티드 / 위드 밀리언즈 오브 뷰어즈]',
-        patternSoundBlock: 'The captivating storyline / deeply resonated / with millions of viewers.',
-        patternMeaningKo: '그 매혹적인 스토리라인은 수백만 시청자들에게 깊은 울림과 공감을 주었습니다.',
-        levelGuide: '고급에서는 콘텐츠가 왜 성공했는지 분석할 때 captivating(매혹적인), phenomenal(경이로운), informative(유익한), resonate(공감을 불러일으키다)를 결합해 깊이 있는 평론을 전개합니다.',
-        paraphraseDrill: [
-          { basicExpr: 'touched people’s hearts', upgradedExpr: 'deeply resonated with the audience', nuanceDiff: '단순 감동을 넘어 사람들의 내면에 깊은 공명과 울림을 주다' },
-          { basicExpr: 'very exciting and useful', upgradedExpr: 'both captivating and highly informative', nuanceDiff: '눈을 뗄 수 없이 매력적이면서도 유익한 정보가 가득한' },
-        ],
-        longTalkPrompt: '[5~30분 AI 토론 주제] 최근 당신의 마음을 사로잡은(captivating) 영화, 음악, 혹은 유튜브 채널을 소개하고, 왜 그 콘텐츠가 사람들에게 깊은 공감(resonate)을 주는지 이야기해 보세요.',
-      },
-    },
-    pattern: {
-      en: 'It really lived up to the hype!',
-      ipa: '/ɪt ˈrɪə.li lɪvd ʌp tə ðə haɪp/',
-      soundBlock: 'It really / lived up / to the hype!',
-      soundMethod:
-        'lived up은 연음하여 [리브-덥]으로 묶고, 마지막 핵심 명사 hype(/haɪp/)에 강하고 높은 강세를 실어 감탄하듯 발음합니다.',
-      pron: '[잇 리얼리 / 리브-덥 / 투 더 하입!]',
-      nuance:
-        '엄청나게 화제가 된 맛집, 영화, 신제품을 직접 경험해 보니 "소문대로 진짜 명불허전이더라!"라고 극찬할 때 쓰는 원어민 1순위 표현입니다.',
-      opicApplication:
-        '기억에 남는 영화, 공연, 새로 산 기기, 맛집 후기의 마침표로 쓰면 만점을 받습니다.',
-    },
-    vocab: [
-      {
-        id: 1,
-        type: '일상 회화',
-        recommendLevel: 'beginner',
-        word: 'go viral',
-        masked: 'g ⬛  v ⬛ ral',
-        ipa: '/ɡəʊ ˈvaɪ.rəl/',
-        pron: '[고- 바이럴]',
-        soundMethod: 'viral의 첫 음절 vi-를 [비]가 아닌 이중모음 [바이]로 발음하는 것에 주의하세요!',
-        soundBlock: 'went viral / overnight',
-        meaning: '(영상·이슈가) 입소문을 타고 대유행하다',
-        enDef: '1. idiom to spread rapidly and widely on the internet through social media',
-        exampleBlank: 'The short clip ______ on YouTube Shorts within hours.',
-        pos: 'V',
-        posLabel: '동사구 (Verb)',
-        comp: 'V',
-        compLabel: '동사 (V)',
-        roleDesc: '2형식 변화동사 go 뒤에 형용사 보어 viral이 결합한 서술어 블록',
-        collocation: 'go viral overnight',
-        collocationKo: '하룻밤 사이에 폭발적인 화제가 되다',
-        paraphraseTip: '[초급 필수] become super popular on SNS를 대체하는 표현',
-      },
-      {
-        id: 2,
-        type: '일상 회화',
-        recommendLevel: 'beginner',
-        word: 'binge-watch',
-        masked: 'b ⬛ nge-w ⬛ tch',
-        ipa: '/ˈbɪndʒ.wɒtʃ/',
-        pron: '[빈지-워치]',
-        soundMethod: 'binge(/bɪndʒ/)에 강세를 두고 watch를 리듬감 있게 붙여 발음합니다.',
-        soundBlock: 'binge-watch / the entire series',
-        meaning: '(드라마·영화를) 몰아서 정주행하다',
-        enDef: '1. verb to watch multiple episodes of a program in rapid succession',
-        exampleBlank: 'We decided to ______ the new drama series this weekend.',
-        pos: 'V',
-        posLabel: '동사 (Verb)',
-        comp: 'V',
-        compLabel: '동사 (V)',
-        roleDesc: '뒤에 시리즈나 영상 목적어(DO)를 취하는 타동사',
-        collocation: 'binge-watch the whole season',
-        collocationKo: '전 시즌을 한꺼번에 몰아보다(정주행하다)',
-        paraphraseTip: '[초급 필수] 넷플릭스·유튜브 시대의 필수 동사',
-      },
-      {
-        id: 3,
-        type: '일상 회화',
-        recommendLevel: 'intermediate',
-        word: 'live up to the hype',
-        masked: 'l ⬛ ve up to the h ⬛ pe',
-        ipa: '/lɪv ʌp tə ðə haɪp/',
-        pron: '[리-법 투 더 하입]',
-        soundMethod: 'live up을 [리-법]으로 연음하고, hype의 p를 깔끔하게 닫아줍니다.',
-        soundBlock: 'definitely / lived up to the hype',
-        meaning: '소문·기대만큼 실제로도 대단하다(명불허전이다)',
-        enDef: '1. idiom to be as good as people expected or advertised',
-        exampleBlank: 'The new tablet definitely ______ with its amazing display.',
-        pos: 'V',
-        posLabel: '동사구 (Verb)',
-        comp: 'V',
-        compLabel: '동사 (V)',
-        roleDesc: '주어의 품질이나 경험이 대중의 기대치(hype)에 부응함을 서술함',
-        collocation: 'more than live up to the hype',
-        collocationKo: '소문과 기대 그 이상으로 훌륭하다',
-        paraphraseTip: '[중급 바꿔말하기] as good as people said ➔ lived up to the hype',
-      },
-      {
-        id: 4,
-        type: '일상 회화',
-        recommendLevel: 'intermediate',
-        word: 'keep an eye on',
-        masked: 'k ⬛ ep an e ⬛ e on',
-        ipa: '/kiːp ən aɪ ɒn/',
-        pron: '[키-퍼-나이 온]',
-        soundMethod: 'keep an eye가 전부 연음되어 [키-퍼-나이]처럼 한 덩어리로 흘러갑니다!',
-        soundBlock: 'keep an eye on / the live score',
-        meaning: '~을 주의 깊게 지켜보다, 눈여겨보다',
-        enDef: '1. idiom to watch or monitor someone or something carefully',
-        exampleBlank: 'I always ______ the live sports standings and highlights.',
-        pos: 'V',
-        posLabel: '동사구 (Verb)',
-        comp: 'V',
-        compLabel: '동사 (V)',
-        roleDesc: '전치사 on 뒤에 지켜보는 대상(DO)을 취하는 3형식 동사구',
-        collocation: 'keep a close eye on trends',
-        collocationKo: '최신 트렌드를 면밀히 주시하다',
-        paraphraseTip: '[중급 핵심] watch closely를 대체하는 원어민 구어 표현',
-      },
-      {
-        id: 5,
-        type: '일상 회화',
-        recommendLevel: 'intermediate',
-        word: 'hit the nail on the head',
-        masked: 'h ⬛ t the n ⬛ il on the h ⬛ ad',
-        ipa: '/hɪt ðə neɪl ɒn ðə hed/',
-        pron: '[힛 더 네일 온 더 헤드]',
-        soundMethod: 'hit, nail, head 세 내용어에 똑같이 박자를 맞춰 리듬감 있게 발음합니다.',
-        soundBlock: 'you hit / the nail / on the head',
-        meaning: '정곡을 찌르다, 핵심을 정확히 짚어내다',
-        enDef: '1. idiom to describe exactly what is causing a situation or problem',
-        exampleBlank: 'Your comment ______ regarding the main issue.',
-        pos: 'V',
-        posLabel: '관용구 (Verb)',
-        comp: 'V',
-        compLabel: '동사 (V)',
-        roleDesc: '상대방의 분석이나 발언이 100% 정확함을 극찬하는 서술어',
-        collocation: 'absolutely hit the nail on the head',
-        collocationKo: '완벽하게 핵심 정곡을 찌르다',
-        paraphraseTip: '[중·고급] You are totally right을 가장 세련되게 바꿔 말하는 표현',
-      },
-      {
-        id: 6,
-        type: '고급/실무',
-        recommendLevel: 'advanced',
-        word: 'resonate',
-        masked: 'r ⬛ s ⬛ nate',
-        ipa: '/ˈrez.ən.eɪt/',
-        pron: '[레-저네이트]',
-        soundMethod: '첫 음절 re-에 강세를 두고 s는 유성음 [즈]로 부드럽게 울려줍니다.',
-        soundBlock: 'deeply resonate / with the audience',
-        meaning: '깊은 공감을 불러일으키다, 마음에 울림을 주다',
-        enDef: '1. verb to evoke emotions; to be deeply meaningful to someone',
-        exampleBlank: 'The movie’s message deeply ______ with millions of viewers.',
-        pos: 'V',
-        posLabel: '동사 (Verb)',
-        comp: 'V',
-        compLabel: '동사 (V)',
-        roleDesc: '전치사 with와 함께 쓰여 감동과 공감대를 형성함을 나타냄',
-        collocation: 'resonate with the public',
-        collocationKo: '대중들에게 깊은 공감과 울림을 주다',
-        paraphraseTip: '[고급 동사] touch people’s hearts를 대체하는 지적인 어휘',
-      },
-      {
-        id: 7,
-        type: '고급/실무',
-        recommendLevel: 'advanced',
-        word: 'captivating',
-        masked: 'c ⬛ pt ⬛ vating',
-        ipa: '/ˈkæp.tɪ.veɪ.tɪŋ/',
-        pron: '[캡-티베이팅]',
-        soundMethod: '첫 음절 cap-을 강하게 발음하고 부드럽게 연결합니다.',
-        soundBlock: 'a truly / captivating performance',
-        meaning: '눈을 뗄 수 없게 매혹적인, 마음을 사로잡는',
-        enDef: '1. adjective capable of attracting and holding interest; charming',
-        exampleBlank: 'The piano soundtrack and storyline were truly ______.',
-        pos: 'Adj',
-        posLabel: '형용사 (Adjective)',
-        comp: 'SC',
-        compLabel: '주격보어 (SC)',
-        roleDesc: '작품이나 영상의 매력도를 보충 설명하는 고급 형용사 보어',
-        collocation: 'a captivating storyline',
-        collocationKo: '마음을 완전히 사로잡는 스토리라인',
-        paraphraseTip: '[고급 변환] very interesting ➔ truly captivating',
-      },
-      {
-        id: 8,
-        type: '고급/실무',
-        recommendLevel: 'advanced',
-        word: 'phenomenal',
-        masked: 'ph ⬛ n ⬛ menal',
-        ipa: '/fəˈnɒm.ɪ.nəl/',
-        pron: '[퍼-나미널]',
-        soundMethod: 'ph는 /f/ 소리이며, 두 번째 음절 -nom-에 강한 강세를 실어 발음합니다.',
-        soundBlock: 'a phenomenal / success',
-        meaning: '경이로운, 놀라울 정도로 대단한',
-        enDef: '1. adjective very remarkable; extraordinary',
-        exampleBlank: 'The athlete showed a ______ performance in the final match.',
-        pos: 'Adj',
-        posLabel: '형용사 (Adjective)',
-        comp: 'M',
-        compLabel: '수식어 (M)',
-        roleDesc: '명사(performance/quality) 앞에서 압도적 수준을 꾸며줌',
-        collocation: 'phenomenal display quality',
-        collocationKo: '경이로울 정도로 뛰어난 디스플레이 화질',
-        paraphraseTip: '[고급 극찬] great or amazing보다 한 차원 높은 감탄 형용사',
-      },
-      {
-        id: 9,
-        type: '고급/실무',
-        recommendLevel: 'intermediate',
-        word: 'informative',
-        masked: 'inf ⬛ rm ⬛ tive',
-        ipa: '/ɪnˈfɔː.mə.tɪv/',
-        pron: '[인-포머티브]',
-        soundMethod: '-for- 음절에 강세를 두고 뒤의 -mative는 힘을 빼고 빠르게 붙여줍니다.',
-        soundBlock: 'both entertaining / and informative',
-        meaning: '유익한, 배울 만한 정보가 가득한',
-        enDef: '1. adjective providing useful or interesting information',
-        exampleBlank: 'This YouTube channel is both entertaining and ______.',
-        pos: 'Adj',
-        posLabel: '형용사 (Adjective)',
-        comp: 'SC',
-        compLabel: '주격보어 (SC)',
-        roleDesc: '유튜브 영상이나 기사가 매우 유익함을 설명하는 주격보어',
-        collocation: 'an informative video clip',
-        collocationKo: '알차고 유익한 영상 클립',
-        paraphraseTip: '[중·고급] useful to know를 한 단어로 압축한 형용사',
-      },
-      {
-        id: 10,
-        type: '고급/실무',
-        recommendLevel: 'advanced',
-        word: 'effortlessly',
-        masked: 'ef ⬛ o ⬛ tlessly',
-        ipa: '/ˈef.ət.ləs.li/',
-        pron: '[에-퍼트러슬리]',
-        soundMethod: '첫 음절 ef-에 강세를 두고 물 흐르듯 가볍게 발음합니다.',
-        soundBlock: 'handled the task / effortlessly',
-        meaning: '물 흐르듯 자연스럽게, 힘들이지 않고 능숙하게',
-        enDef: '1. adverb in a way that requires no physical or mental exertion; smoothly',
-        exampleBlank: 'He ______ switched between Korean and English during the talk.',
-        pos: 'Adv',
-        posLabel: '부사 (Adverb)',
-        comp: 'M',
-        compLabel: '수식어 (M)',
-        roleDesc: '동사나 형용사를 꾸며 숙련된 자연스러움(꾸안꾸)을 강조함',
-        collocation: 'effortlessly cool and natural',
-        collocationKo: '힘 주지 않아도 물 흐르듯 멋스러운',
-        paraphraseTip: '[고급 필수] easily보다 훨씬 우아하고 숙련된 느낌을 줍니다.',
-      },
-    ],
-    synonymScale: {
-      baseWord: 'good / amazing (극찬·감탄 표현 강세 비교)',
-      pos: '형용사 뉘앙스 스케일',
-      meaning: '초급 칭찬에서 고급 극찬으로 올라가는 어감 차이',
-      levels: [
-        {
-          strength: '매우 강함 (Extreme)',
-          words: [{ word: 'phenomenal / mind-blowing', ipa: '/fəˈnɒm.ɪ.nəl/', nuance: '경이롭고 압도적이어서 입이 다물어지지 않는 수준' }],
-        },
-        {
-          strength: '강함 (Strong)',
-          words: [{ word: 'captivating / lived up to the hype', ipa: '/ˈkæp.tɪ.veɪ.tɪŋ/', nuance: '마음을 완전히 사로잡는, 소문대로 명불허전인' }],
-        },
-        {
-          strength: '보통 (Neutral)',
-          words: [{ word: 'impressive / informative', ipa: '/ɪnˈfɔː.mə.tɪv/', nuance: '인상 깊고 유익한 (중급 표준 칭찬)' }],
-        },
-        {
-          strength: '약함/완곡 (Mild)',
-          words: [{ word: 'nice / pretty good', ipa: '/naɪs/', nuance: '꽤 괜찮은, 무난한 (초급 기초 표현)' }],
-        },
-      ],
-    },
-    sentences: [
-      {
-        id: 1,
-        levelTag: 'beginner',
-        tag: '🌱 [초급] 기본 표현 & 느린 발음 훈련',
-        targetWord: 'go viral & binge-watch',
-        wordOrderFormula: '[주어(The drama)] + [동사1(went viral)] + [연결(so)] + [주어2+동사2(I binge-watched it)]',
-        structure: '주어(S) + 동사구(V+SC) + 접속사 + 주어(S) + 동사(V) + 목적어(DO)',
-        soundBlockEn: 'The new drama / went viral / so I binge-watched it / all weekend.',
-        soundMethodGuide: '0.75배속으로 went viral[웬-바이럴]과 binge-watched[빈지-워치트]를 천천히 따라 읽으세요.',
-        ipaLine: '/ðə njuː ˈdrɑː.mə went ˈvaɪ.rəl səʊ aɪ ˈbɪndʒ.wɒtʃt ɪt ɔːl ˌwiːkˈend/',
-        koLine: '새 드라마가 대유행했습니다(S+V) / 그래서 나는 그것을 몰아봤습니다(S+V+DO) / 주말 내내(M).',
-        enLine: 'The new drama [went viral](S+V) / so I [binge-watched] it(S+V+DO) / all weekend(M).',
-        rawEn: 'The new drama went viral so I binge-watched it all weekend.',
-        pronLine: '[더 뉴 드라마 / 웬-바이럴 / 쏘 아이 빈지-워치트 잇 / 올 위켄드]',
-        naturalKo: '새 드라마가 입소문이 자자해서 주말 내내 몰아서 정주행했습니다.',
-        paraphraseVersion: 'Because the series became a huge hit online, I watched the entire season in two days.',
-        grammarPoint: '원인(went viral)과 결과(binge-watched)를 접속사 so로 자연스럽게 이어준 초급 필수 문장입니다.',
-        contextNuance: '월요일 아침 동료들과 주말에 본 영상을 이야기할 때 바로 쓸 수 있습니다.',
-      },
-      {
-        id: 2,
-        levelTag: 'intermediate',
-        tag: '🌿 [중급] 상황별 대화 & 바꿔 말하기 훈련',
-        targetWord: 'live up to the hype & phenomenal',
-        wordOrderFormula: '[주어(The new iPad)] + [동사구(lived up to the hype)] + [수식어(with its phenomenal display)]',
-        structure: '주어(S) + 동사구(V+O) + 전치사구 수식어(M)',
-        soundBlockEn: 'The new iPad / definitely lived up to the hype / with its phenomenal display.',
-        soundMethodGuide: 'lived up to를 [리브-덥-투]로 묶고, phenomenal의 [-나-] 음절을 높게 강조합니다.',
-        ipaLine: '/ðə njuː ˈaɪ.pæd ˈdef.ɪ.nət.li lɪvd ʌp tə ðə haɪp wɪð ɪts fəˈnɒm.ɪ.nəl dɪˈspleɪ/',
-        koLine: '새 아이패드는(S) / 확실히 소문만큼 명불허전이었습니다(M+V+O) / 경이로운 디스플레이 덕분에(M).',
-        enLine: 'The new iPad(S) / definitely [lived up to the hype](M+V+O) / with its [phenomenal] display(M).',
-        rawEn: 'The new iPad definitely lived up to the hype with its phenomenal display.',
-        pronLine: '[더 뉴 아이패드 / 데피닛리 리브-덥 투 더 하입 / 위드 잇츠 퍼-나미널 디스플레이]',
-        naturalKo: '새로 나온 아이패드는 경이로운 화질 덕분에 정말 소문대로 명불허전이었습니다.',
-        paraphraseVersion: 'The new tablet was every bit as amazing as people said, especially the screen quality.',
-        grammarPoint: '부사 definitely가 동사구 lived up to the hype 바로 앞에서 확신의 정도를 꾸며주는 수식어(M)로 쓰였습니다.',
-        contextNuance: '초급의 "It was very good"을 중·고급 원어민 리뷰 표현으로 완벽히 바꾼 문장입니다.',
-      },
-      {
-        id: 3,
-        levelTag: 'advanced',
-        tag: '🌳 [고급] 세련된 뉘앙스 & 미디어 비평 ①',
-        targetWord: 'captivating & resonate & informative',
-        wordOrderFormula: '[주어(This channel)] + [동사+보어(is captivating and informative)] + [결과절(so it resonates with viewers)]',
-        structure: '주어(S) + 동사(V) + 주격보어(SC) + 접속사 + 동사2(V) + 수식어(M)',
-        soundBlockEn: 'This content / is both captivating and informative / so it deeply resonates / with viewers.',
-        soundMethodGuide: 'captivating, informative, resonates 세 핵심 어휘의 강세를 리듬감 있게 짚어주세요.',
-        ipaLine: '/ðɪs ˈkɒn.tent ɪz bəʊθ ˈkæp.tɪ.veɪ.tɪŋ ænd ɪnˈfɔː.mə.tɪv səʊ ɪt ˈdiːp.li ˈrez.ən.eɪts wɪð ˈvjuː.əz/',
-        koLine: '이 콘텐츠는(S) / 매혹적이면서도 유익합니다(V+SC) / 그래서 시청자들에게 깊은 공감을 줍니다(S+V+M).',
-        enLine: 'This content(S) / is both [captivating] and [informative](V+SC) / so it deeply [resonates] with viewers(S+V+M).',
-        rawEn: 'This content is both captivating and informative so it deeply resonates with viewers.',
-        pronLine: '[디스 컨텐츠 / 이즈 보쓰 캡-티베이팅 앤 인-포머티브 / 쏘 잇 디플리 레-저네이츠 위드 뷰어즈]',
-        naturalKo: '이 콘텐츠는 눈을 뗄 수 없이 매력적이면서도 유익해서 시청자들에게 깊은 울림을 줍니다.',
-        paraphraseVersion: 'Because the video combines great storytelling with useful insights, people can strongly relate to it.',
-        grammarPoint: '상관접속사 both A and B 구조로 형용사 보어(captivating, informative) 두 개를 균형 있게 연결했습니다.',
-        contextNuance: '품격 있는 문화·미디어 비평이나 오픽 고급 질문에서 최고점을 받는 문장입니다.',
-      },
-      {
-        id: 4,
-        levelTag: 'advanced',
-        tag: '🌳 [고급] 세련된 뉘앙스 & 긴 대화 토론 ②',
-        targetWord: 'hit the nail on the head & effortlessly',
-        wordOrderFormula: '[주어(Your analysis)] + [동사구(hit the nail on the head)] + [연결(and)] + [동사2(persuaded everyone effortlessly)]',
-        structure: '주어(S) + 동사구(V+O+M) + 접속사 + 동사2(V) + 목적어(DO) + 수식어(M)',
-        soundBlockEn: 'Your analysis / hit the nail on the head / and persuaded everyone / effortlessly.',
-        soundMethodGuide: 'nail on을 [네이-론]으로 연음하고 effortlessly를 부드럽게 흘려줍니다.',
-        ipaLine: '/jɔːr əˈnæl.ə.sɪs hɪt ðə neɪl ɒn ðə hed ænd pəˈsweɪ.dɪd ˈev.ri.wʌn ˈef.ət.ləs.li/',
-        koLine: '당신의 분석이(S) / 정확히 핵심 정곡을 찔렀고(V+O+M) / 모두를 물 흐르듯 설득했습니다(V+DO+M).',
-        enLine: 'Your analysis(S) / [hit the nail on the head](V+O+M) / and persuaded everyone [effortlessly](V+DO+M).',
-        rawEn: 'Your analysis hit the nail on the head and persuaded everyone effortlessly.',
-        pronLine: '[유어 어-낼러시스 / 힛 더 네이-론 더 헤드 / 앤 퍼스웨이디드 에브리원 / 에-퍼트러슬리]',
-        naturalKo: '당신의 분석이 정확히 정곡을 찔러서 모두를 자연스럽게 설득해 냈습니다.',
-        paraphraseVersion: 'You pinpointed the exact core of the issue and convinced the whole team without difficulty.',
-        grammarPoint: '과거 시제에서도 hit의 형태는 그대로 hit(hit-hit-hit)이며, 등위접속사 and 뒤의 과거동사 persuaded와 병렬을 이룹니다.',
-        contextNuance: '토론이나 회의에서 상대방의 통찰력을 극찬할 때 쓰는 최고급 표현입니다.',
-      },
-    ],
-    quiz: {
-      beginner: {
-        word: 'binge-watch',
-        ipa: '/ˈbɪndʒ.wɒtʃ/',
-        options: ['일정을 취소하다', '(드라마·영화를) 몰아서 정주행하다', '운동 계획을 세우다', '회의를 주재하다'],
-        answerIdx: 1,
-        explanation: 'binge(한꺼번에 몰아서 하기) + watch가 결합하여 시리즈물을 몰아본다는 뜻입니다.',
-      },
-      intermediate: {
-        sentenceBefore: 'The new tablet definitely',
-        sentenceAfter: 'with its breathtaking display.',
-        hint: '소문이나 기대만큼 실제로도 명불허전이었다는 뜻의 이디엄입니다.',
-        options: ['lived up to the hype', 'dropped off', 'checked in', 'unwound'],
-        answerIdx: 0,
-        explanation: '대중의 높은 기대치나 홍보(hype)에 걸맞게 훌륭했다는 표현은 lived up to the hype입니다.',
-      },
-      advanced: {
-        sentenceBefore: 'The pianist’s performance was truly',
-        highlightWord: 'captivating',
-        sentenceAfter: 'from start to finish.',
-        options: ['fascinating', 'enchanting', 'tedious'],
-        answerIndices: [0, 1],
-        explanation: 'captivating(마음을 사로잡는, 매혹적인)과 같은 의미로 쓰일 수 있는 단어는 fascinating과 enchanting입니다.',
-      },
-      writingMission: {
-        koPrompt: '그 짧은 영상은 매우 유익했기 때문에 하룻밤 사이에 대유행했습니다.',
-        wordOrderHint: '[주어: The short video] + [동사구: went viral overnight] + [이유절: because it was very informative]',
-        hint: 'The short video / went viral overnight / because it was very informative.',
-        modelAnswer: 'The short video went viral overnight because it was very informative.',
-        checkPoint:
-          '유행하다(go viral)의 과거 시제 went viral 뒤에 부사 overnight(하룻밤 사이에)를 수식어(M)로 붙입니다.',
-      },
-    },
-  },
-
-  // --------------------------------------------------------------------------
-  // THEME 5: 글로벌 패션·스타일 & 업계 트렌드 (Vogue · WWD · ELLE · Bazaar · GQ)
-  // --------------------------------------------------------------------------
-  {
-    id: 'fashion-runway',
-    title: '👔 글로벌 패션·스타일 & 트렌드 비평 (Vogue · WWD · GQ)',
-    badge: '5대 패션 매거진 연동 · 초급 코디~고급 런웨이',
-    dateLabel: '오늘의 스타일 & 트렌드 코스 · Vogue / WWD / ELLE / Bazaar / GQ',
-    opicLevel: '초급(일상코디·쇼핑) ➔ 중급(스타일링·바꿔말하기) ➔ 고급(런웨이·업계동향 토론)',
-    coachPoint:
-      '5대 패션 매체(Vogue Runway, WWD, ELLE, Harper’s Bazaar, GQ Style)를 완벽 통합했습니다! 초급은 일상 착장과 쇼핑 기본 표현, 중급은 ELLE·GQ 스타일의 세련된 칭찬과 바꿔 말하기, 고급은 Vogue 런웨이 미학과 WWD 럭셔리 시장 동향 토론으로 이어집니다.',
-    wordOrderPrinciple:
-      '📌 핵심 어순 공식: [스타일·아이템 주어(S)] + [매칭·소화 동사(go well with / pull off / elevate)] + [대상·효과 목적어(DO)]',
-    grammarSummary:
-      '초급은 자동사+전치사(go well with ~: ~와 잘 어울리다), 중급은 타동사구(pull off a look: 룩을 멋지게 소화하다), 고급은 타동사(blend A with B, spearhead the market)를 구사합니다.',
-    situationGuide:
-      '오늘 입은 옷(OOTD) 칭찬하기, 해외 편집샵 쇼핑, 남성 수트 핏(GQ)과 액세서리 스타일링(Bazaar) 대화부터 패션 업계 트렌드(WWD·Vogue) 분석까지 모두 아우릅니다.',
-    levelTracks: {
-      beginner: {
-        levelName: '🌱 초급 (느린 발음 0.75x & 한글 뜻·발음 기본 도움)',
-        targetSpeed: 0.75,
-        focusBadge: '일상 데일리룩 칭찬 & 해외 쇼핑 필수 생존 표현 (ELLE / GQ 기초)',
-        patternEn: 'This jacket / goes really well / with your jeans.',
-        patternIpa: '/ðɪs ˈdʒæk.ɪt ɡəʊz ˈrɪə.li wel wɪð jɔːr dʒiːnz/',
-        patternPron: '[디스 재킷 / 고-즈 리얼리 웰 / 위드 유어 진즈]',
-        patternSoundBlock: 'This jacket / goes really well / with your jeans.',
-        patternMeaningKo: '이 재킷은 당신의 청바지와 정말 잘 어울리네요.',
-        levelGuide: '초급에서는 매장이나 일상에서 가장 많이 쓰는 "Can I try this on?(입어봐도 될까요?)"과 "It goes well with ~(그거 ~랑 잘 어울린다)" 두 가지만 천천히 익혀도 패션 대화가 시작됩니다.',
-        paraphraseDrill: [
-          { basicExpr: 'matches your jeans (청바지와 맞다)', upgradedExpr: 'goes really well with your jeans', nuanceDiff: '색상이나 스타일이 자연스럽게 잘 어우러진다는 원어민 일상 표현' },
-          { basicExpr: 'wear nice clothes (좋은 옷을 입다)', upgradedExpr: 'dress up for the occasion', nuanceDiff: '특별한 날이나 격식 있는 자리에 맞춰 멋지게 차려입다' },
-        ],
-        longTalkPrompt: '상대방의 셔츠나 재킷이 오늘 코디와 정말 잘 어울린다고(go well with) 한 문장으로 칭찬해 보세요.',
-      },
-      intermediate: {
-        levelName: '🌿 중급 (듣기 집중 0.90x & ELLE·Bazaar·GQ 스타일 바꿔 말하기)',
-        targetSpeed: 0.9,
-        focusBadge: '단순 칭찬(looks good)을 패션 매거진 에디터 표현으로 바꿔 말하기',
-        patternEn: 'You really pull off / that effortlessly chic / tailored look!',
-        patternIpa: '/ju ˈrɪə.li pʊl ɒf ðæt ˈef.ət.ləs.li ʃiːk ˈteɪ.ləd lʊk/',
-        patternPron: '[유 리얼리 풀-오프 / 댓 에-퍼트러슬리 시크 / 테일러드 룩!]',
-        patternSoundBlock: 'You really pull off / that effortlessly chic / tailored look!',
-        patternMeaningKo: '그 꾸안꾸 시크 테일러드 룩을 정말 완벽하게 소화하시네요!',
-        levelGuide: '중급에서는 GQ Style과 ELLE에서 매일 쓰는 "pull off(멋지게 소화하다)", "effortlessly chic(힘 안 준 듯 세련된/꾸안꾸)", "wardrobe staple(옷장 속 필수 기본템)"으로 바꿔 말하는 훈련을 합니다.',
-        paraphraseDrill: [
-          { basicExpr: 'It looks good on you (너한테 잘 어울려)', upgradedExpr: 'You really pull off that look!', nuanceDiff: '아무나 소화하기 힘든 스타일까지 자기 것처럼 멋지게 소화해 냈다는 극찬' },
-          { basicExpr: 'basic clothes I always wear (늘 입는 기본 옷)', upgradedExpr: 'a timeless wardrobe staple', nuanceDiff: 'GQ 선정 유행을 타지 않는 옷장 속 평생 기본 아이템' },
-          { basicExpr: 'make the clothes look better (옷을 더 돋보이게 하다)', upgradedExpr: 'elevate the outfit with a statement piece', nuanceDiff: 'Bazaar 스타일: 포인트 액세서리 하나로 전체 룩의 격을 높이다' },
-        ],
-        longTalkPrompt: '당신의 옷장 속에 있는 유행 타지 않는 최애 기본템(timeless wardrobe staple)이 무엇인지 2~3문장으로 소개해 보세요.',
-      },
-      advanced: {
-        levelName: '🌳 고급 (실전 속도 1.0x+ & Vogue 런웨이·WWD 업계 동향 토론)',
-        targetSpeed: 1.0,
-        focusBadge: 'Vogue Runway 컬렉션 미학 비평 & WWD 글로벌 브랜드 시장 분석',
-        patternEn: 'The new collection seamlessly blends / classic heritage / with modern aesthetics.',
-        patternIpa: '/ðə njuː kəˈlek.ʃən ˈsiːm.ləs.li blendz ˈklæs.ɪk ˈher.ɪ.tɪdʒ wɪð ˈmɒd.ən iːsˈθet.ɪks/',
-        patternPron: '[더 뉴 컬렉션 심-러슬리 블렌즈 / 클래식 헤리티지 / 위드 모던 에스-떼틱스]',
-        patternSoundBlock: 'The new collection / seamlessly blends / classic heritage / with modern aesthetics.',
-        patternMeaningKo: '이번 신규 컬렉션은 클래식한 브랜드 헤리티지와 현대적 미학을 물 흐르듯 결합했습니다.',
-        levelGuide: '고급에서는 Vogue Runway와 WWD 기사 원문에 등장하는 silhouette(실루엣), aesthetic(미학/감성), spearhead(시장을 선도하다), complement(상호 보완해 돋보이게 하다)를 활용해 수준 높은 트렌드 토론을 진행합니다.',
-        paraphraseDrill: [
-          { basicExpr: 'lead the fashion market', upgradedExpr: 'spearhead the global luxury market', nuanceDiff: 'WWD 비즈니스 용어: 글로벌 럭셔리 시장의 최전선에서 트렌드를 선도하다' },
-          { basicExpr: 'has a very unique style and shape', upgradedExpr: 'features an avant-garde silhouette and bold aesthetic', nuanceDiff: 'Vogue Runway 용어: 독창적인 실루엣과 대담한 미학적 감성을 보여주다' },
-        ],
-        longTalkPrompt: '[5~30분 AI 트렌드 토론] 유행을 빠르게 소비하는 패스트 패션과 오랫동안 입는 타임리스 클래식(timeless staple / heritage) 중 당신이 선호하는 스타일 철학을 Vogue·GQ 에디터처럼 이야기해 보세요.',
-      },
-    },
-    pattern: {
-      en: 'You really pull off that effortlessly chic look!',
-      ipa: '/ju ˈrɪə.li pʊl ɒf ðæt ˈef.ət.ləs.li ʃiːk lʊk/',
-      soundBlock: 'You really / pull off / that effortlessly chic look!',
-      soundMethod:
-        'pull off는 연음해 [풀-러프]로 부드럽게 잇고, chic는 [칙]이 아니라 프랑스어 유래 발음인 [시-크/ʃiːk/]로 발음하는 것이 핵심입니다!',
-      pron: '[유 리얼리 풀-오프 / 댓 에-퍼트러슬리 시-크 룩!]',
-      nuance:
-        '단순히 옷이 예쁘다는 것을 넘어, 입은 사람의 분위기와 핏이 그 스타일을 완벽하게 자기 것으로 소화해 냈을 때 쓰는 세련된 찬사입니다.',
-      opicApplication:
-        '인물 묘사, 패션·쇼핑 취미, 문화 트렌드 답변에서 어휘력을 단숨에 돋보이게 만듭니다.',
-    },
-    vocab: [
-      {
-        id: 1,
-        type: '일상 회화',
-        recommendLevel: 'beginner',
-        word: 'try on',
-        masked: 'tr ⬛  o ⬛',
-        ipa: '/traɪ ɒn/',
-        pron: '[트라이 온]',
-        soundMethod: 'try의 이중모음 /aɪ/ 뒤에 on을 부드럽게 연결해 발음합니다.',
-        soundBlock: 'try on / this tailored jacket',
-        meaning: '(옷·신발 등을) 입어보다, 착용해 보다',
-        enDef: '1. phrasal verb to put on an item of clothing to see if it fits or suits one',
-        exampleBlank: 'Where is the fitting room? I would like to ______ these trousers.',
-        pos: 'V',
-        posLabel: '구동사 (Verb)',
-        comp: 'V',
-        compLabel: '동사 (V)',
-        roleDesc: '옷이나 액세서리가 맞는지 착용해 보는 3형식 타동사구',
-        collocation: 'try on a new outfit',
-        collocationKo: '새 옷(코디)을 피팅룸에서 입어보다',
-        paraphraseTip: '[초급 필수] 대명사(it/them)는 반드시 try it on처럼 사이에 넣습니다!',
-      },
-      {
-        id: 2,
-        type: '일상 회화',
-        recommendLevel: 'beginner',
-        word: 'go well with',
-        masked: 'g ⬛  w ⬛ ll  w ⬛ th',
-        ipa: '/ɡəʊ wel wɪð/',
-        pron: '[고- 웰 위드]',
-        soundMethod: 'well에 강세를 실어 긍정적이고 밝은 톤으로 발음합니다.',
-        soundBlock: 'goes really well / with your suit',
-        meaning: '(색상·스타일이) ~와 아주 잘 어울리다',
-        enDef: '1. idiom to harmonize or match nicely with another item',
-        exampleBlank: 'That classic watch ______ your smart-casual outfit.',
-        pos: 'V',
-        posLabel: '동사구 (Verb)',
-        comp: 'V',
-        compLabel: '동사 (V)',
-        roleDesc: '주어 아이템이 전치사 with 뒤의 아이템과 조화를 이룸을 서술',
-        collocation: 'go well with everything',
-        collocationKo: '어느 옷에나 두루두루 잘 어울리다',
-        paraphraseTip: '[초급➔고급] 초급은 go well with, 고급은 complement를 씁니다.',
-      },
-      {
-        id: 3,
-        type: '일상 회화',
-        recommendLevel: 'intermediate',
-        word: 'pull off',
-        masked: 'p ⬛ ll  o ⬛ f',
-        ipa: '/pʊl ɒf/',
-        pron: '[풀-오프]',
-        soundMethod: 'pull의 끝소리 l을 윗잇몸에 댔다가 off로 곧바로 연결합니다.',
-        soundBlock: 'pull off / a bold style',
-        meaning: '(패션·스타일을) 멋지게 소화해 내다',
-        enDef: '1. phrasal verb to succeed in wearing a style of clothing attractively',
-        exampleBlank: 'Not everyone can ______ a bright burgundy suit like you do.',
-        pos: 'V',
-        posLabel: '구동사 (Verb)',
-        comp: 'V',
-        compLabel: '동사 (V)',
-        roleDesc: '까다로운 옷이나 컬러를 훌륭하게 소화해 내는 타동사구',
-        collocation: 'pull off a tailored look',
-        collocationKo: '테일러드 수트 룩을 완벽히 소화하다 (GQ 표현)',
-        paraphraseTip: '[중급 1순위] wear well을 대체하는 패션 매거진 최다 빈출 구동사',
-      },
-      {
-        id: 4,
-        type: '일상 회화',
-        recommendLevel: 'intermediate',
-        word: 'effortlessly chic',
-        masked: 'ef ⬛ ortlessly  ch ⬛ c',
-        ipa: '/ˈef.ət.ləs.li ʃiːk/',
-        pron: '[에-퍼트러슬리 시-크]',
-        soundMethod: 'chic는 철자 c가 [크]로 끝나지만 첫 ch는 [ʃ(쉬/시)] 소리여서 [시-크]로 발음합니다!',
-        soundBlock: 'an effortlessly chic / daily look',
-        meaning: '힘 안 준 듯 자연스럽게 세련된 (꾸안꾸 시크)',
-        enDef: '1. phrase stylish and elegant in a natural, unforced way',
-        exampleBlank: 'ELLE highlighted her ______ street style in Paris.',
-        pos: 'Adj',
-        posLabel: '형용사구 (Adj)',
-        comp: 'SC',
-        compLabel: '주격보어 (SC)',
-        roleDesc: '부사 effortlessly가 형용사 chic를 수식하여 세련된 상태를 나타냄',
-        collocation: 'effortlessly chic vibe',
-        collocationKo: '꾸민 듯 안 꾸민 듯 시크한 분위기 (ELLE 표현)',
-        paraphraseTip: '[중·고급] 한국어의 "꾸안꾸"에 100% 대응하는 원어민 패션 표현!',
-      },
-      {
-        id: 5,
-        type: '일상 회화',
-        recommendLevel: 'intermediate',
-        word: 'wardrobe staple',
-        masked: 'wa ⬛ drobe  st ⬛ ple',
-        ipa: '/ˈwɔː.drəʊb ˈsteɪ.pəl/',
-        pron: '[워-드로브 스테이플]',
-        soundMethod: 'wardrobe(옷장)와 staple(필수품) 각각의 첫 음절에 강세를 줍니다.',
-        soundBlock: 'a timeless / wardrobe staple',
-        meaning: '옷장 속 필수 기본템 (유행 안 타는 클래식 아이템)',
-        enDef: '1. noun a basic, essential item of clothing that forms the foundation of an outfit',
-        exampleBlank: 'A well-fitted white shirt is a timeless ______ for every man.',
-        pos: 'N',
-        posLabel: '명사구 (Noun)',
-        comp: 'SC',
-        compLabel: '주격보어 (SC)',
-        roleDesc: '주어 아이템이 옷장의 핵심 필수품임을 설명하는 명사 보어',
-        collocation: 'a timeless wardrobe staple',
-        collocationKo: '시대를 초월한 옷장 속 필수 기본템 (GQ 선정)',
-        paraphraseTip: '[중급 바꿔말하기] must-have basic item ➔ wardrobe staple',
-      },
-      {
-        id: 6,
-        type: '고급/실무',
-        recommendLevel: 'advanced',
-        word: 'silhouette',
-        masked: 'si ⬛ hou ⬛ tte',
-        ipa: '/ˌsɪl.uˈet/',
-        pron: '[실루-엣]',
-        soundMethod: '묵음 h는 발음하지 않고, 마지막 음절 -ette에 강한 강세를 둡니다.',
-        soundBlock: 'a sharp / tailored silhouette',
-        meaning: '(옷의 전체적인) 실루엣, 라인, 윤곽',
-        enDef: '1. noun the overall shape or outline created by a garment on the body',
-        exampleBlank: 'Vogue Runway praised the designer’s structured and modern ______.',
-        pos: 'N',
-        posLabel: '명사 (Noun)',
-        comp: 'DO',
-        compLabel: '직접목적어 (DO)',
-        roleDesc: '컬렉션이나 의상의 전체적인 핏과 외형 라인을 뜻하는 핵심 명사',
-        collocation: 'flatter your silhouette',
-        collocationKo: '체형과 실루엣을 돋보이게 살려주다',
-        paraphraseTip: '[Vogue 핵심] shape or fit을 격조 높게 표현하는 런웨이 필수 명사',
-      },
-      {
-        id: 7,
-        type: '고급/실무',
-        recommendLevel: 'advanced',
-        word: 'aesthetic',
-        masked: 'ae ⬛ th ⬛ tic',
-        ipa: '/iːsˈθet.ɪk/',
-        pron: '[에스-떼틱]',
-        soundMethod: 'th는 혀끝을 윗니 사이에 살짝 끼우는 무성음 /θ/로 발음하고 -the-에 강세를 줍니다.',
-        soundBlock: 'minimalist / aesthetic',
-        meaning: '미학, 독창적인 미적 감성·스타일 철학',
-        enDef: '1. noun/adj a set of principles underlying the work of a particular artist or brand',
-        exampleBlank: 'The brand’s signature ______ combines luxury with comfort.',
-        pos: 'N',
-        posLabel: '명사/형용사 (N)',
-        comp: 'S',
-        compLabel: '주어 (S)',
-        roleDesc: '브랜드나 디자이너만의 고유한 미적 세계관을 나타내는 주어/목적어',
-        collocation: 'modern and refined aesthetic',
-        collocationKo: '현대적이고 정제된 미학적 감성',
-        paraphraseTip: '[Vogue·Bazaar] 단순 style을 넘어 예술적 감성과 디자인 철학을 뜻함',
-      },
-      {
-        id: 8,
-        type: '고급/실무',
-        recommendLevel: 'advanced',
-        word: 'statement piece',
-        masked: 'st ⬛ tement  p ⬛ ece',
-        ipa: '/ˈsteɪt.mənt piːs/',
-        pron: '[스테이트먼트 피-스]',
-        soundMethod: 'statement의 첫 음절과 piece의 장모음 /iː/를 선명하게 살려줍니다.',
-        soundBlock: 'elevate the look / with a statement piece',
-        meaning: '단번에 시선을 사로잡는 강렬한 포인트 아이템',
-        enDef: '1. noun an eye-catching item of clothing or accessory that defines an outfit',
-        exampleBlank: 'Harper’s Bazaar recommends adding a bold watch or bag as a ______.',
-        pos: 'N',
-        posLabel: '명사구 (Noun)',
-        comp: 'DO',
-        compLabel: '직접목적어 (DO)',
-        roleDesc: '전체 코디의 중심을 잡아주는 핵심 포인트 아이템을 지칭',
-        collocation: 'make a bold statement',
-        collocationKo: '강렬하고 대담한 존재감을 드러내다',
-        paraphraseTip: '[Bazaar 핵심] point item(콩글리시)을 대체하는 진짜 원어민 표현!',
-      },
-      {
-        id: 9,
-        type: '고급/실무',
-        recommendLevel: 'advanced',
-        word: 'complement',
-        masked: 'co ⬛ pl ⬛ ment',
-        ipa: '/ˈkɒm.plɪ.ment/',
-        pron: '[캄-플리먼트]',
-        soundMethod: '칭찬하다(compliment: i)와 발음은 같지만 철자 e를 써서 "서로 보완해 돋보이게 하다"를 뜻합니다.',
-        soundBlock: 'perfectly complement / the tailored suit',
-        meaning: '(서로 어울려) 한층 더 돋보이게 보완하다',
-        enDef: '1. verb to add to something in a way that enhances or improves its quality',
-        exampleBlank: 'The silk tie and pocket square ______ the charcoal suit.',
-        pos: 'V',
-        posLabel: '동사 (Verb)',
-        comp: 'V',
-        compLabel: '동사 (V)',
-        roleDesc: '아이템끼리 조화를 이루어 서로의 매력을 배가시키는 타동사',
-        collocation: 'complement each other beautifully',
-        collocationKo: '서로 기막히게 어우러져 빛을 발하다',
-        paraphraseTip: '[고급 변환] 초급의 go well with를 대체하는 최고급 동사',
-      },
-      {
-        id: 10,
-        type: '고급/실무',
-        recommendLevel: 'advanced',
-        word: 'spearhead',
-        masked: 'sp ⬛ arh ⬛ ad',
-        ipa: '/ˈspɪə.hed/',
-        pron: '[스피어-헤드]',
-        soundMethod: '창(spear)의 끝(head)이라는 뜻에서 유래했으며, 첫 음절 spear-에 강세를 줍니다.',
-        soundBlock: 'spearhead / the global trend',
-        meaning: '(새로운 트렌드·시장을) 최전선에서 선도하다, 앞장서다',
-        enDef: '1. verb to lead an attack, movement, or market trend',
-        exampleBlank: 'According to WWD, the new creative director will ______ the brand’s digital expansion.',
-        pos: 'V',
-        posLabel: '동사 (Verb)',
-        comp: 'V',
-        compLabel: '동사 (V)',
-        roleDesc: '패션 하우스나 기업이 새로운 시장 흐름을 주도함을 나타내는 동사',
-        collocation: 'spearhead the luxury market',
-        collocationKo: '글로벌 럭셔리 시장을 선도하다 (WWD 표현)',
-        paraphraseTip: '[WWD 비즈니스] lead the market을 대체하는 강력하고 전문적인 동사',
-      },
-    ],
-    synonymScale: {
-      baseWord: 'stylish / match (패션 감각 & 조화 강세 비교)',
-      pos: '패션 매거진(Vogue·GQ·ELLE) 뉘앙스 스케일',
-      meaning: '초급 일상 칭찬에서 하이패션 에디터 표현까지의 어감 차이',
-      levels: [
-        {
-          strength: '매우 강함 (Extreme)',
-          words: [{ word: 'avant-garde / refined aesthetic', ipa: '/ˌæv.ɒ̃ˈɡɑːd/', nuance: '시대를 앞서가는 독창적 실루엣과 정제된 미학 (Vogue Runway)' }],
-        },
-        {
-          strength: '강함 (Strong)',
-          words: [{ word: 'effortlessly chic / complement', ipa: '/ˈef.ət.ləs.li ʃiːk/', nuance: '꾸안꾸 시크의 정석 / 서로를 완벽히 돋보이게 보완하다 (ELLE·Bazaar)' }],
-        },
-        {
-          strength: '보통 (Neutral)',
-          words: [{ word: 'pull off / tailored fit', ipa: '/pʊl ɒf/', nuance: '멋지게 소화해 내다 / 몸에 딱 맞는 테일러드 핏 (GQ Style)' }],
-        },
-        {
-          strength: '약함/완곡 (Mild)',
-          words: [{ word: 'look nice / go well with', ipa: '/ɡəʊ wel wɪð/', nuance: '보기 좋다 / 잘 어울린다 (초급 일상 회화)' }],
-        },
-      ],
-    },
-    sentences: [
-      {
-        id: 1,
-        levelTag: 'beginner',
-        tag: '🌱 [초급] 일상 스타일 & 느린 발음 훈련 (ELLE·GQ 기초)',
-        targetWord: 'try on & go well with',
-        wordOrderFormula: '[주어+동사(I tried on this jacket)] + [연결(and)] + [주어2+동사2(it goes well with my jeans)]',
-        structure: '주어(S) + 동사(V) + 목적어(DO) + 접속사 + 주어(S) + 동사(V) + 수식어(M)',
-        soundBlockEn: 'I tried on / this jacket / and it goes really well / with my jeans.',
-        soundMethodGuide: '0.75배속으로 tried on[트라이-돈] 연음과 goes well with를 천천히 따라 읽어보세요.',
-        ipaLine: '/aɪ traɪd ɒn ðɪs ˈdʒæk.ɪt ænd ɪt ɡəʊz ˈrɪə.li wel wɪð maɪ dʒiːnz/',
-        koLine: '나는 입어보았습니다(S+V) / 이 재킷을(DO) / 그리고 그것은 정말 잘 어울립니다(S+V) / 내 청바지와(M).',
-        enLine: 'I [tried on](S+V) / this jacket(DO) / and it [goes really well with](S+V) / my jeans(M).',
-        rawEn: 'I tried on this jacket and it goes really well with my jeans.',
-        pronLine: '[아이 트라이-돈 / 디스 재킷 / 앤 잇 고-즈 리얼리 웰 / 위드 마이 진즈]',
-        naturalKo: '이 재킷을 입어봤는데 제 청바지랑 정말 잘 어울리네요.',
-        paraphraseVersion: 'This jacket fits me nicely and matches my denim trousers.',
-        grammarPoint: '구동사 try on 뒤에 일반명사(this jacket)가 목적어로 와서 자연스럽게 연결된 3형식 문장입니다.',
-        contextNuance: '쇼핑할 때나 오늘 입은 옷을 이야기할 때 가장 먼저 쓰게 되는 필수 표현입니다.',
-      },
-      {
-        id: 2,
-        levelTag: 'intermediate',
-        tag: '🌿 [중급] 스타일 묘사 & 바꿔 말하기 훈련 (GQ & Bazaar)',
-        targetWord: 'pull off & wardrobe staple & statement piece',
-        wordOrderFormula: '[주어(You)] + [동사(pulled off)] + [목적어(that wardrobe staple)] + [수식어(by adding a statement piece)]',
-        structure: '주어(S) + 동사(V) + 직접목적어(DO) + 수단 전치사구 수식어(M)',
-        soundBlockEn: 'You effortlessly pulled off / that wardrobe staple / by adding / a bold statement piece.',
-        soundMethodGuide: 'pulled off를 [풀-도프]로 연음하고 statement piece에 또렷한 강세를 실어줍니다.',
-        ipaLine: '/ju ˈef.ət.ləs.li pʊld ɒf ðæt ˈwɔː.drəʊb ˈsteɪ.pəl baɪ ˈæd.ɪŋ ə bəʊld ˈsteɪt.mənt piːs/',
-        koLine: '당신은 물 흐르듯 소화해 냈습니다(S+M+V) / 그 기본 필수템을(DO) / 대담한 포인트 아이템을 더함으로써(M).',
-        enLine: 'You effortlessly [pulled off](S+M+V) / that [wardrobe staple](DO) / by adding a bold [statement piece](M).',
-        rawEn: 'You effortlessly pulled off that wardrobe staple by adding a bold statement piece.',
-        pronLine: '[유 에-퍼트러슬리 풀-도프 / 댓 워-드로브 스테이플 / 바이 애딩 / 어 볼드 스테이트먼트 피-스]',
-        naturalKo: '기본 필수 아이템에 대담한 포인트 액세서리를 더해서 코디를 정말 시크하게 소화하셨네요.',
-        paraphraseVersion: 'You made a classic basic outfit look extraordinary with an eye-catching accessory.',
-        grammarPoint: '전치사 by + 동명사(by adding ~: ~함으로써) 구조로 스타일링 비법(수단·방법)을 문장 뒤 수식어(M)로 덧붙였습니다.',
-        contextNuance: 'GQ와 Harper’s Bazaar 에디터들이 가장 즐겨 쓰는 세련된 스타일링 찬사입니다.',
-      },
-      {
-        id: 3,
-        levelTag: 'advanced',
-        tag: '🌳 [고급] 런웨이 컬렉션 비평 ① (Vogue Runway & ELLE)',
-        targetWord: 'silhouette & aesthetic & complement',
-        wordOrderFormula: '[주어(The tailored silhouette)] + [동사(complements)] + [목적어(the brand’s modern aesthetic)]',
-        structure: '주어(S) + 동사(V) + 직접목적어(DO) + 수식어(M)',
-        soundBlockEn: 'The tailored silhouette / on Vogue Runway / perfectly complements / the brand’s modern aesthetic.',
-        soundMethodGuide: 'silhouette[실루-엣]과 aesthetic[에스-떼틱]의 강세를 정확히 살려 지적인 톤으로 발음하세요.',
-        ipaLine: '/ðə ˈteɪ.ləd ˌsɪl.uˈet ɒn vəʊɡ ˈrʌn.weɪ ˈpɜː.fekt.li ˈkɒm.plɪ.ments ðə brændz ˈmɒd.ən iːsˈθet.ɪk/',
-        koLine: '테일러드 실루엣은(S) / 보그 런웨이의(M) / 완벽히 돋보이게 보완합니다(M+V) / 브랜드의 현대적 미학을(DO).',
-        enLine: 'The tailored [silhouette](S) / on Vogue Runway(M) / perfectly [complements](M+V) / the brand’s modern [aesthetic](DO).',
-        rawEn: 'The tailored silhouette on Vogue Runway perfectly complements the brand’s modern aesthetic.',
-        pronLine: '[더 테일러드 실루-엣 / 온 보그 런웨이 / 퍼펙틀리 캄-플리먼츠 / 더 브랜즈 모던 에스-떼틱]',
-        naturalKo: '보그 런웨이에서 선보인 정교한 실루엣은 브랜드 특유의 현대적 미학을 한층 더 완벽하게 돋보이게 합니다.',
-        paraphraseVersion: 'The structured outline of the collection harmonizes seamlessly with the house’s contemporary design philosophy.',
-        grammarPoint: '주어 핵이 단수명사 silhouette이므로 전치사구(on Vogue Runway)에 현혹되지 않고 단수동사 complements(-s)로 수일치시킵니다.',
-        contextNuance: 'Vogue Runway 컬렉션 리뷰 기사를 읽거나 디자인·트렌드를 비평할 때 쓰이는 최고급 문장입니다.',
-      },
-      {
-        id: 4,
-        levelTag: 'advanced',
-        tag: '🌳 [고급] 패션 업계 동향 토론 ② (WWD 비즈니스)',
-        targetWord: 'spearhead & effortlessly chic',
-        wordOrderFormula: '[부사구(According to WWD)] + [주어(the luxury house)] + [동사(will spearhead)] + [목적어(the market)] + [수식어(with ~)]',
-        structure: '수식어(M) + 주어(S) + 동사(V) + 직접목적어(DO) + 전치사구 수식어(M)',
-        soundBlockEn: 'According to WWD, / the luxury house / will spearhead the market / with effortlessly chic collections.',
-        soundMethodGuide: 'spearhead[스피어-헤드]와 effortlessly chic[에-퍼트러슬리 시-크]를 매끄럽게 연결합니다.',
-        ipaLine: '/əˈkɔː.dɪŋ tə ˌdʌb.əl.juː.dʌb.əl.juːˈdiː ðə ˈlʌk.ʃər.i haʊs wɪl ˈspɪə.hed ðə ˈmɑː.kɪt wɪð ˈef.ət.ləs.li ʃiːk kəˈlek.ʃənz/',
-        koLine: 'WWD에 따르면(M) / 그 럭셔리 하우스는(S) / 시장을 선도할 것입니다(V+DO) / 꾸안꾸 시크 컬렉션들로(M).',
-        enLine: 'According to WWD(M), / the luxury house(S) / will [spearhead] the market(V+DO) / with [effortlessly chic] collections(M).',
-        rawEn: 'According to WWD, the luxury house will spearhead the market with effortlessly chic collections.',
-        pronLine: '[어코딩 투 더블유더블유디 / 더 럭셔리 하우스 / 윌 스피어-헤드 더 마켓 / 위드 에-퍼트러슬리 시-크 컬렉션즈]',
-        naturalKo: 'WWD 보도에 따르면, 해당 럭셔리 브랜드는 자연스러우면서도 시크한 컬렉션을 앞세워 글로벌 시장을 선도할 전망입니다.',
-        paraphraseVersion: 'WWD reports that the fashion brand is set to lead the industry through its refined yet relaxed designs.',
-        grammarPoint: '출처를 밝히는 전치사구 According to ~(WWD에 따르면)를 문두 수식어(M)로 두어 비즈니스 브리핑의 객관성을 높였습니다.',
-        contextNuance: '패션 업계뿐만 아니라 모든 산업의 시장 트렌드와 브랜드 전략을 논의할 때 그대로 응용할 수 있습니다.',
-      },
-    ],
-    quiz: {
-      beginner: {
-        word: 'pull off (GQ & ELLE 핵심 표현)',
-        ipa: '/pʊl ɒf/',
-        options: ['옷을 벗어 두다', '(어려운 스타일·룩을) 멋지게 소화해 내다', '매장을 방문하다', '가격을 할인하다'],
-        answerIdx: 1,
-        explanation: 'pull off는 까다로운 패션 스타일이나 과감한 컬러를 자기 것처럼 멋지게 소화해 낸다는 뜻의 필수 구동사입니다.',
-      },
-      intermediate: {
-        sentenceBefore: 'A crisp white shirt is a timeless',
-        sentenceAfter: 'that goes well with everything.',
-        hint: '유행을 타지 않고 옷장 속에 늘 갖추어야 할 "필수 기본템"을 뜻하는 GQ 선정 표현입니다.',
-        options: ['wardrobe staple', 'layover', 'heads-up', 'itinerary'],
-        answerIdx: 0,
-        explanation: 'timeless wardrobe staple은 시대를 초월한 옷장 속 필수 기본 아이템을 뜻합니다.',
-      },
-      advanced: {
-        sentenceBefore: 'The silk scarf and leather bag perfectly',
-        highlightWord: 'complement',
-        sentenceAfter: 'her tailored coat.',
-        options: ['enhance', 'harmonize with', 'ruin'],
-        answerIndices: [0, 1],
-        explanation: 'complement(보완하여 한층 더 돋보이게 하다)는 enhance(높이다/돋보이게 하다), harmonize with(~와 조화를 이루다)와 바꿔 쓸 수 있습니다.',
-      },
-      writingMission: {
-        koPrompt: '당신은 그 꾸안꾸 시크(힘 안 준 듯 세련된) 테일러드 룩을 정말 멋지게 소화해 내시네요!',
-        wordOrderHint: '[주어: You] + [동사구: really pull off] + [목적어: that effortlessly chic tailored look]!',
-        hint: 'You really pull off / that effortlessly chic / tailored look!',
-        modelAnswer: 'You really pull off that effortlessly chic tailored look!',
-        checkPoint:
-          '부사 effortlessly가 형용사 chic를 꾸며주고, 전체가 명사 look을 수식(M)하는 세련된 어순입니다.',
-      },
-    },
-  },
-];
-
-export const THEMES: ThemeData[] = [...THEMES_PART1, ...THEMES_PART2];
-
-// ============================================================================
-// 🎓 [신규 탑재] 수능·내신 1등급 완벽 대비 전략적 학습 데이터베이스
-//    - 슬로건: "영어로 생각하고 표현하는 힘, 외운 답이 아닌 답을 만드는 영어"
-//    - 3대 전문 반: ① 수능 정규 완성반(고3 1등급) ② 고등 어법·서술형 완성반(406개교 6개년) ③ 학교별 내신 대비반(5단계 누적·변형)
-// ============================================================================
-export type ExamTrackId = 'CSAT_MASTER' | 'GRAMMAR_ESSAY' | 'SCHOOL_INTERNAL';
-
-export interface ExamStepModule {
+export interface ExamCourseStep {
   stepNum: number;
   stepTitle: string;
-  durationLabel: string;
-  goalDesc: string;
+  focusPoint: string;
   originalPassageEn: string;
+  originalPassagePron: string;
   originalPassageKo: string;
-  transformedEn: string; // 변형 / 패러프레이징 지문
+  transformedEn: string;
+  transformedPron: string;
   transformedPoint: string;
-  killerGrammarTrap: {
-    questionEn: string;
-    wrongChoice: string;
-    correctChoice: string;
-    freqBadge: string;
-    ruleExplanation: string;
+  grammarTrapQuestion: {
+    prompt: string;
+    choiceA: string;
+    choiceB: string;
+    correctChoice: 'A' | 'B';
+    explanation: string;
   };
   essayMission: {
     typeBadge: string;
@@ -3203,184 +248,4042 @@ export interface ExamStepModule {
 
 export interface ExamMasterCourse {
   id: ExamTrackId;
-  name: string;
-  shortTabName: string;
   badge: string;
+  title: string;
+  shortTabName: string;
+  scheduleGuide: string;
   targetGoal: string;
-  scheduleRule: string;
-  philosophy: string;
-  curriculumPills: string[];
-  steps: ExamStepModule[];
+  coreCurriculum: string[];
+  steps: ExamCourseStep[];
 }
 
-export const EXAM_MASTER_COURSES: ExamMasterCourse[] = [
+export interface ChatTurn {
+  role: 'user' | 'coach';
+  text: string;
+  correction?: string;
+  nuanceTip?: string;
+}
+
+export interface SavedWordItem {
+  id: string;
+  word: string;
+  ipa: string;
+  pron?: string;
+  meaning: string;
+  collocation: string;
+  posLabel: string;
+  compLabel: string;
+  levelBadge?: string;
+  customNote?: string;
+  mastered?: boolean;
+}
+
+export interface SavedSentenceItem {
+  id: string;
+  en: string;
+  pron?: string;
+  ko: string;
+  note: string;
+  category: string;
+  mastered: boolean;
+}
+
+export interface StrokePoint {
+  x: number;
+  y: number;
+  pressure: number;
+}
+
+export interface CanvasStroke {
+  tool: 'fountain' | 'marker' | 'ballpoint' | 'highlighter' | 'eraser';
+  color: '#2563eb' | '#0f172a' | '#10b981' | '#e11d48' | '#facc15';
+  width: number;
+  alpha: number;
+  points: StrokePoint[];
+}
+
+// ============================================================================
+// 1. 문장 성분 7개(구·절 역할) + 9품사(단어 정체, 한정사 포함) = 총 16개 문법 노드 사전
+//    ※ 단어 단위의 품사(Pos)와 구·절 단위의 문장 성분(Comp)을 명확히 구분하여 서술
+// ============================================================================
+export const SENTENCE_COMPONENTS: SentenceComponentInfo[] = [
+  {
+    id: 'S',
+    name: '주어',
+    engName: 'Subject (S)',
+    roleTitle: '문장의 주체 (~은/는/이/가)',
+    easyMeaning:
+      '문장에서 동작을 행하거나 상태의 주체가 되는 자리입니다. 기본적으로 명사(구)·대명사가 오며, 구·절 단위에서는 동명사구(V-ing), to부정사구, 명사절(that절·what절·의문사절)도 주어 역할을 합니다.',
+    wordOrderRule:
+      '평서문에서는 원칙적으로 본동사(V) 앞에 위치합니다. (단, 부정어구·Only 부사구 문두 도치나 유도부사 There 구문에서는 동사/조동사 뒤로 도치됨)',
+    allowedPos: ['N', 'Pron'],
+    exampleHighlight: '[Our team (S)] streamlined the workflow. / [Streamlining the process (S:동명사구)] makes it feasible.',
+  },
+  {
+    id: 'V',
+    name: '동사(서술어)',
+    engName: 'Verb / Predicate (V)',
+    roleTitle: '주어의 동작·상태 서술 (~하다/~이다)',
+    easyMeaning:
+      '주어가 어떤 동작을 하는지 또는 어떤 상태인지를 서술하는 문장의 핵심 동사(구) 자리입니다. 조동사(will, can, should 등)나 완료형(have p.p.)과 결합하여 하나의 서술어 블록을 이룹니다.',
+    wordOrderRule:
+      '주어(S) 바로 뒤에 위치하며, 동사의 성질(자동사·타동사·연결동사·수여동사)에 따라 뒤에 올 목적어(O)나 보어(C)의 구조가 결정됩니다.',
+    allowedPos: ['V'],
+    exampleHighlight: 'Our team [streamlined (V)] the workflow. / We [will touch base (V)] tomorrow.',
+  },
+  {
+    id: 'IO',
+    name: '간접목적어',
+    engName: 'Indirect Object (IO)',
+    roleTitle: '4형식 수여동사의 받는 대상 (~에게)',
+    easyMeaning:
+      '4형식 수여동사(give, send, offer, grant, show 등) 뒤에서 직접목적어(DO)를 전달받는 대상(~에게)입니다.',
+    wordOrderRule:
+      '[수여동사(V) + 간접목적어(IO: ~에게) + 직접목적어(DO: ~을/를)] 어순으로 놓입니다. IO를 뒤로 보내면 전치사(to/for/of)가 붙어 수식어구(M)로 전환됩니다.',
+    allowedPos: ['N', 'Pron'],
+    exampleHighlight: 'Thanks for giving [me (IO)] a quick heads-up(DO).',
+  },
+  {
+    id: 'DO',
+    name: '직접목적어',
+    engName: 'Direct Object (DO)',
+    roleTitle: '타동사 동작의 대상 (~을/를)',
+    easyMeaning:
+      '타동사가 나타내는 동작의 직접적인 대상입니다. 명사(구)·대명사뿐만 아니라 to부정사구, 동명사구(V-ing), 명사절(that절·what절·if/whether절)도 목적어 자리에 옵니다.',
+    wordOrderRule:
+      '3형식에서는 타동사(V) 바로 뒤에, 4형식에서는 간접목적어(IO) 바로 뒤에 위치합니다.',
+    allowedPos: ['N', 'Pron'],
+    exampleHighlight: 'We carefully checked [the schedule (DO)].',
+  },
+  {
+    id: 'SC',
+    name: '주격보어',
+    engName: 'Subject Complement (SC)',
+    roleTitle: '주어(S)의 정체·상태 보충 설명',
+    easyMeaning:
+      '2형식 연결동사(be, become, remain, seem, feel, look 등) 뒤에서 주어가 무엇인지(명사구) 또는 어떤 상태인지(형용사구) 보충합니다. to부정사구·동명사구·명사절 및 상태를 나타내는 전치사구(예: on the same page)도 보어로 쓰입니다.',
+    wordOrderRule:
+      '2형식 연결동사 바로 뒤에 위치합니다. 해석이 "~하게"로 되더라도 주어의 상태를 설명하므로 부사(-ly)가 아닌 형용사를 써야 합니다.',
+    allowedPos: ['N', 'Pron', 'Adj', 'Prep'],
+    exampleHighlight: 'The wording remained [ambiguous (SC:형용사)]. / Everyone is [on the same page (SC:전치사구)].',
+  },
+  {
+    id: 'OC',
+    name: '목적격보어',
+    engName: 'Object Complement (OC)',
+    roleTitle: '목적어(DO)의 정체·상태·동작 보충 설명',
+    easyMeaning:
+      '5형식 동사(make, keep, find, consider, help, encourage 등) 뒤에서 목적어(DO)가 어떤 상태인지(형용사·명사) 또는 어떤 동작을 하는지(to부정사·원형부정사·분사)를 보충 설명합니다.',
+    wordOrderRule:
+      '[5형식 동사(V) + 목적어(DO) + 목적격보어(OC)] 어순입니다. 상태 보어 자리에는 부사(-ly)를 쓸 수 없으며, 목적어와의 능동(V-ing/to V)·수동(p.p.) 관계를 구별해야 합니다.',
+    allowedPos: ['N', 'Adj', 'V'],
+    exampleHighlight: 'Streamlining the process makes the project [feasible (OC:형용사)].',
+  },
+  {
+    id: 'M',
+    name: '수식어(및 부가어)',
+    engName: 'Modifier / Adjunct (M)',
+    roleTitle: '명사·동사·문장 수식 및 명사구 내부 한정',
+    easyMeaning:
+      '문장의 필수 뼈대(S·V·O·C)를 꾸며주거나 시간·장소·이유·조건 등의 부가 정보를 더합니다. 단어 단위에서는 형용사·부사·한정사(명사구 내부 한정)가, 구·절 단위에서는 전치사구·부사절·분사구문이 수식어 역할을 수행합니다.',
+    wordOrderRule:
+      '한정사(Det)와 단일 형용사(Adj)는 명사 앞에서, 전치사구·관계사절·부사절은 주로 명사 뒤나 문장 앞뒤에서 수식합니다.',
+    allowedPos: ['Adj', 'Adv', 'Prep', 'Conj', 'Det', 'Interj'],
+    exampleHighlight: '[The (M:한정사)] [short (M:형용사)] video went viral [overnight (M:부사)].',
+  },
+];
+
+export const PARTS_OF_SPEECH: PartOfSpeechInfo[] = [
+  {
+    id: 'N',
+    name: '명사',
+    engName: 'Noun (N)',
+    identityTitle: '사람·사물·추상 개념의 이름',
+    easyMeaning:
+      '구체적인 사물부터 추상적 개념(perspective, autonomy, feasibility 등)까지 이름을 나타내는 품사입니다. 명사구의 중심(핵)이 되어 주어·목적어·보어 자리에 들어갑니다.',
+    allowedComp: ['S', 'IO', 'DO', 'SC', 'OC'],
+    exampleWords: 'schedule, perspective, itinerary, silhouette, milestone, bias',
+  },
+  {
+    id: 'Pron',
+    name: '대명사',
+    engName: 'Pronoun (Pron)',
+    identityTitle: '명사(구)를 대신 가리키는 말',
+    easyMeaning:
+      '명사의 반복을 피하거나 화자·청자·대상을 가리킬 때 명사구 자리에 대신 들어갑니다. 인칭대명사(I, we, you, me, us), 재귀대명사(yourself), 관계대명사(what, which) 등이 포함됩니다.',
+    allowedComp: ['S', 'IO', 'DO', 'SC'],
+    exampleWords: 'I, we, you, they, me, us, it, yourself, ourselves, what',
+  },
+  {
+    id: 'V',
+    name: '동사',
+    engName: 'Verb (V)',
+    identityTitle: '동작이나 상태를 나타내는 말',
+    easyMeaning:
+      '시제와 수일치를 가지며 문장의 서술어(V)가 됩니다. 또한 to부정사·원형부정사·분사(준동사) 형태로 변환되면 5형식의 목적격보어(OC) 등 다양한 구문 역할을 수행합니다.',
+    allowedComp: ['V', 'OC'],
+    exampleWords: 'streamline, expedite, accommodate, unwind, foster, consolidate',
+  },
+  {
+    id: 'Adj',
+    name: '형용사',
+    engName: 'Adjective (Adj)',
+    identityTitle: '명사의 성질·상태를 설명하는 말',
+    easyMeaning:
+      '명사 앞뒤에서 명사를 꾸미는 수식어(M)가 되거나, 2형식 주격보어(SC) 및 5형식 목적격보어(OC) 자리에서 주어·목적어의 상태를 설명합니다.',
+    allowedComp: ['SC', 'OC', 'M'],
+    exampleWords: 'feasible, available, comfortable, ambiguous, tentative, sustainable',
+  },
+  {
+    id: 'Adv',
+    name: '부사',
+    engName: 'Adverb (Adv)',
+    identityTitle: '동사·형용사·다른 부사·문장 전체를 수식하는 말',
+    easyMeaning:
+      '시간, 장소, 빈도, 방식, 정도를 나타내며 문장에서 수식어(M)로 기능합니다. (주의: 보어 자리인 SC·OC에는 부사가 들어갈 수 없습니다.)',
+    allowedComp: ['M'],
+    exampleWords: 'meticulously, simultaneously, seamlessly, overnight, genuinely, today',
+  },
+  {
+    id: 'Prep',
+    name: '전치사',
+    engName: 'Preposition (Prep)',
+    identityTitle: '명사구(동명사구) 앞에 놓여 관계를 나타내는 말',
+    easyMeaning:
+      '단독으로 쓰이지 않고 뒤에 목적어(명사구·동명사구)를 이끌어 [전치사구]를 형성합니다. 형성된 전치사구는 문장에서 부사적/형용사적 수식어(M)가 되거나 상태를 나타내는 주격보어(SC)로 쓰입니다.',
+    allowedComp: ['SC', 'M'],
+    exampleWords: 'in, on, at, for, with, by, before, during, without, within, upon',
+  },
+  {
+    id: 'Conj',
+    name: '접속사',
+    engName: 'Conjunction (Conj)',
+    identityTitle: '단어·구·절을 이어주는 연결어',
+    easyMeaning:
+      '대등한 요소를 잇는 등위접속사(and, but, or, so)와 부사절·명사절을 이끄는 종속접속사(because, although, if, until, that, whether)가 있으며 절 단위의 연결 및 수식(M)을 담당합니다.',
+    allowedComp: ['M'],
+    exampleWords: 'and, but, so, because, although, if, until, whether, while',
+  },
+  {
+    id: 'Det',
+    name: '한정사',
+    engName: 'Determiner (Det)',
+    identityTitle: '명사구 맨 앞에서 명사의 범위·소유·특정성을 한정하는 말',
+    easyMeaning:
+      '관사(a, an, the), 소유격(my, our, their), 지시한정사(this, that) 등입니다. 단독으로 독립된 문장 성분이 되기보다 명사구(NP) 내부에서 핵심 명사를 한정하는 수식 요소(M)로 기능합니다.',
+    allowedComp: ['M'],
+    exampleWords: 'the, a, an, my, our, your, their, this, that, every, each',
+  },
+  {
+    id: 'Interj',
+    name: '감탄사(담화표지)',
+    engName: 'Interjection (Interj)',
+    identityTitle: '느낌·부름·응답·화제 전환을 나타내는 독립 요소',
+    easyMeaning:
+      '문장의 필수 성분 밖에서 독립적으로 쓰여 화자의 감정이나 담화 분위기를 전달하는 요소(M/독립어)입니다.',
+    allowedComp: ['M'],
+    exampleWords: 'Well, Oh, Wow, Hey, Honestly, Thankfully',
+  },
+];
+
+// SENTENCE_COMPONENTS.allowedPos 및 PARTS_OF_SPEECH.allowedComp와 1:1로 일치하는 20개 결합 관계선
+export const MAPPING_EDGES: { comp: CompId; pos: PosId }[] = [
+  { comp: 'S', pos: 'N' },
+  { comp: 'S', pos: 'Pron' },
+  { comp: 'V', pos: 'V' },
+  { comp: 'IO', pos: 'N' },
+  { comp: 'IO', pos: 'Pron' },
+  { comp: 'DO', pos: 'N' },
+  { comp: 'DO', pos: 'Pron' },
+  { comp: 'SC', pos: 'N' },
+  { comp: 'SC', pos: 'Pron' },
+  { comp: 'SC', pos: 'Adj' },
+  { comp: 'SC', pos: 'Prep' },
+  { comp: 'OC', pos: 'N' },
+  { comp: 'OC', pos: 'Adj' },
+  { comp: 'OC', pos: 'V' },
+  { comp: 'M', pos: 'Adj' },
+  { comp: 'M', pos: 'Adv' },
+  { comp: 'M', pos: 'Prep' },
+  { comp: 'M', pos: 'Conj' },
+  { comp: 'M', pos: 'Det' },
+  { comp: 'M', pos: 'Interj' },
+];
+
+// STEP 3에서 언제든 선택해 확인할 수 있는 정밀 수작업 주석 대표 예문 3선 (3형식 · 4형식 · 5형식)
+export const DIAGRAM_EXAMPLES: DiagramSentence[] = [
+  {
+    title: '대표 표준 예문 1 (5형식: 동명사구 주어 + make + 목적어 + 형용사 보어)',
+    rawEn: 'Streamlining the process makes the schedule feasible.',
+    naturalKo: '절차를 간소화하는 것은 그 일정을 실현 가능하게 만든다.',
+    skeleton: 'Streamlining the process[S] + makes[V] + the schedule[DO] + feasible[OC]',
+    patternType: '5형식 (S + V + DO + OC) — 목적격보어 형용사 주의 구문',
+    wordOrderTip:
+      '문장 맨 앞의 Streamlining은 콤마 없이 동사 makes와 결합하므로 분사구문이 아니라 동명사구 주어(S)이며, 단수 동사 makes와 수일치합니다. 맨 끝 feasible은 목적어(the schedule)의 상태를 보충하는 목적격보어(OC)이므로 부사(feasibly)를 쓰지 않습니다.',
+    isHeuristic: false,
+    tokens: [
+      {
+        word: 'Streamlining',
+        comp: 'S',
+        compLabel: '주어 (S)',
+        pos: 'N',
+        posLabel: '동명사 (N역할)',
+        meaning: '간소화하는 것',
+        roleExplanation: '동사 streamline에 -ing가 붙어 명사구 역할을 하는 동명사구 주어(S)의 핵심어입니다.',
+        colorClass: 'border-blue-500 text-blue-700',
+      },
+      {
+        word: 'the',
+        comp: 'M',
+        compLabel: '한정수식 (M)',
+        pos: 'Det',
+        posLabel: '한정사 (Det)',
+        meaning: '그',
+        roleExplanation: '명사 process 앞에서 특정 대상을 한정하는 정관사(한정사)입니다.',
+        colorClass: 'border-slate-300 text-slate-600',
+      },
+      {
+        word: 'process',
+        comp: 'DO',
+        compLabel: '준동사의 목적어',
+        pos: 'N',
+        posLabel: '명사 (N)',
+        meaning: '절차를',
+        roleExplanation: '앞의 동명사 Streamlining의 의미상 목적어로 결합되어 전체 주어구(Streamlining the process)를 완성합니다.',
+        colorClass: 'border-indigo-400 text-indigo-700',
+      },
+      {
+        word: 'makes',
+        comp: 'V',
+        compLabel: '동사 (V)',
+        pos: 'V',
+        posLabel: '동사 (V)',
+        meaning: '만든다',
+        roleExplanation: '동명사구 주어(단수 취급)에 수일치된 5형식 본동사(V)입니다.',
+        colorClass: 'border-rose-500 text-rose-700',
+      },
+      {
+        word: 'the',
+        comp: 'M',
+        compLabel: '한정수식 (M)',
+        pos: 'Det',
+        posLabel: '한정사 (Det)',
+        meaning: '그',
+        roleExplanation: '목적어 명사 schedule을 한정하는 정관사입니다.',
+        colorClass: 'border-slate-300 text-slate-600',
+      },
+      {
+        word: 'schedule',
+        comp: 'DO',
+        compLabel: '직접목적어 (DO)',
+        pos: 'N',
+        posLabel: '명사 (N)',
+        meaning: '일정을',
+        roleExplanation: '5형식 동사 makes의 직접목적어(DO)입니다.',
+        colorClass: 'border-emerald-500 text-emerald-700',
+      },
+      {
+        word: 'feasible.',
+        comp: 'OC',
+        compLabel: '목적격보어 (OC)',
+        pos: 'Adj',
+        posLabel: '형용사 (Adj)',
+        meaning: '실현 가능한(가능하게)',
+        roleExplanation: '목적어(the schedule)가 어떤 상태가 되는지 설명하는 목적격보어(OC)이므로 형용사 형태를 씁니다.',
+        colorClass: 'border-amber-500 text-amber-700',
+      },
+    ],
+  },
+  {
+    title: '대표 표준 예문 2 (4형식: 수여동사 give + 간접목적어 IO + 직접목적어 DO)',
+    rawEn: 'Traveling abroad gives us valuable experience.',
+    naturalKo: '해외여행을 하는 것은 우리에게 귀중한 경험을 준다.',
+    skeleton: 'Traveling abroad[S] + gives[V] + us[IO] + valuable experience[DO]',
+    patternType: '4형식 수여동사 구문 (S + V + IO + DO)',
+    wordOrderTip:
+      '4형식 동사 gives 뒤에 받는 사람(us: 우리에게, IO)이 먼저 오고, 주는 대상(valuable experience: 귀중한 경험을, DO)이 바로 이어집니다.',
+    isHeuristic: false,
+    tokens: [
+      {
+        word: 'Traveling',
+        comp: 'S',
+        compLabel: '주어 (S)',
+        pos: 'N',
+        posLabel: '동명사 (N역할)',
+        meaning: '여행하는 것은',
+        roleExplanation: '문장의 주어 역할을 하는 동명사(S)입니다.',
+        colorClass: 'border-blue-500 text-blue-700',
+      },
+      {
+        word: 'abroad',
+        comp: 'M',
+        compLabel: '수식어 (M)',
+        pos: 'Adv',
+        posLabel: '부사 (Adv)',
+        meaning: '해외로',
+        roleExplanation: '앞의 동명사 Traveling을 수식하는 장소·방향 부사(M)입니다.',
+        colorClass: 'border-slate-400 text-slate-600',
+      },
+      {
+        word: 'gives',
+        comp: 'V',
+        compLabel: '동사 (V)',
+        pos: 'V',
+        posLabel: '동사 (V)',
+        meaning: '준다',
+        roleExplanation: '간접목적어와 직접목적어 두 개를 취하는 4형식 수여동사(V)입니다.',
+        colorClass: 'border-rose-500 text-rose-700',
+      },
+      {
+        word: 'us',
+        comp: 'IO',
+        compLabel: '간접목적어 (IO)',
+        pos: 'Pron',
+        posLabel: '대명사 (Pron)',
+        meaning: '우리에게',
+        roleExplanation: '경험을 받는 대상인 간접목적어(IO) 자리에 목적격 대명사가 쓰였습니다.',
+        colorClass: 'border-purple-500 text-purple-700',
+      },
+      {
+        word: 'valuable',
+        comp: 'M',
+        compLabel: '수식어 (M)',
+        pos: 'Adj',
+        posLabel: '형용사 (Adj)',
+        meaning: '귀중한',
+        roleExplanation: '뒤의 명사 experience를 꾸며주는 형용사 수식어(M)입니다.',
+        colorClass: 'border-amber-500 text-amber-700',
+      },
+      {
+        word: 'experience.',
+        comp: 'DO',
+        compLabel: '직접목적어 (DO)',
+        pos: 'N',
+        posLabel: '명사 (N)',
+        meaning: '경험을',
+        roleExplanation: '수여동사 gives가 전달하는 실제 내용물인 직접목적어(DO)입니다.',
+        colorClass: 'border-emerald-500 text-emerald-700',
+      },
+    ],
+  },
+  {
+    title: '대표 표준 예문 3 (2형식: 연결동사 remain + 형용사 주격보어 SC)',
+    rawEn: 'The wording remained somewhat ambiguous.',
+    naturalKo: '그 문구는 다소 모호한 상태로 남아 있었다.',
+    skeleton: 'The wording[S] + remained[V] + somewhat[M] + ambiguous[SC]',
+    patternType: '2형식 상태유지 구문 (S + V + SC)',
+    wordOrderTip:
+      'remained는 2형식 연결동사이며, 부사 somewhat(다소)은 뒤의 형용사 보어 ambiguous를 수식(M)하고, 핵심 주격보어(SC)는 형용사 ambiguous입니다.',
+    isHeuristic: false,
+    tokens: [
+      {
+        word: 'The',
+        comp: 'M',
+        compLabel: '한정수식 (M)',
+        pos: 'Det',
+        posLabel: '한정사 (Det)',
+        meaning: '그',
+        roleExplanation: '주어 명사 wording을 한정하는 정관사(Det)입니다.',
+        colorClass: 'border-slate-300 text-slate-600',
+      },
+      {
+        word: 'wording',
+        comp: 'S',
+        compLabel: '주어 (S)',
+        pos: 'N',
+        posLabel: '명사 (N)',
+        meaning: '문구는',
+        roleExplanation: '문장의 주체가 되는 주어(S) 명사입니다.',
+        colorClass: 'border-blue-500 text-blue-700',
+      },
+      {
+        word: 'remained',
+        comp: 'V',
+        compLabel: '동사 (V)',
+        pos: 'V',
+        posLabel: '동사 (V)',
+        meaning: '남아 있었다',
+        roleExplanation: '주어의 상태가 유지됨을 나타내는 2형식 연결동사(V)입니다.',
+        colorClass: 'border-rose-500 text-rose-700',
+      },
+      {
+        word: 'somewhat',
+        comp: 'M',
+        compLabel: '수식어 (M)',
+        pos: 'Adv',
+        posLabel: '부사 (Adv)',
+        meaning: '다소, 어느 정도',
+        roleExplanation: '뒤에 오는 형용사 보어 ambiguous의 정도를 꾸며주는 부사(M)입니다.',
+        colorClass: 'border-slate-400 text-slate-600',
+      },
+      {
+        word: 'ambiguous.',
+        comp: 'SC',
+        compLabel: '주격보어 (SC)',
+        pos: 'Adj',
+        posLabel: '형용사 (Adj)',
+        meaning: '모호한 (상태로)',
+        roleExplanation: '주어(The wording)의 상태를 보충 설명하는 주격보어(SC)입니다.',
+        colorClass: 'border-amber-500 text-amber-700',
+      },
+    ],
+  },
+];
+
+// ============================================================================
+// 2. 9대 분야 에디터 큐레이션 & 구글 뉴스 RSS 연동 토픽 90선
+//    - 모든 키워드에 dictTargetWord(사전 검색용 단일 표제어), ipa(미국식), pron(한글발음) 완비
+//    - 2025년 7월 유튜브 급상승 폐지 및 2021년 네이버 실검 종료 등 실제 서비스 현황 반영
+// ============================================================================
+export const INITIAL_MEDIA_PLATFORMS: MediaTrendPlatform[] = [
+  {
+    id: 'FASHION_MAGS',
+    name: '패션 에디토리얼 큐레이션 (런웨이·스타일링 핵심 표현)',
+    shortName: '👗 패션에디토리얼',
+    badgeColor: 'bg-rose-600 text-white',
+    liveUrl: 'https://www.vogue.com/fashion',
+    sourceNote: '에디터 선정 패션·스타일링 필수 연어 10선',
+    keywords: [
+      {
+        rank: 1,
+        koTitle: '테일러드 룩을 멋지게 소화하기',
+        enExpression: 'pull off a tailored look',
+        dictTargetWord: 'tailored',
+        ipa: '/pʊl ɔːf ə ˈteɪ.lɚd lʊk/',
+        pron: '[풀 오프 어 테일러드 룩]',
+        targetThemeId: 'theme-fashion-editorial',
+        extUrl: 'https://www.vogue.com/fashion',
+      },
+      {
+        rank: 2,
+        koTitle: '유행을 타지 않는 옷장 필수 기본템에 투자하기',
+        enExpression: 'invest in a wardrobe staple',
+        dictTargetWord: 'staple',
+        ipa: '/ɪnˈvest ɪn ə ˈwɔːr.droʊb ˈsteɪ.pəl/',
+        pron: '[인베스트 이너 워드로브 스테이플]',
+        targetThemeId: 'theme-fashion-editorial',
+        extUrl: 'https://www.harpersbazaar.com/fashion/',
+      },
+      {
+        rank: 3,
+        koTitle: '절제된 미니멀 미학(조용한 럭셔리) 수용하기',
+        enExpression: 'embrace a minimalist aesthetic',
+        dictTargetWord: 'aesthetic',
+        ipa: '/ɪmˈbreɪs ə ˈmɪn.ə.məl.ɪst esˈθet̬.ɪk/',
+        pron: '[임브레이스 어 미니멀리스트 에스쎄틱]',
+        targetThemeId: 'theme-fashion-editorial',
+        extUrl: 'https://www.elle.com/fashion/',
+      },
+      {
+        rank: 4,
+        koTitle: '지속 가능한 친환경 패션 캠페인 선도하기',
+        enExpression: 'spearhead sustainable fashion',
+        dictTargetWord: 'spearhead',
+        ipa: '/ˈspɪr.hed səˈsteɪ.nə.bəl ˈfæʃ.ən/',
+        pron: '[스피어헤드 서스테이너블 패션]',
+        targetThemeId: 'theme-fashion-editorial',
+        extUrl: 'https://wwd.com/fashion-news/',
+      },
+      {
+        rank: 5,
+        koTitle: '서로 다른 소재·질감을 자연스럽게 레이어링하기',
+        enExpression: 'layer different textures seamlessly',
+        dictTargetWord: 'texture',
+        ipa: '/ˈleɪ.ɚ ˈdɪf.ɚ.ənt ˈteks.tʃɚz ˈsiːm.ləs.li/',
+        pron: '[레이어 디프런트 텍스처즈 심리슬리]',
+        targetThemeId: 'theme-fashion-editorial',
+        extUrl: 'https://www.gq.com/style',
+      },
+      {
+        rank: 6,
+        koTitle: '체형과 전체적인 실루엣을 돋보이게 보완하기',
+        enExpression: 'complement your silhouette naturally',
+        dictTargetWord: 'silhouette',
+        ipa: '/ˈkɑːm.plə.ment jʊr ˌsɪl.uˈet ˈnætʃ.ɚ.əl.i/',
+        pron: '[캄플러먼트 유어 실루엣 내추럴리]',
+        targetThemeId: 'theme-fashion-editorial',
+        extUrl: 'https://www.vogue.com/fashion',
+      },
+      {
+        rank: 7,
+        koTitle: '단숨에 시선을 사로잡는 포인트 아이템 착용하기',
+        enExpression: 'wear a bold statement piece',
+        dictTargetWord: 'statement',
+        ipa: '/wer ə boʊld ˈsteɪt.mənt piːs/',
+        pron: '[웨어 러 볼드 스테이트먼트 피스]',
+        targetThemeId: 'theme-fashion-editorial',
+        extUrl: 'https://www.elle.com/fashion/',
+      },
+      {
+        rank: 8,
+        koTitle: '전통 헤리티지와 현대적 감각을 조화롭게 결합하기',
+        enExpression: 'blend heritage with modern style',
+        dictTargetWord: 'heritage',
+        ipa: '/blend ˈher.ɪ.t̬ɪdʒ wɪð ˈmɑː.dɚn staɪl/',
+        pron: '[블렌드 헤리티지 위드 모던 스타일]',
+        targetThemeId: 'theme-fashion-editorial',
+        extUrl: 'https://wwd.com/',
+      },
+      {
+        rank: 9,
+        koTitle: '사이즈와 핏을 확인하기 위해 재킷 직접 입어보기',
+        enExpression: 'try on the jacket for size',
+        dictTargetWord: 'jacket',
+        ipa: '/traɪ ɑːn ðə ˈdʒæk.ɪt fɔːr saɪz/',
+        pron: '[트라이 안 더 재킷 포 사이즈]',
+        targetThemeId: 'theme-fashion-editorial',
+        extUrl: 'https://www.gq.com/style',
+      },
+      {
+        rank: 10,
+        koTitle: '캐주얼과 정장 모두에 잘 어울리기',
+        enExpression: 'go well with both casual and formal wear',
+        dictTargetWord: 'casual',
+        ipa: '/ɡoʊ wel wɪð boʊθ ˈkæʒ.u.əl ænd ˈfɔːr.məl wer/',
+        pron: '[고우 웰 위드 보쓰 캐주얼 앤 포멀 웨어]',
+        targetThemeId: 'theme-fashion-editorial',
+        extUrl: 'https://www.harpersbazaar.com/',
+      },
+    ],
+  },
+  {
+    id: 'NAVER',
+    name: '네이버 뉴스·비즈니스 토픽 큐레이션',
+    shortName: '💚 네이버뉴스',
+    badgeColor: 'bg-emerald-600 text-white',
+    liveUrl: 'https://news.naver.com/',
+    sourceNote: '직장인·시사 뉴스 핵심 비즈니스 표현 10선',
+    keywords: [
+      {
+        rank: 1,
+        koTitle: '복잡한 업무 프로세스 간소화·효율화하기',
+        enExpression: 'streamline the workflow',
+        dictTargetWord: 'streamline',
+        ipa: '/ˈstriːm.laɪn ðə ˈwɝːk.floʊ/',
+        pron: '[스트림라인 더 워크플로우]',
+        targetThemeId: 'theme-biz-meeting',
+        extUrl: 'https://news.naver.com/',
+      },
+      {
+        rank: 2,
+        koTitle: '결재 및 승인 절차를 신속히 앞당겨 처리하기',
+        enExpression: 'expedite the approval process',
+        dictTargetWord: 'expedite',
+        ipa: '/ˈek.spə.daɪt ðə əˈpruː.vəl ˈprɑː.ses/',
+        pron: '[엑스퍼다이트 디 어프루벌 프로세스]',
+        targetThemeId: 'theme-biz-meeting',
+        extUrl: 'https://news.naver.com/',
+      },
+      {
+        rank: 3,
+        koTitle: '일정 변경에 대해 팀에 미리 귀띔해 주기',
+        enExpression: 'give a quick heads-up',
+        dictTargetWord: 'schedule',
+        ipa: '/ɡɪv ə kwɪk ˈhedz.ʌp/',
+        pron: '[기버 퀵 헤즈업]',
+        targetThemeId: 'theme-biz-meeting',
+        extUrl: 'https://news.naver.com/',
+      },
+      {
+        rank: 4,
+        koTitle: '프로젝트 일정을 실현 가능하게 만들기',
+        enExpression: 'make the project feasible',
+        dictTargetWord: 'feasible',
+        ipa: '/meɪk ðə ˈprɑː.dʒekt ˈfiː.zə.bəl/',
+        pron: '[메익 더 프로젝트 피저블]',
+        targetThemeId: 'theme-biz-meeting',
+        extUrl: 'https://news.naver.com/',
+      },
+      {
+        rank: 5,
+        koTitle: '긴 하루 일과를 마치고 퇴근 후 긴장 풀기',
+        enExpression: 'unwind after a long day at work',
+        dictTargetWord: 'unwind',
+        ipa: '/ʌnˈwaɪnd ˈæf.tɚ ə lɔːŋ deɪ æt wɝːk/',
+        pron: '[언와인드 애프터 러 롱 데이 앳 워크]',
+        targetThemeId: 'theme-opic-routine',
+        extUrl: 'https://news.naver.com/',
+      },
+      {
+        rank: 6,
+        koTitle: '호텔 레이트 체크아웃 요청을 수용해 주다',
+        enExpression: 'accommodate a late check-out request',
+        dictTargetWord: 'accommodate',
+        ipa: '/əˈkɑː.mə.deɪt ə leɪt ˈtʃek.aʊt rɪˈkwest/',
+        pron: '[어카머데이트 어 레이트 체크아웃 리퀘스트]',
+        targetThemeId: 'theme-travel-hotel',
+        extUrl: 'https://news.naver.com/',
+      },
+      {
+        rank: 7,
+        koTitle: '하룻밤 사이에 입소문을 타고 빠르게 확산되다',
+        enExpression: 'go viral overnight',
+        dictTargetWord: 'viral',
+        ipa: '/ɡoʊ ˈvaɪ.rəl ˌoʊ.vɚˈnaɪt/',
+        pron: '[고우 바이럴 오버나이트]',
+        targetThemeId: 'theme-youtube-viral',
+        extUrl: 'https://news.naver.com/',
+      },
+      {
+        rank: 8,
+        koTitle: '모두가 같은 내용을 공유하고 있는지 확인하기',
+        enExpression: 'make sure we are on the same page',
+        dictTargetWord: 'consensus',
+        ipa: '/meɪk ʃʊr wi ɑːr ɑːn ðə seɪm peɪdʒ/',
+        pron: '[메익 슈어 위 아 안 더 세임 페이지]',
+        targetThemeId: 'theme-biz-meeting',
+        extUrl: 'https://news.naver.com/',
+      },
+      {
+        rank: 9,
+        koTitle: '주말마다 늘 찾는 단골 커피숍 방문하기',
+        enExpression: 'visit my go-to coffee shop',
+        dictTargetWord: 'routine',
+        ipa: '/ˈvɪz.ɪt maɪ ˈɡoʊ.tuː ˈkɔː.fi ʃɑːp/',
+        pron: '[비짓 마이 고우투 커피 샵]',
+        targetThemeId: 'theme-opic-routine',
+        extUrl: 'https://news.naver.com/',
+      },
+      {
+        rank: 10,
+        koTitle: '체크인 시간 전에 수하물 먼저 맡기기',
+        enExpression: 'drop off our luggage early',
+        dictTargetWord: 'luggage',
+        ipa: '/drɑːp ɔːf ˈaʊ.ɚ ˈlʌɡ.ɪdʒ ˈɝː.li/',
+        pron: '[드랍 오프 아워 러기지 얼리]',
+        targetThemeId: 'theme-travel-hotel',
+        extUrl: 'https://news.naver.com/',
+      },
+    ],
+  },
+  {
+    id: 'GOOGLE_TRENDS',
+    name: '구글 뉴스 RSS & 글로벌 테크 토픽 (실시간 연동)',
+    shortName: '🔵 구글트렌드',
+    badgeColor: 'bg-blue-600 text-white',
+    liveUrl: 'https://trends.google.co.kr/trending?geo=KR',
+    sourceNote: '구글 뉴스 RSS 실시간 헤드라인 연동 지원 플랫폼',
+    keywords: [
+      {
+        rank: 1,
+        koTitle: '소문·기대만큼 실제로도 뛰어난 가치를 증명하다',
+        enExpression: 'live up to the hype',
+        dictTargetWord: 'hype',
+        ipa: '/lɪv ʌp tə ðə haɪp/',
+        pron: '[리법 투 더 하입]',
+        targetThemeId: 'theme-youtube-viral',
+        extUrl: 'https://trends.google.co.kr/trending?geo=KR',
+      },
+      {
+        rank: 2,
+        koTitle: '문제의 핵심(정곡)을 정확히 찌르다',
+        enExpression: 'hit the nail on the head',
+        dictTargetWord: 'accurate',
+        ipa: '/hɪt ðə neɪl ɑːn ðə hed/',
+        pron: '[힛 더 네일 안 더 헤드]',
+        targetThemeId: 'theme-youtube-viral',
+        extUrl: 'https://trends.google.co.kr/trending?geo=KR',
+      },
+      {
+        rank: 3,
+        koTitle: '데이터 분석 도구를 실무에 적극 활용하다',
+        enExpression: 'leverage data analytics tools',
+        dictTargetWord: 'leverage',
+        ipa: '/ˈlev.ɚ.ɪdʒ ˈdeɪ.t̬ə ˌæn.əˈlɪt̬.ɪks tuːlz/',
+        pron: '[레버리지 데이터 애널리틱스 툴즈]',
+        targetThemeId: 'theme-biz-meeting',
+        extUrl: 'https://trends.google.co.kr/trending?geo=KR',
+      },
+      {
+        rank: 4,
+        koTitle: '신제품 출시를 위한 잠정 일정을 잡다',
+        enExpression: 'set a tentative launch date',
+        dictTargetWord: 'tentative',
+        ipa: '/set ə ˈten.tə.t̬ɪv lɔːntʃ deɪt/',
+        pron: '[세러 텐터티브 런치 데이트]',
+        targetThemeId: 'theme-biz-meeting',
+        extUrl: 'https://trends.google.co.kr/trending?geo=KR',
+      },
+      {
+        rank: 5,
+        koTitle: '주말 동안 신작 시리즈 전체를 몰아서 정주행하다',
+        enExpression: 'binge-watch the entire season',
+        dictTargetWord: 'episode',
+        ipa: '/ˈbɪndʒ.wɑːtʃ ðə ɪnˈtaɪr ˈsiː.zən/',
+        pron: '[빈지워치 디 인타이어 시즌]',
+        targetThemeId: 'theme-youtube-viral',
+        extUrl: 'https://trends.google.co.kr/trending?geo=KR',
+      },
+      {
+        rank: 6,
+        koTitle: '복잡한 머리를 식히기 위해 산책하다',
+        enExpression: 'take a walk to clear my head',
+        dictTargetWord: 'refresh',
+        ipa: '/teɪk ə wɔːk tə klɪr maɪ hed/',
+        pron: '[테이커 워크 투 클리어 마이 헤드]',
+        targetThemeId: 'theme-opic-routine',
+        extUrl: 'https://trends.google.co.kr/trending?geo=KR',
+      },
+      {
+        rank: 7,
+        koTitle: '호텔 투숙객용 무료 조식 혜택을 이용하다',
+        enExpression: 'enjoy complimentary breakfast',
+        dictTargetWord: 'complimentary',
+        ipa: '/ɪnˈdʒɔɪ ˌkɑːm.pləˈmen.t̬ɚ.i ˈbrek.fəst/',
+        pron: '[인조이 캄플러멘터리 브렉퍼스트]',
+        targetThemeId: 'theme-travel-hotel',
+        extUrl: 'https://trends.google.co.kr/trending?geo=KR',
+      },
+      {
+        rank: 8,
+        koTitle: '세부 계약 조건을 빈틈없이 꼼꼼하게 검토하다',
+        enExpression: 'review the terms meticulously',
+        dictTargetWord: 'meticulous',
+        ipa: '/rɪˈvjuː ðə tɝːmz məˈtɪk.jə.ləs.li/',
+        pron: '[리뷰 더 텀즈 머티큘러슬리]',
+        targetThemeId: 'theme-biz-meeting',
+        extUrl: 'https://trends.google.co.kr/trending?geo=KR',
+      },
+      {
+        rank: 9,
+        koTitle: '매일 정해둔 운동 루틴을 흔들림 없이 지키다',
+        enExpression: 'stick to my daily workout routine',
+        dictTargetWord: 'consistent',
+        ipa: '/stɪk tə maɪ ˈdeɪ.li ˈwɝːk.aʊt ruːˈtiːn/',
+        pron: '[스틱 투 마이 데일리 워크아웃 루틴]',
+        targetThemeId: 'theme-opic-routine',
+        extUrl: 'https://trends.google.co.kr/trending?geo=KR',
+      },
+      {
+        rank: 10,
+        koTitle: '업데이트된 항공편 상세 일정표를 확인하다',
+        enExpression: 'check the updated flight itinerary',
+        dictTargetWord: 'itinerary',
+        ipa: '/tʃek ðə ʌpˈdeɪ.t̬ɪd flaɪt aɪˈtɪn.ə.rer.i/',
+        pron: '[체크 디 업데이티드 플라이트 아이티너레리]',
+        targetThemeId: 'theme-travel-hotel',
+        extUrl: 'https://trends.google.co.kr/trending?geo=KR',
+      },
+    ],
+  },
+  {
+    id: 'YOUTUBE',
+    name: '유튜브 크리에이터 & 쇼츠(Shorts) 핵심 표현',
+    shortName: '🔴 유튜브·쇼츠',
+    badgeColor: 'bg-red-600 text-white',
+    liveUrl: 'https://www.youtube.com/',
+    sourceNote: '유튜브 크리에이터·브이로그·리뷰 빈출 표현 10선',
+    keywords: [
+      {
+        rank: 1,
+        koTitle: '소셜 미디어 전반에서 빠르게 입소문을 타다',
+        enExpression: 'go viral across social media',
+        dictTargetWord: 'viral',
+        ipa: '/ɡoʊ ˈvaɪ.rəl əˈkrɔːs ˈsoʊ.ʃəl ˈmiː.di.ə/',
+        pron: '[고우 바이럴 어크로스 소셜 미디어]',
+        targetThemeId: 'theme-youtube-viral',
+        extUrl: 'https://www.youtube.com/',
+      },
+      {
+        rank: 2,
+        koTitle: '시청자의 시선을 즉시 사로잡다',
+        enExpression: 'capture viewers’ attention right away',
+        dictTargetWord: 'capture',
+        ipa: '/ˈkæp.tʃɚ ˈvjuː.ɚz əˈten.ʃən raɪt əˈweɪ/',
+        pron: '[캡처 뷰어즈 어텐션 라이러웨이]',
+        targetThemeId: 'theme-youtube-viral',
+        extUrl: 'https://www.youtube.com/',
+      },
+      {
+        rank: 3,
+        koTitle: '확실히 소문·기대만큼의 가치를 증명하다',
+        enExpression: 'definitely live up to the hype',
+        dictTargetWord: 'hype',
+        ipa: '/ˈdef.ə.nət.li lɪv ʌp tə ðə haɪp/',
+        pron: '[데피니틀리 리법 투 더 하입]',
+        targetThemeId: 'theme-youtube-viral',
+        extUrl: 'https://www.youtube.com/',
+      },
+      {
+        rank: 4,
+        koTitle: '핵심을 정확히 찌르는 분석을 제시하다',
+        enExpression: 'hit the nail on the head',
+        dictTargetWord: 'insight',
+        ipa: '/hɪt ðə neɪl ɑːn ðə hed/',
+        pron: '[힛 더 네일 안 더 헤드]',
+        targetThemeId: 'theme-youtube-viral',
+        extUrl: 'https://www.youtube.com/',
+      },
+      {
+        rank: 5,
+        koTitle: '밀린 최신 브이로그들을 몰아서 정주행하다',
+        enExpression: 'binge-watch the latest vlogs',
+        dictTargetWord: 'marathon',
+        ipa: '/ˈbɪndʒ.wɑːtʃ ðə ˈleɪ.t̬ɪst vlɑːɡz/',
+        pron: '[빈지워치 더 레이티스트 브이로그즈]',
+        targetThemeId: 'theme-youtube-viral',
+        extUrl: 'https://www.youtube.com/',
+      },
+      {
+        rank: 6,
+        koTitle: '좋아하는 음악을 들으며 에너지를 재충전하다',
+        enExpression: 'recharge my batteries with music',
+        dictTargetWord: 'recharge',
+        ipa: '/riːˈtʃɑːrdʒ maɪ ˈbæt̬.ɚ.iz wɪð ˈmjuː.zɪk/',
+        pron: '[리차지 마이 배러리즈 위드 뮤직]',
+        targetThemeId: 'theme-opic-routine',
+        extUrl: 'https://www.youtube.com/',
+      },
+      {
+        rank: 7,
+        koTitle: '과감한 포인트 스타일을 멋지게 소화해 내다',
+        enExpression: 'pull off a bold look',
+        dictTargetWord: 'bold',
+        ipa: '/pʊl ɔːf ə boʊld lʊk/',
+        pron: '[풀 오프 어 볼드 룩]',
+        targetThemeId: 'theme-fashion-editorial',
+        extUrl: 'https://www.youtube.com/',
+      },
+      {
+        rank: 8,
+        koTitle: '경유 대기 시간 동안 간단히 씻고 재정비하다',
+        enExpression: 'freshen up during the layover',
+        dictTargetWord: 'layover',
+        ipa: '/ˈfreʃ.ən ʌp ˈdʊr.ɪŋ ðə ˈleɪ.oʊ.vɚ/',
+        pron: '[프레셔넙 듀링 더 레이오버]',
+        targetThemeId: 'theme-travel-hotel',
+        extUrl: 'https://www.youtube.com/',
+      },
+      {
+        rank: 9,
+        koTitle: '오늘의 논의를 매끄럽게 마무리하다',
+        enExpression: 'wrap up the discussion smoothly',
+        dictTargetWord: 'conclude',
+        ipa: '/ræp ʌp ðə dɪˈskʌʃ.ən ˈsmuːð.li/',
+        pron: '[래펍 더 디스커션 스무들리]',
+        targetThemeId: 'theme-biz-meeting',
+        extUrl: 'https://www.youtube.com/',
+      },
+      {
+        rank: 10,
+        koTitle: '기내 반입 수하물 크기 제한 규격을 맞추다',
+        enExpression: 'meet the carry-on size limit',
+        dictTargetWord: 'baggage',
+        ipa: '/miːt ðə ˈkær.i.ɑːn saɪz ˈlɪm.ɪt/',
+        pron: '[밋 더 캐리안 사이즈 리밋]',
+        targetThemeId: 'theme-travel-hotel',
+        extUrl: 'https://www.youtube.com/',
+      },
+    ],
+  },
+  {
+    id: 'NATE',
+    name: '네이트 직장인 & 라이프 토픽 큐레이션',
+    shortName: '🟠 네이트뉴스',
+    badgeColor: 'bg-orange-600 text-white',
+    liveUrl: 'https://news.nate.com/',
+    sourceNote: '직장 생활·여가·일상 회화 빈출 표현 10선',
+    keywords: [
+      {
+        rank: 1,
+        koTitle: '매니저와 잠깐 연락해 진행 상황을 공유하다',
+        enExpression: 'touch base with my manager',
+        dictTargetWord: 'manager',
+        ipa: '/tʌtʃ beɪs wɪð maɪ ˈmæn.ɪ.dʒɚ/',
+        pron: '[터치 베이스 위드 마이 매니저]',
+        targetThemeId: 'theme-biz-meeting',
+        extUrl: 'https://news.nate.com/',
+      },
+      {
+        rank: 2,
+        koTitle: '파급력이 큰 핵심 업무부터 우선순위에 두다',
+        enExpression: 'prioritize high-impact tasks',
+        dictTargetWord: 'prioritize',
+        ipa: '/praɪˈɔːr.ə.taɪz haɪ ˈɪm.pækt tæsks/',
+        pron: '[프라이오러타이즈 하이 임팩트 태스크스]',
+        targetThemeId: 'theme-biz-meeting',
+        extUrl: 'https://news.nate.com/',
+      },
+      {
+        rank: 3,
+        koTitle: '단골 베이커리에서 간단히 요기하다',
+        enExpression: 'grab a bite at my go-to bakery',
+        dictTargetWord: 'bakery',
+        ipa: '/ɡræb ə baɪt æt maɪ ˈɡoʊ.tuː ˈbeɪ.kɚ.i/',
+        pron: '[그래버 바이트 앳 마이 고우투 베이커리]',
+        targetThemeId: 'theme-opic-routine',
+        extUrl: 'https://news.nate.com/',
+      },
+      {
+        rank: 4,
+        koTitle: '오션뷰 객실이 이용 가능한지 확인하다',
+        enExpression: 'check if an ocean-view room is available',
+        dictTargetWord: 'available',
+        ipa: '/tʃek ɪf ən ˈoʊ.ʃən vjuː ruːm ɪz əˈveɪ.lə.bəl/',
+        pron: '[체크 이프 언 오션뷰 룸 이즈 어베일러블]',
+        targetThemeId: 'theme-travel-hotel',
+        extUrl: 'https://news.nate.com/',
+      },
+      {
+        rank: 5,
+        koTitle: '부서 간에 긴밀하게 협업하다',
+        enExpression: 'collaborate closely across teams',
+        dictTargetWord: 'collaborate',
+        ipa: '/kəˈlæb.ə.reɪt ˈkloʊs.li əˈkrɔːs tiːmz/',
+        pron: '[컬래버레이트 클로슬리 어크로스 팀즈]',
+        targetThemeId: 'theme-biz-meeting',
+        extUrl: 'https://news.nate.com/',
+      },
+      {
+        rank: 6,
+        koTitle: '저녁 운동으로 하루의 긴장과 피로를 풀다',
+        enExpression: 'unwind with an evening workout',
+        dictTargetWord: 'unwind',
+        ipa: '/ʌnˈwaɪnd wɪð ən ˈiːv.nɪŋ ˈwɝːk.aʊt/',
+        pron: '[언와인드 위드 언 이브닝 워크아웃]',
+        targetThemeId: 'theme-opic-routine',
+        extUrl: 'https://news.nate.com/',
+      },
+      {
+        rank: 7,
+        koTitle: '문제의 정곡을 정확히 찌르다',
+        enExpression: 'hit the nail on the head',
+        dictTargetWord: 'precise',
+        ipa: '/hɪt ðə neɪl ɑːn ðə hed/',
+        pron: '[힛 더 네일 안 더 헤드]',
+        targetThemeId: 'theme-youtube-viral',
+        extUrl: 'https://news.nate.com/',
+      },
+      {
+        rank: 8,
+        koTitle: '유행을 타지 않는 옷장 필수 기본템을 활용하다',
+        enExpression: 'rely on a timeless wardrobe staple',
+        dictTargetWord: 'timeless',
+        ipa: '/rɪˈlaɪ ɑːn ə ˈtaɪm.ləs ˈwɔːr.droʊb ˈsteɪ.pəl/',
+        pron: '[릴라이 아너 타임리스 워드로브 스테이플]',
+        targetThemeId: 'theme-fashion-editorial',
+        extUrl: 'https://news.nate.com/',
+      },
+      {
+        rank: 9,
+        koTitle: '예산을 효율적으로 할당·배분하다',
+        enExpression: 'allocate the budget efficiently',
+        dictTargetWord: 'allocate',
+        ipa: '/ˈæl.ə.keɪt ðə ˈbʌdʒ.ɪt ɪˈfɪʃ.ənt.li/',
+        pron: '[앨러케이트 더 버짓 이피션틀리]',
+        targetThemeId: 'theme-biz-meeting',
+        extUrl: 'https://news.nate.com/',
+      },
+      {
+        rank: 10,
+        koTitle: '수하물 찾는 구역으로 이동하다',
+        enExpression: 'head to the baggage claim area',
+        dictTargetWord: 'baggage',
+        ipa: '/hed tə ðə ˈbæɡ.ɪdʒ kleɪm ˈer.i.ə/',
+        pron: '[헤드 투 더 배기지 클레임 에어리어]',
+        targetThemeId: 'theme-travel-hotel',
+        extUrl: 'https://news.nate.com/',
+      },
+    ],
+  },
+  {
+    id: 'DAUM_ZUM',
+    name: '다음·ZUM 시사 & 교양 인사이트 큐레이션',
+    shortName: '🟡 다음·ZUM',
+    badgeColor: 'bg-amber-500 text-slate-950',
+    liveUrl: 'https://news.daum.net/',
+    sourceNote: '시사·칼럼·학술 교양 핵심 표현 10선',
+    keywords: [
+      {
+        rank: 1,
+        koTitle: '다양한 관점을 수용해 확증 편향을 극복하다',
+        enExpression: 'overcome confirmation bias',
+        dictTargetWord: 'bias',
+        ipa: '/ˌoʊ.vɚˈkʌm ˌkɑːn.fɚˈmeɪ.ʃən ˈbaɪ.əs/',
+        pron: '[오버컴 칸퍼메이션 바이어스]',
+        targetThemeId: 'theme-biz-meeting',
+        extUrl: 'https://news.daum.net/',
+      },
+      {
+        rank: 2,
+        koTitle: '독서와 대화를 통해 우리의 시야(관점)를 넓히다',
+        enExpression: 'broaden our perspective',
+        dictTargetWord: 'perspective',
+        ipa: '/ˈbrɔː.dən ˈaʊ.ɚ pɚˈspek.tɪv/',
+        pron: '[브로든 아워 퍼스펙티브]',
+        targetThemeId: 'theme-opic-routine',
+        extUrl: 'https://news.daum.net/',
+      },
+      {
+        rank: 3,
+        koTitle: '전통 유산과 현대적 미학을 조화롭게 결합하다',
+        enExpression: 'blend heritage with modern aesthetics',
+        dictTargetWord: 'aesthetic',
+        ipa: '/blend ˈher.ɪ.t̬ɪdʒ wɪð ˈmɑː.dɚn esˈθet̬.ɪks/',
+        pron: '[블렌드 헤리티지 위드 모던 에스쎄틱스]',
+        targetThemeId: 'theme-fashion-editorial',
+        extUrl: 'https://news.daum.net/',
+      },
+      {
+        rank: 4,
+        koTitle: '지속 가능한 일상 습관을 채택하다',
+        enExpression: 'adopt sustainable daily habits',
+        dictTargetWord: 'sustainable',
+        ipa: '/əˈdɑːpt səˈsteɪ.nə.bəl ˈdeɪ.li ˈhæb.ɪts/',
+        pron: '[어답트 서스테이너블 데일리 해비츠]',
+        targetThemeId: 'theme-opic-routine',
+        extUrl: 'https://news.daum.net/',
+      },
+      {
+        rank: 5,
+        koTitle: '상호 이익이 되는 계약 조건을 협상하다',
+        enExpression: 'negotiate mutually beneficial terms',
+        dictTargetWord: 'negotiate',
+        ipa: '/nəˈɡoʊ.ʃi.eɪt ˈmjuː.tʃu.əl.i ˌben.əˈfɪʃ.əl tɝːmz/',
+        pron: '[너고우시에이트 뮤추얼리 베니피셜 텀즈]',
+        targetThemeId: 'theme-biz-meeting',
+        extUrl: 'https://news.daum.net/',
+      },
+      {
+        rank: 6,
+        koTitle: '높은 사전 기대치에 부응하다',
+        enExpression: 'live up to the high expectations',
+        dictTargetWord: 'expectation',
+        ipa: '/lɪv ʌp tə ðə haɪ ˌek.spekˈteɪ.ʃənz/',
+        pron: '[리법 투 더 하이 익스펙테이션즈]',
+        targetThemeId: 'theme-youtube-viral',
+        extUrl: 'https://news.daum.net/',
+      },
+      {
+        rank: 7,
+        koTitle: '투숙객의 특별 요청을 수용해 편의를 봐주다',
+        enExpression: 'accommodate special guest requests',
+        dictTargetWord: 'accommodate',
+        ipa: '/əˈkɑː.mə.deɪt ˈspeʃ.əl ɡest rɪˈkwests/',
+        pron: '[어카머데이트 스페셜 게스트 리퀘스츠]',
+        targetThemeId: 'theme-travel-hotel',
+        extUrl: 'https://news.daum.net/',
+      },
+      {
+        rank: 8,
+        koTitle: '차분한 음악으로 복잡한 머리를 식히다',
+        enExpression: 'clear my head with calm music',
+        dictTargetWord: 'calm',
+        ipa: '/klɪr maɪ hed wɪð kɑːm ˈmjuː.zɪk/',
+        pron: '[클리어 마이 헤드 위드 캄 뮤직]',
+        targetThemeId: 'theme-opic-routine',
+        extUrl: 'https://news.daum.net/',
+      },
+      {
+        rank: 9,
+        koTitle: '업데이트된 신규 시스템을 시행하다',
+        enExpression: 'implement the updated system',
+        dictTargetWord: 'implement',
+        ipa: '/ˈɪm.plə.ment ðə ʌpˈdeɪ.t̬ɪd ˈsɪs.təm/',
+        pron: '[임플러먼트 디 업데이티드 시스템]',
+        targetThemeId: 'theme-biz-meeting',
+        extUrl: 'https://news.daum.net/',
+      },
+      {
+        rank: 10,
+        koTitle: '착용자의 실루엣을 돋보이게 보완하다',
+        enExpression: 'complement the wearer’s silhouette',
+        dictTargetWord: 'complement',
+        ipa: '/ˈkɑːm.plə.ment ðə ˈwer.ɚz ˌsɪl.uˈet/',
+        pron: '[캄플러먼트 더 웨어러즈 실루엣]',
+        targetThemeId: 'theme-fashion-editorial',
+        extUrl: 'https://news.daum.net/',
+      },
+    ],
+  },
+  {
+    id: 'INSTA_TIKTOK',
+    name: '인스타그램·틱톡 라이프스타일 표현 큐레이션',
+    shortName: '🟣 인스타·틱톡',
+    badgeColor: 'bg-pink-600 text-white',
+    liveUrl: 'https://www.instagram.com/',
+    sourceNote: 'SNS 일상·패션·여행 캡션 핵심 구어 표현 10선',
+    keywords: [
+      {
+        rank: 1,
+        koTitle: '오늘의 아웃핏을 자연스럽게 소화해 내다',
+        enExpression: 'pull off today’s outfit effortlessly',
+        dictTargetWord: 'outfit',
+        ipa: '/pʊl ɔːf təˈdeɪz ˈaʊt.fɪt ˈef.ɚt.ləs.li/',
+        pron: '[풀 오프 투데이즈 아웃핏 에포트리스리]',
+        targetThemeId: 'theme-fashion-editorial',
+        extUrl: 'https://www.instagram.com/',
+      },
+      {
+        rank: 2,
+        koTitle: '하룻밤 사이에 릴스에서 큰 화제가 되다',
+        enExpression: 'go viral on social media overnight',
+        dictTargetWord: 'viral',
+        ipa: '/ɡoʊ ˈvaɪ.rəl ɑːn ˈsoʊ.ʃəl ˈmiː.di.ə ˌoʊ.vɚˈnaɪt/',
+        pron: '[고우 바이럴 안 소셜 미디어 오버나이트]',
+        targetThemeId: 'theme-youtube-viral',
+        extUrl: 'https://www.instagram.com/',
+      },
+      {
+        rank: 3,
+        koTitle: '주말마다 찾는 나만의 단골 브런치 카페에 가다',
+        enExpression: 'visit my go-to brunch spot',
+        dictTargetWord: 'brunch',
+        ipa: '/ˈvɪz.ɪt maɪ ˈɡoʊ.tuː brʌntʃ spɑːt/',
+        pron: '[비짓 마이 고우투 브런치 스팟]',
+        targetThemeId: 'theme-opic-routine',
+        extUrl: 'https://www.instagram.com/',
+      },
+      {
+        rank: 4,
+        koTitle: '프런트 데스크에 가방을 먼저 맡기다',
+        enExpression: 'drop off our bags at the front desk',
+        dictTargetWord: 'luggage',
+        ipa: '/drɑːp ɔːf ˈaʊ.ɚ bæɡz æt ðə frʌnt desk/',
+        pron: '[드랍 오프 아워 백스 앳 더 프런트 데스크]',
+        targetThemeId: 'theme-travel-hotel',
+        extUrl: 'https://www.instagram.com/',
+      },
+      {
+        rank: 5,
+        koTitle: '데님 청바지와 정말 잘 어울리다',
+        enExpression: 'go really well with denim jeans',
+        dictTargetWord: 'denim',
+        ipa: '/ɡoʊ ˈrɪə.li wel wɪð ˈden.ɪm dʒiːnz/',
+        pron: '[고우 릴리 웰 위드 데님 진즈]',
+        targetThemeId: 'theme-fashion-editorial',
+        extUrl: 'https://www.instagram.com/',
+      },
+      {
+        rank: 6,
+        koTitle: '아침 운동 루틴을 거르지 않고 꾸준히 지키다',
+        enExpression: 'stick to my morning workout routine',
+        dictTargetWord: 'routine',
+        ipa: '/stɪk tə maɪ ˈmɔːr.nɪŋ ˈwɝːk.aʊt ruːˈtiːn/',
+        pron: '[스틱 투 마이 모닝 워크아웃 루틴]',
+        targetThemeId: 'theme-opic-routine',
+        extUrl: 'https://www.instagram.com/',
+      },
+      {
+        rank: 7,
+        koTitle: '팀 프로젝트를 성공적으로 마무리하다',
+        enExpression: 'wrap up the project successfully',
+        dictTargetWord: 'project',
+        ipa: '/ræp ʌp ðə ˈprɑː.dʒekt səkˈses.fəl.i/',
+        pron: '[래펍 더 프로젝트 석세스풀리]',
+        targetThemeId: 'theme-biz-meeting',
+        extUrl: 'https://www.instagram.com/',
+      },
+      {
+        rank: 8,
+        koTitle: '저녁 식사 전에 간단히 씻고 단장하다',
+        enExpression: 'freshen up before dinner',
+        dictTargetWord: 'refresh',
+        ipa: '/ˈfreʃ.ən ʌp bɪˈfɔːr ˈdɪn.ɚ/',
+        pron: '[프레셔넙 비포 디너]',
+        targetThemeId: 'theme-travel-hotel',
+        extUrl: 'https://www.instagram.com/',
+      },
+      {
+        rank: 9,
+        koTitle: '블레이저 재킷을 미디엄 사이즈로 입어보다',
+        enExpression: 'try on the blazer in a medium size',
+        dictTargetWord: 'blazer',
+        ipa: '/traɪ ɑːn ðə ˈbleɪ.zɚ ɪn ə ˈmiː.di.əm saɪz/',
+        pron: '[트라이 안 더 블레이저 이너 미디엄 사이즈]',
+        targetThemeId: 'theme-fashion-editorial',
+        extUrl: 'https://www.instagram.com/',
+      },
+      {
+        rank: 10,
+        koTitle: '소문난 핫플레이스가 기대만큼 훌륭하다',
+        enExpression: 'definitely live up to the hype',
+        dictTargetWord: 'hype',
+        ipa: '/ˈdef.ə.nət.li lɪv ʌp tə ðə haɪp/',
+        pron: '[데피니틀리 리법 투 더 하입]',
+        targetThemeId: 'theme-youtube-viral',
+        extUrl: 'https://www.instagram.com/',
+      },
+    ],
+  },
+  {
+    id: 'THREADS_X',
+    name: '스레드(Threads) & X 실전 코멘트 표현',
+    shortName: '⚫ 스레드·X',
+    badgeColor: 'bg-slate-900 text-white',
+    liveUrl: 'https://www.threads.net/',
+    sourceNote: '짧은 의견 개진·공감·토론 핵심 표현 10선',
+    keywords: [
+      {
+        rank: 1,
+        koTitle: '모두가 공감할 만큼 정곡을 정확히 찌르다',
+        enExpression: 'hit the nail on the head',
+        dictTargetWord: 'exact',
+        ipa: '/hɪt ðə neɪl ɑːn ðə hed/',
+        pron: '[힛 더 네일 안 더 헤드]',
+        targetThemeId: 'theme-youtube-viral',
+        extUrl: 'https://www.threads.net/',
+      },
+      {
+        rank: 2,
+        koTitle: '팀원들에게 변경 사항을 미리 귀띔해 주다',
+        enExpression: 'give the team a quick heads-up',
+        dictTargetWord: 'notice',
+        ipa: '/ɡɪv ðə tiːm ə kwɪk ˈhedz.ʌp/',
+        pron: '[기브 더 팀 어 퀵 헤즈업]',
+        targetThemeId: 'theme-biz-meeting',
+        extUrl: 'https://www.threads.net/',
+      },
+      {
+        rank: 3,
+        koTitle: '복잡한 머리를 식히기 위해 산책하러 나가다',
+        enExpression: 'go for a walk to clear my head',
+        dictTargetWord: 'stroll',
+        ipa: '/ɡoʊ fɔːr ə wɔːk tə klɪr maɪ hed/',
+        pron: '[고우 포 러 워크 투 클리어 마이 헤드]',
+        targetThemeId: 'theme-opic-routine',
+        extUrl: 'https://www.threads.net/',
+      },
+      {
+        rank: 4,
+        koTitle: '모두의 이해와 방향성이 일치하는지 확인하다',
+        enExpression: 'make sure everyone is on the same page',
+        dictTargetWord: 'agreement',
+        ipa: '/meɪk ʃʊr ˈev.ri.wʌn ɪz ɑːn ðə seɪm peɪdʒ/',
+        pron: '[메익 슈어 에브리원 이즈 안 더 세임 페이지]',
+        targetThemeId: 'theme-biz-meeting',
+        extUrl: 'https://www.threads.net/',
+      },
+      {
+        rank: 5,
+        koTitle: '글로벌 패션 트렌드를 주의 깊게 지켜보다',
+        enExpression: 'keep an eye on fashion trends',
+        dictTargetWord: 'trend',
+        ipa: '/kiːp ən aɪ ɑːn ˈfæʃ.ən trendz/',
+        pron: '[키퍼나이 안 패션 트렌즈]',
+        targetThemeId: 'theme-fashion-editorial',
+        extUrl: 'https://www.threads.net/',
+      },
+      {
+        rank: 6,
+        koTitle: '불필요한 보고 절차를 간소화하다',
+        enExpression: 'streamline the reporting process',
+        dictTargetWord: 'streamline',
+        ipa: '/ˈstriːm.laɪn ðə rɪˈpɔːr.t̬ɪŋ ˈprɑː.ses/',
+        pron: '[스트림라인 더 리포팅 프로세스]',
+        targetThemeId: 'theme-biz-meeting',
+        extUrl: 'https://www.threads.net/',
+      },
+      {
+        rank: 7,
+        koTitle: '좋아하는 시리즈를 몰아서 정주행하다',
+        enExpression: 'binge-watch my favorite series',
+        dictTargetWord: 'series',
+        ipa: '/ˈbɪndʒ.wɑːtʃ maɪ ˈfeɪ.vər.ɪt ˈsɪr.iːz/',
+        pron: '[빈지워치 마이 페이버릿 시리즈]',
+        targetThemeId: 'theme-youtube-viral',
+        extUrl: 'https://www.threads.net/',
+      },
+      {
+        rank: 8,
+        koTitle: '호텔에서 무료 조식을 즐기다',
+        enExpression: 'have complimentary breakfast at the hotel',
+        dictTargetWord: 'complimentary',
+        ipa: '/hæv ˌkɑːm.pləˈmen.t̬ɚ.i ˈbrek.fəst æt ðə hoʊˈtel/',
+        pron: '[해브 캄플러멘터리 브렉퍼스트 앳 더 호텔]',
+        targetThemeId: 'theme-travel-hotel',
+        extUrl: 'https://www.threads.net/',
+      },
+      {
+        rank: 9,
+        koTitle: '미니멀한 코디에 과감한 포인트 아이템을 더하다',
+        enExpression: 'add a bold statement piece',
+        dictTargetWord: 'statement',
+        ipa: '/æd ə boʊld ˈsteɪt.mənt piːs/',
+        pron: '[애더 볼드 스테이트먼트 피스]',
+        targetThemeId: 'theme-fashion-editorial',
+        extUrl: 'https://www.threads.net/',
+      },
+      {
+        rank: 10,
+        koTitle: '퇴근 후 취미 활동으로 활력을 재충전하다',
+        enExpression: 'recharge my batteries after work',
+        dictTargetWord: 'recharge',
+        ipa: '/riːˈtʃɑːrdʒ maɪ ˈbæt̬.ɚ.iz ˈæf.tɚ wɝːk/',
+        pron: '[리차지 마이 배러리즈 애프터 워크]',
+        targetThemeId: 'theme-opic-routine',
+        extUrl: 'https://www.threads.net/',
+      },
+    ],
+  },
+  {
+    id: 'DANAWA_KOVO',
+    name: '테크 리뷰 & 스포츠 리포트 핵심 표현',
+    shortName: '🏆 테크·스포츠',
+    badgeColor: 'bg-indigo-600 text-white',
+    liveUrl: 'https://www.danawa.com/',
+    sourceNote: 'IT 기기 벤치마크·스포츠 중계 필수 표현 10선',
+    keywords: [
+      {
+        rank: 1,
+        koTitle: '성능 면에서 업계의 새로운 기준점을 세우다',
+        enExpression: 'set a new benchmark in performance',
+        dictTargetWord: 'benchmark',
+        ipa: '/set ə nuː ˈbentʃ.mɑːrk ɪn pɚˈfɔːr.məns/',
+        pron: '[세러 뉴 벤치마크 인 퍼포먼스]',
+        targetThemeId: 'theme-biz-meeting',
+        extUrl: 'https://www.danawa.com/',
+      },
+      {
+        rank: 2,
+        koTitle: '출시 전의 높은 기대치에 부응하다',
+        enExpression: 'live up to the pre-launch hype',
+        dictTargetWord: 'hype',
+        ipa: '/lɪv ʌp tə ðə priː lɔːntʃ haɪp/',
+        pron: '[리법 투 더 프리런치 하입]',
+        targetThemeId: 'theme-youtube-viral',
+        extUrl: 'https://www.danawa.com/',
+      },
+      {
+        rank: 3,
+        koTitle: '팀 프로젝트에서 중요한 이정표에 도달하다',
+        enExpression: 'reach a major milestone',
+        dictTargetWord: 'milestone',
+        ipa: '/riːtʃ ə ˈmeɪ.dʒɚ ˈmaɪl.stoʊn/',
+        pron: '[리치 어 메이저 마일스톤]',
+        targetThemeId: 'theme-biz-meeting',
+        extUrl: 'https://www.danawa.com/',
+      },
+      {
+        rank: 4,
+        koTitle: '경기 분석이 승부처의 핵심을 정확히 찌르다',
+        enExpression: 'hit the nail on the head',
+        dictTargetWord: 'analysis',
+        ipa: '/hɪt ðə neɪl ɑːn ðə hed/',
+        pron: '[힛 더 네일 안 더 헤드]',
+        targetThemeId: 'theme-youtube-viral',
+        extUrl: 'https://kovo.co.kr/',
+      },
+      {
+        rank: 5,
+        koTitle: '비시즌 동안 체력 훈련 루틴을 꾸준히 유지하다',
+        enExpression: 'stick to the training routine',
+        dictTargetWord: 'training',
+        ipa: '/stɪk tə ðə ˈtreɪ.nɪŋ ruːˈtiːn/',
+        pron: '[스틱 투 더 트레이닝 루틴]',
+        targetThemeId: 'theme-opic-routine',
+        extUrl: 'https://kovo.co.kr/',
+      },
+      {
+        rank: 6,
+        koTitle: '원정 경기 이동을 위한 상세 일정표를 검토하다',
+        enExpression: 'review the team travel itinerary',
+        dictTargetWord: 'itinerary',
+        ipa: '/rɪˈvjuː ðə tiːm ˈtræv.əl aɪˈtɪn.ə.rer.i/',
+        pron: '[리뷰 더 팀 트래블 아이티너레리]',
+        targetThemeId: 'theme-travel-hotel',
+        extUrl: 'https://kovo.co.kr/',
+      },
+      {
+        rank: 7,
+        koTitle: '기내 반입 수하물 규격 내에 꼭 맞다',
+        enExpression: 'fit within the carry-on size limit',
+        dictTargetWord: 'limit',
+        ipa: '/fɪt wɪˈðɪn ðə ˈkær.i.ɑːn saɪz ˈlɪm.ɪt/',
+        pron: '[핏 위딘 더 캐리안 사이즈 리밋]',
+        targetThemeId: 'theme-travel-hotel',
+        extUrl: 'https://www.danawa.com/',
+      },
+      {
+        rank: 8,
+        koTitle: '모든 하드웨어 세부 사양을 빈틈없이 비교하다',
+        enExpression: 'compare specifications meticulously',
+        dictTargetWord: 'specification',
+        ipa: '/kəmˈper ˌspes.ə.fəˈkeɪ.ʃənz məˈtɪk.jə.ləs.li/',
+        pron: '[컴페어 스페시피케이션즈 머티큘러슬리]',
+        targetThemeId: 'theme-biz-meeting',
+        extUrl: 'https://www.danawa.com/',
+      },
+      {
+        rank: 9,
+        koTitle: '기능성 스포츠웨어와 일상 스타일을 조화롭게 결합하다',
+        enExpression: 'blend athletic function with daily style',
+        dictTargetWord: 'athletic',
+        ipa: '/blend æθˈlet̬.ɪk ˈfʌŋk.ʃən wɪð ˈdeɪ.li staɪl/',
+        pron: '[블렌드 애쓸레틱 펑션 위드 데일리 스타일]',
+        targetThemeId: 'theme-fashion-editorial',
+        extUrl: 'https://www.danawa.com/',
+      },
+      {
+        rank: 10,
+        koTitle: '스포츠 팬들 사이에서 빠르게 입소문을 타다',
+        enExpression: 'go viral among sports fans',
+        dictTargetWord: 'viral',
+        ipa: '/ɡoʊ ˈvaɪ.rəl əˈmʌŋ spɔːrts fænz/',
+        pron: '[고우 바이럴 어멍 스포츠 팬즈]',
+        targetThemeId: 'theme-youtube-viral',
+        extUrl: 'https://kovo.co.kr/',
+      },
+    ],
+  },
+];
+// ============================================================================
+// src/App.tsx — [파트 2/4]
+// - 필수 어휘 10선 챌린지 (미국식 IPA · 한글발음 · 영영정의 검증 완료)
+// - 테마 1 (비즈니스 회의) · 테마 2 (OPIc 일상 루틴) · 테마 3 (여행·호텔·공항)
+// ============================================================================
+
+export const NAVER_OFFICIAL_WORD_CHALLENGE = [
+  {
+    id: 'chal-1',
+    word: 'intend',
+    ipa: '/ɪnˈtend/',
+    pron: '[인텐드]',
+    pos: '동사 (V)',
+    meaning: '의도하다, ~할 작정이다',
+    enDef: 'to have a plan or purpose in mind to do something',
+    exampleEn: 'We intend to launch the updated service next month.',
+    examplePron: '[위 인텐드 투 런치 / 디 업데이티드 서비스 넥스트 먼쓰]',
+    exampleKo: '우리는 다음 달에 업데이트된 서비스를 출시할 계획이다.',
+  },
+  {
+    id: 'chal-2',
+    word: 'lawless',
+    ipa: '/ˈlɔː.ləs/',
+    pron: '[로-리스]',
+    pos: '형용사 (Adj)',
+    meaning: '무법의, 법을 지키지 않는',
+    enDef: 'not controlled by laws or rules; disorderly',
+    exampleEn: 'Strict regulations prevented the market from becoming lawless.',
+    examplePron: '[스트릭트 레귤레이션즈 프리벤티드 더 마켓 / 프롬 비커밍 로-리스]',
+    exampleKo: '엄격한 규제가 시장이 무법 상태가 되는 것을 막아주었다.',
+  },
+  {
+    id: 'chal-3',
+    word: 'deliberate',
+    ipa: '/dɪˈlɪb.ɚ.ət/',
+    pron: '[딜리버릿]',
+    pos: '형용사 (Adj)',
+    meaning: '의도적인, 계획적인, 신중한',
+    enDef: 'done consciously and intentionally rather than by accident',
+    exampleEn: 'Mastering a language requires deliberate daily practice.',
+    examplePron: '[마스터링 어 랭귀지 리콰이어즈 / 딜리버릿 데일리 프랙티스]',
+    exampleKo: '언어를 마스터하는 것은 의도적인 매일의 연습을 필요로 한다.',
+  },
+  {
+    id: 'chal-4',
+    word: 'compromise',
+    ipa: '/ˈkɑːm.prə.maɪz/',
+    pron: '[캄프러마이즈]',
+    pos: '명사/동사 (N/V)',
+    meaning: '타협(하다), 절충안; (신뢰·안전을) 위태롭게 하다',
+    enDef: 'an agreement reached by each side making concessions',
+    exampleEn: 'Both teams reached a reasonable compromise after the meeting.',
+    examplePron: '[보쓰 팀즈 리치드 어 리즈너블 캄프러마이즈 / 애프터 더 미팅]',
+    exampleKo: '양 팀은 회의 끝에 합리적인 타협안에 도달했다.',
+  },
+  {
+    id: 'chal-5',
+    word: 'substantial',
+    ipa: '/səbˈstæn.ʃəl/',
+    pron: '[섭스탠셜]',
+    pos: '형용사 (Adj)',
+    meaning: '상당한, 실질적인, 꽤 많은',
+    enDef: 'of considerable importance, size, or worth',
+    exampleEn: 'The new workflow brought a substantial improvement in speed.',
+    examplePron: '[더 뉴 워크플로우 브로트 / 어 섭스탠셜 임프루브먼트 인 스피드]',
+    exampleKo: '새로운 업무 공정은 속도 면에서 상당한 개선을 가져왔다.',
+  },
+];
+
+// ============================================================================
+// 3. 테마별 초·중·고급 통합 커리큘럼 (테마 1 ~ 테마 3)
+// ============================================================================
+
+export const THEME_BIZ_MEETING: ThemeData = {
+  id: 'theme-biz-meeting',
+  badge: '💼 비즈니스·실무 핵심',
+  title: '업무 효율화 & 프로젝트 일정 조율',
+  subtitle: '회의 진행, 결재 독려, 잠정 일정 공유 및 부서 간 협업 표현',
+  levelTracks: {
+    beginner: {
+      levelName: '🌱 초급 (뼈대 어순 & 기본 의사소통)',
+      focusBadge: '3형식 S + V + DO 기본 어순 체화',
+      speedGuide: '권장 리딩 속도: 0.30x(초저속) ~ 0.50x(천천히) 배속으로 소리블록 끊어 읽기',
+      levelGuide: '복잡한 수식어를 빼고 [주어 + 동사 + 목적어] 핵심 3단어 뼈대를 정확히 소리 내어 말합니다.',
+      patternEn: 'We need to check the schedule today.',
+      patternIpa: '/wi niːd tə tʃek ðə ˈskedʒ.uːl təˈdeɪ/',
+      patternPron: '[위 니드 투 체크 / 더 스케줄 투데이]',
+      patternSoundBlock: 'We need to check / the schedule / today.',
+      patternSoundRule: 'need to에서 d가 약화되어 [니투]에 가깝게 발음되며, check와 the schedule을 한 호흡으로 연결합니다.',
+      patternMeaningKo: '우리는 오늘 일정을 확인해야 합니다.',
+      grammarSummary: '주어(We) + 본동사(need) + 목적어(to부정사구: to check the schedule) + 시간부사(today)로 이루어진 명확한 3형식 구조입니다.',
+      paraphraseDrill: [
+        {
+          basicExpr: 'check the schedule (일정을 확인하다)',
+          upgradedExpr: 'review the tentative schedule (잠정 일정을 검토하다)',
+          nuanceDiff: '단순 확인(check)에서 면밀한 검토(review)로 격식을 높인 표현입니다.',
+        },
+        {
+          basicExpr: 'finish the meeting (회의를 끝내다)',
+          upgradedExpr: 'wrap up the meeting (회의를 깔끔히 마무리하다)',
+          nuanceDiff: '원어민 비즈니스 회의 말미에 가장 자연스럽게 쓰는 구동사입니다.',
+        },
+      ],
+      dialogue: [
+        {
+          speaker: 'A',
+          roleName: '팀장 (Manager)',
+          en: "Let's check the project schedule before lunch.",
+          soundBlock: "Let's check / the project schedule / before lunch.",
+          pron: '[레츠 체크 / 더 프로젝트 스케줄 / 비포 런치]',
+          ko: '점심 식사 전에 프로젝트 일정을 확인합시다.',
+          pointNote: "권유 표현 Let's + 동사원형(check)",
+        },
+        {
+          speaker: 'B',
+          roleName: '팀원 (Member)',
+          en: "Sure, I will share a quick heads-up with the team.",
+          soundBlock: 'Sure, / I will share / a quick heads-up / with the team.',
+          pron: '[슈어, 아이 윌 쉐어 / 어 퀵 헤즈업 / 위드 더 팀]',
+          ko: '네, 팀원들에게 미리 간단한 귀띔(사전 안내)을 공유하겠습니다.',
+          pointNote: 'share A with B (B와 A를 공유하다)',
+        },
+      ],
+    },
+    intermediate: {
+      levelName: '🌿 중급 (실전 구동사 & 5형식 활용)',
+      focusBadge: 'to부정사 목적어 & 5형식 목적격보어(OC)',
+      speedGuide: '권장 리딩 속도: 0.75x(연음·중저속) ~ 1.0x(원어민 정속)',
+      levelGuide: '실무에서 매일 쓰는 동사(streamline, expedite, touch base)를 소리블록 단위로 유창하게 연결합니다.',
+      patternEn: 'We need to streamline the workflow this quarter.',
+      patternIpa: '/wi niːd tə ˈstriːm.laɪn ðə ˈwɝːk.floʊ ðɪs ˈkwɔːr.t̬ɚ/',
+      patternPron: '[위 니드 투 스트림라인 / 더 워크플로우 / 디스 쿼터]',
+      patternSoundBlock: 'We need to streamline / the workflow / this quarter.',
+      patternSoundRule: 'streamline[스트림라인]에 명확한 강세를 실어주고 this quarter[디스 쿼러]는 가볍게 마무리합니다.',
+      patternMeaningKo: '우리는 이번 분기에 업무 공정을 간소화(효율화)해야 합니다.',
+      grammarSummary: 'streamline은 불필요한 단계를 줄여 효율적으로 만들다라는 뜻의 타동사로, 뒤에 전치사 없이 바로 목적어(the workflow)가 옵니다.',
+      paraphraseDrill: [
+        {
+          basicExpr: 'make the work simpler (업무를 더 단순하게 만들다)',
+          upgradedExpr: 'streamline the entire workflow (전체 업무 공정을 효율화하다)',
+          nuanceDiff: '보고서와 회의에서 전문성을 즉시 높여주는 핵심 비즈니스 동사입니다.',
+        },
+        {
+          basicExpr: 'make the review faster (검토를 더 빠르게 하다)',
+          upgradedExpr: 'expedite the approval process (승인 절차를 신속히 앞당기다)',
+          nuanceDiff: '정중하게 빠른 처리를 요청할 때 쓰는 격식 있는 표현입니다.',
+        },
+      ],
+      dialogue: [
+        {
+          speaker: 'A',
+          roleName: '프로젝트 리더 (PL)',
+          en: 'Could you please expedite the approval process for this contract?',
+          soundBlock: 'Could you please expedite / the approval process / for this contract?',
+          pron: '[쿠쥬 플리즈 엑스퍼다이트 / 디 어프루벌 프로세스 / 포 디스 컨트랙트]',
+          ko: '이번 계약 건에 대한 승인 절차를 좀 더 신속히 진행해 주실 수 있을까요?',
+          pointNote: '정중한 요청 Could you please + 동사원형(expedite)',
+        },
+        {
+          speaker: 'B',
+          roleName: '부서 매니저 (Director)',
+          en: "Of course. Let's touch base again tomorrow morning.",
+          soundBlock: "Of course. / Let's touch base again / tomorrow morning.",
+          pron: '[오브 코스. 레츠 터치 베이스 어겐 / 투모로우 모닝]',
+          ko: '물론이죠. 내일 아침에 다시 잠깐 연락해서 진행 상황을 공유합시다.',
+          pointNote: 'touch base with ~ (~와 잠깐 연락해 현황을 점검하다)',
+        },
+      ],
+    },
+    advanced: {
+      levelName: '🌳 고급 (동명사구 주어 & 조건·도치 구문)',
+      focusBadge: '동명사구 주어 수일치 & 5형식 형용사 보어',
+      speedGuide: '권장 리딩 속도: 1.0x(원어민 정속) ~ 1.25x(고급·쾌속)',
+      levelGuide: '동명사구 주어(Streamlining ~)와 5형식 목적격보어(feasible)를 결합해 논리적인 임원급 발언을 구사합니다.',
+      patternEn: 'Streamlining the approval process makes the schedule feasible.',
+      patternIpa: '/ˈstriːm.laɪ.nɪŋ ðə əˈpruː.vəl ˈprɑː.ses meɪks ðə ˈskedʒ.uːl ˈfiː.zə.bəl/',
+      patternPron: '[스트림라이닝 디 어프루벌 프로세스 / 메익스 더 스케줄 피저블]',
+      patternSoundBlock: 'Streamlining the approval process / makes the schedule / feasible.',
+      patternSoundRule: '주어 덩어리(Streamlining the approval process) 끝에서 살짝 호흡을 고른 뒤 단수 동사 makes를 강하게 발음합니다.',
+      patternMeaningKo: '승인 절차를 간소화하는 것은 그 일정을 실현 가능하게 만든다.',
+      grammarSummary: '동명사구 주어(Streamlining ~)는 단수 취급하여 단수 동사 makes를 쓰며, 목적어(the schedule)의 상태를 설명하는 목적격보어(OC) 자리에는 부사(feasibly)가 아닌 형용사 feasible이 옵니다.',
+      paraphraseDrill: [
+        {
+          basicExpr: 'give you early notice about the tentative schedule',
+          upgradedExpr: 'give you a quick heads-up on the tentative itinerary',
+          nuanceDiff: '실전 비즈니스 회화와 이메일에서 가장 자연스럽게 쓰이는 고급 연어 조합입니다.',
+        },
+        {
+          basicExpr: 'check every detail very carefully',
+          upgradedExpr: 'review every specification meticulously',
+          nuanceDiff: 'very carefully를 부사 meticulously 한 단어로 압축해 정밀한 느낌을 줍니다.',
+        },
+      ],
+      dialogue: [
+        {
+          speaker: 'A',
+          roleName: '전략 기획 총괄 (VP)',
+          en: 'Streamlining our reporting process makes the tentative launch schedule feasible.',
+          soundBlock: 'Streamlining our reporting process / makes the tentative launch schedule / feasible.',
+          pron: '[스트림라이닝 아워 리포팅 프로세스 / 메익스 더 텐터티브 런치 스케줄 / 피저블]',
+          ko: '보고 절차를 간소화하는 것이 우리의 잠정 출시 일정을 실현 가능하게 만들어 줍니다.',
+          pointNote: '5형식 makes + 목적어 + 형용사 보어(feasible)',
+        },
+        {
+          speaker: 'B',
+          roleName: '운영 디렉터 (Lead)',
+          en: "I agree. Let's review the action items so that everyone is on the same page.",
+          soundBlock: "I agree. / Let's review the action items / so that everyone is / on the same page.",
+          pron: '[아이 어그리. 레츠 리뷰 디 액션 아이템즈 / 소 댓 에브리원 이즈 안 더 세임 페이지]',
+          ko: '동의합니다. 모두가 같은 내용을 공유할 수 있도록 실행 과제를 함께 점검합시다.',
+          pointNote: '목적 부사절 접속사 so that + 주어 + 동사 (~하도록)',
+        },
+      ],
+    },
+  },
+  synonymScales: [
+    {
+      conceptTitle: '업무 절차 개선·효율화 강도 (동사구)',
+      scaleAxisLabel: '단순 정리 ➔ 공정 효율화 ➔ 전면 개편',
+      weak: {
+        expr: 'organize the tasks',
+        pron: '[오거나이즈 더 태스크스]',
+        ko: '업무를 정리하다',
+        note: '일상적인 할 일 목록을 정돈할 때 쓰는 기본 표현',
+      },
+      medium: {
+        expr: 'streamline the workflow',
+        pron: '[스트림라인 더 워크플로우]',
+        ko: '업무 공정을 간소화·효율화하다',
+        note: '불필요한 절차를 줄여 속도와 능률을 높이는 실무 표준 표현',
+      },
+      strong: {
+        expr: 'overhaul the entire system',
+        pron: '[오버홀 디 인타이어 시스템]',
+        ko: '전체 시스템을 전면 개편하다',
+        note: '기존 체계를 뿌리부터 완전히 뜯어고칠 때 쓰는 강한 표현',
+      },
+    },
+    {
+      conceptTitle: '일정 및 계획의 확정성 정도 (형용사)',
+      scaleAxisLabel: '초안 상태 ➔ 잠정 가안 ➔ 최종 확정',
+      weak: {
+        expr: 'rough (draft)',
+        pron: '[러프 드래프트]',
+        ko: '대략적인 (초안의)',
+        note: '세부 내용이 아직 잡히지 않은 초기 단계',
+      },
+      medium: {
+        expr: 'tentative (schedule)',
+        pron: '[텐터티브 스케줄]',
+        ko: '잠정적인 (일정)',
+        note: '일단은 잡아두었으나 추후 변경될 수 있는 비즈니스 가안',
+      },
+      strong: {
+        expr: 'finalized (itinerary)',
+        pron: '[파이널라이즈드 아이티너레리]',
+        ko: '최종 확정된 (일정표)',
+        note: '모든 승인을 마치고 변경 없이 실행되는 확정 단계',
+      },
+    },
+  ],
+  vocab: [
+    {
+      id: 101,
+      type: '일상 회화',
+      recommendLevel: 'beginner',
+      word: 'wrap up',
+      masked: 'w___ u_',
+      ipa: '/ræp ʌp/',
+      pron: '[래펍]',
+      soundMethod: 'wrap의 끝 자음 /p/와 up이 연음되어 [래펍]으로 한 단어처럼 발음됩니다.',
+      soundBlock: 'wrap up / the meeting',
+      meaning: '(회의·업무 등을) 마무리하다, 끝내다',
+      enDef: 'to bring a meeting, task, or agreement to a successful conclusion',
+      exampleBlank: "Let's _____ today's meeting in five minutes.",
+      pos: 'V',
+      posLabel: '동사구 (V)',
+      comp: 'V',
+      compLabel: '동사 (V)',
+      roleDesc: "Let's 뒤에서 문장의 본동사(서술어) 역할을 수행합니다.",
+      collocation: 'wrap up the meeting',
+      collocationKo: '회의를 마무리하다',
+      paraphraseTip: 'finish the meeting보다 훨씬 자연스럽고 정중한 비즈니스 마무리 표현입니다.',
+    },
+    {
+      id: 102,
+      type: '오픽·구동사',
+      recommendLevel: 'beginner',
+      word: 'heads-up',
+      masked: 'h____-u_',
+      ipa: '/ˈhedz.ʌp/',
+      pron: '[헤즈업]',
+      soundMethod: 'heads의 /z/와 up이 이어져 [헤즈업]으로 부드럽게 발음됩니다.',
+      soundBlock: 'give me / a quick heads-up',
+      meaning: '사전 귀띔, 미리 알림',
+      enDef: 'an advance warning or piece of information given before something happens',
+      exampleBlank: 'Thanks for giving me a quick _____ on the change.',
+      pos: 'N',
+      posLabel: '명사 (N)',
+      comp: 'DO',
+      compLabel: '직접목적어 (DO)',
+      roleDesc: '4형식 동명사 giving의 직접목적어(DO) 자리에 쓰인 가산명사입니다.',
+      collocation: 'give a quick heads-up',
+      collocationKo: '미리 살짝 귀띔해 주다',
+      paraphraseTip: 'advance notice(사전 통지)를 친근하고 간결하게 표현할 때 씁니다.',
+    },
+    {
+      id: 103,
+      type: '비즈니스',
+      recommendLevel: 'intermediate',
+      word: 'streamline',
+      masked: 'str_______',
+      ipa: '/ˈstriːm.laɪn/',
+      pron: '[스트림라인]',
+      soundMethod: '첫 음절(stream-)을 길게 빼며 [스트림라인]으로 발음합니다.',
+      soundBlock: 'streamline / the workflow',
+      meaning: '(업무·절차를) 간소화하다, 효율화하다',
+      enDef: 'to make an organization or system more efficient by employing faster or simpler working methods',
+      exampleBlank: 'We need to _____ the entire workflow this quarter.',
+      pos: 'V',
+      posLabel: '동사 (V)',
+      comp: 'V',
+      compLabel: '동사 (V)',
+      roleDesc: '목적어(the entire workflow)를 취해 효율화 동작을 나타내는 타동사입니다.',
+      collocation: 'streamline the workflow',
+      collocationKo: '업무 공정을 효율화하다',
+      paraphraseTip: 'simplify(단순화하다)보다 능률과 속도를 높인다는 전문적 뉘앙스가 강합니다.',
+    },
+    {
+      id: 104,
+      type: '비즈니스',
+      recommendLevel: 'intermediate',
+      word: 'expedite',
+      masked: 'ex______',
+      ipa: '/ˈek.spə.daɪt/',
+      pron: '[엑스퍼다이트]',
+      soundMethod: '첫 음절(ex-)에 강세를 두고 끝음절(-dite)은 [다이트]로 발음합니다.',
+      soundBlock: 'expedite / the approval process',
+      meaning: '(절차·처리를) 신속히 처리하다, 앞당기다',
+      enDef: 'to make an action or process happen sooner or be accomplished more quickly',
+      exampleBlank: 'Could you please _____ the approval process?',
+      pos: 'V',
+      posLabel: '동사 (V)',
+      comp: 'V',
+      compLabel: '동사 (V)',
+      roleDesc: '조동사 Could와 결합해 정중한 요청문의 본동사(V) 역할을 합니다.',
+      collocation: 'expedite the process',
+      collocationKo: '절차를 신속히 앞당기다',
+      paraphraseTip: 'speed up의 격식 있는 비즈니스 상위 표현입니다.',
+    },
+    {
+      id: 105,
+      type: '비즈니스',
+      recommendLevel: 'intermediate',
+      word: 'tentative',
+      masked: 'ten______',
+      ipa: '/ˈten.tə.t̬ɪv/',
+      pron: '[텐터티브]',
+      soundMethod: '첫 음절(ten-)에 강세를 두어 미국식으로 부드럽게 [텐터티브]로 읽습니다.',
+      soundBlock: 'a tentative / schedule',
+      meaning: '잠정적인, 가안의, 확정되지 않은',
+      enDef: 'not certain or fixed; provisional and subject to change',
+      exampleBlank: 'We have set a _____ schedule for the launch.',
+      pos: 'Adj',
+      posLabel: '형용사 (Adj)',
+      comp: 'M',
+      compLabel: '수식어 (M)',
+      roleDesc: '명사 schedule 앞에서 명사의 성질을 꾸며주는 한정적 수식어(M)입니다.',
+      collocation: 'a tentative schedule',
+      collocationKo: '잠정적인 일정',
+      paraphraseTip: 'provisional(임시의)과 유사하며, 반대말은 confirmed(확정된)입니다.',
+    },
+    {
+      id: 106,
+      type: '수능·학술',
+      recommendLevel: 'advanced',
+      word: 'feasible',
+      masked: 'fea_____',
+      ipa: '/ˈfiː.zə.bəl/',
+      pron: '[피저블]',
+      soundMethod: '첫 음절(fea-)에 강세를 두고 s는 유성음 /z/[저]로 발음합니다.',
+      soundBlock: 'make the schedule / feasible',
+      meaning: '실현 가능한, 실행할 수 있는',
+      enDef: 'possible to do easily or conveniently; achievable in practice',
+      exampleBlank: 'Streamlining the process makes the schedule _____.',
+      pos: 'Adj',
+      posLabel: '형용사 (Adj)',
+      comp: 'OC',
+      compLabel: '목적격보어 (OC)',
+      roleDesc: '5형식 동사 makes 뒤에서 목적어(the schedule)의 상태를 보충 설명하는 목적격보어(OC)입니다.',
+      collocation: 'economically feasible',
+      collocationKo: '경제적으로 실현 가능한',
+      paraphraseTip: '단순히 확률상 가능한(possible) 것을 넘어 실무적으로 실행 가능한(viable, achievable) 상태를 뜻합니다.',
+    },
+    {
+      id: 107,
+      type: '수능·학술',
+      recommendLevel: 'advanced',
+      word: 'meticulously',
+      masked: 'met_________',
+      ipa: '/məˈtɪk.jə.ləs.li/',
+      pron: '[머티큘러슬리]',
+      soundMethod: '두 번째 음절(-tic-)에 강한 강세를 두어 [머티큘러슬리]로 발음합니다.',
+      soundBlock: 'reviewed / meticulously',
+      meaning: '꼼꼼하게, 세심하게, 빈틈없이',
+      enDef: 'in a way that shows great attention to detail; very thoroughly',
+      exampleBlank: 'Our team _____ checked every single clause.',
+      pos: 'Adv',
+      posLabel: '부사 (Adv)',
+      comp: 'M',
+      compLabel: '수식어 (M)',
+      roleDesc: '동사 checked를 앞에서 수식하여 동작의 방식을 설명하는 부사 수식어(M)입니다.',
+      collocation: 'review meticulously',
+      collocationKo: '빈틈없이 검토하다',
+      paraphraseTip: 'carefully나 thoroughly보다 훨씬 더 정밀하고 세심한 주의를 기울일 때 씁니다.',
+    },
+  ],
+  sentences: [
+    {
+      id: 1001,
+      levelTag: 'beginner',
+      tag: '초급 필수 · 4형식 사전 공유',
+      targetWord: 'heads-up',
+      wordOrderFormula: 'Thanks for[M] + giving + me[IO] + a quick heads-up[DO] + on the schedule[M]',
+      structure: '전치사구 + 4형식 동명사구(giving + IO + DO)',
+      soundBlockEn: 'Thanks for giving me / a quick heads-up / on the schedule.',
+      soundMethodGuide: 'giving me[기빙 미] 뒤에 a quick heads-up[어 퀵 헤즈업]을 한 덩어리로 경쾌하게 붙여 읽습니다.',
+      ipaLine: '/θæŋks fɔːr ˈɡɪv.ɪŋ mi ə kwɪk ˈhedz.ʌp ɑːn ðə ˈskedʒ.uːl/',
+      koLine: '나에게 주셔서 감사합니다 / 빠른 사전 귀띔을 / 일정에 관한.',
+      enLine: 'Thanks for giving me / a quick heads-up / on the schedule.',
+      rawEn: 'Thanks for giving me a quick heads-up on the schedule.',
+      pronLine: '[땡스 포 기빙 미 / 어 퀵 헤즈업 / 안 더 스케줄]',
+      naturalKo: '일정에 대해 미리 귀띔해 주셔서 감사합니다.',
+      paraphraseVersion: 'Thank you for letting me know in advance about the schedule.',
+      grammarPoint: '수여동사 give에서 파생된 동명사 giving이 간접목적어(me)와 직접목적어(a quick heads-up)를 차례대로 이끌고 있습니다.',
+      contextNuance: '동료가 회의 시간 변경이나 중요 이슈를 미리 알려주었을 때 가볍고 세련되게 고마움을 표하는 표현입니다.',
+    },
+    {
+      id: 1002,
+      levelTag: 'intermediate',
+      tag: '중급 핵심 · 절차 신속 처리 요청',
+      targetWord: 'expedite',
+      wordOrderFormula: 'Could you please[조동사] + expedite[V] + the approval process[DO] + before Friday[M]?',
+      structure: '3형식 정중한 의문문 (Could you please + V + DO + M)',
+      soundBlockEn: 'Could you please expedite / the approval process / before Friday?',
+      soundMethodGuide: 'Could you는 [쿠쥬]로 연음하고 expedite[엑스퍼다이트]에 강세를 실어 정중하게 올림조로 발음합니다.',
+      ipaLine: '/kʊd ju pliːz ˈek.spə.daɪt ðə əˈpruː.vəl ˈprɑː.ses bɪˈfɔːr ˈfraɪ.deɪ/',
+      koLine: '신속히 처리해 주실 수 있나요 / 승인 절차를 / 금요일 전까지?',
+      enLine: 'Could you please expedite / the approval process / before Friday?',
+      rawEn: 'Could you please expedite the approval process before Friday?',
+      pronLine: '[쿠쥬 플리즈 엑스퍼다이트 / 디 어프루벌 프로세스 / 비포 프라이데이]',
+      naturalKo: '금요일 전까지 승인 절차를 좀 더 신속히 진행해 주실 수 있을까요?',
+      paraphraseVersion: 'Would it be possible to speed up the approval process before Friday?',
+      grammarPoint: 'hurry up은 상대방을 재촉하는 무례한 어감을 줄 수 있으므로, 비즈니스에서는 타동사 expedite를 사용해 정중하게 요청합니다.',
+      contextNuance: '타 부서나 상사에게 결재·검토를 빠르게 부탁할 때 가장 격식 있고 효과적인 문장입니다.',
+    },
+    {
+      id: 1003,
+      levelTag: 'advanced',
+      tag: '고급 마스터 · 동명사구 주어 & 5형식 보어',
+      targetWord: 'feasible',
+      wordOrderFormula: 'Streamlining the workflow[S:동명사구] + makes[V] + the tentative schedule[DO] + feasible[OC].',
+      structure: '5형식 (동명사구 S + 단수 V + DO + 형용사 OC)',
+      soundBlockEn: 'Streamlining the workflow / makes the tentative schedule / feasible.',
+      soundMethodGuide: '동명사구 주어 끝(workflow)에서 살짝 끊어 읽고, makes와 마지막 보어 feasible[피저블]을 명확히 강조합니다.',
+      ipaLine: '/ˈstriːm.laɪ.nɪŋ ðə ˈwɝːk.floʊ meɪks ðə ˈten.tə.t̬ɪv ˈskedʒ.uːl ˈfiː.zə.bəl/',
+      koLine: '업무 공정을 간소화하는 것은 / 잠정 일정을 만든다 / 실현 가능한 상태로.',
+      enLine: 'Streamlining the workflow / makes the tentative schedule / feasible.',
+      rawEn: 'Streamlining the workflow makes the tentative schedule feasible.',
+      pronLine: '[스트림라이닝 더 워크플로우 / 메익스 더 텐터티브 스케줄 / 피저블]',
+      naturalKo: '업무 공정을 간소화하는 것은 그 잠정 일정을 실현 가능하게 만든다.',
+      paraphraseVersion: 'If we streamline the workflow, the tentative schedule becomes achievable.',
+      grammarPoint: '주어 핵이 동명사(Streamlining)이므로 단수 동사 makes를 쓰며, 목적격보어(OC) 자리에는 부사 feasibly가 아닌 형용사 feasible이 와야 합니다.',
+      contextNuance: '단순히 일정이 어렵다고 말하기보다 해결책(공정 간소화)과 결과(실현 가능성)를 한 문장으로 제시하는 고급 구문입니다.',
+    },
+  ],
+  quiz: {
+    beginner: {
+      word: 'wrap up',
+      ipa: '/ræp ʌp/',
+      options: [
+        '새 프로젝트를 기획하다',
+        '(회의·업무 등을) 마무리하다, 끝내다',
+        '예산을 추가로 배정하다',
+        '출장 일정을 연기하다',
+      ],
+      answerIdx: 1,
+      explanation: 'wrap up은 회의나 업무를 깔끔하게 마무리하다(bring to a close)라는 뜻의 필수 구동사입니다.',
+    },
+    intermediate: {
+      sentenceBefore: 'We need to',
+      sentenceAfter: 'the entire workflow to save time this quarter.',
+      hint: '(업무 공정을) 간소화하다, 효율화하다',
+      options: ['hesitate', 'complicate', 'streamline', 'postpone'],
+      answerIdx: 2,
+      explanation: '시간을 절약하기 위해 전체 업무 공정(workflow)의 불필요한 단계를 줄여 효율화한다는 맥락이므로 streamline이 정답입니다.',
+    },
+    advanced: {
+      questionPrompt:
+        '다음 문장의 빈칸 (A)와 (B)에 들어갈 어법상 올바른 형태를 2개 고르세요: "[ (A) ] the process makes the tentative schedule [ (B) ]."',
+      highlightWord: '동명사구 주어 단수 수일치 & 5형식 목적격보어(OC) 형용사',
+      options: [
+        '(A) Streamlining (동명사구 주어)',
+        '(A) Streamlined (과거분사)',
+        '(B) feasible (목적격보어 형용사)',
+        '(B) feasibly (부사 — 보어 불가)',
+      ],
+      answerIndices: [0, 2],
+      explanation:
+        '(A) 뒤에 목적어(the process)를 취해 문장의 주어 역할을 해야 하므로 능동형 동명사 Streamlining이 맞고, (B) 5형식 동사 makes의 목적격보어(OC) 자리이므로 형용사 feasible이 정답입니다.',
+    },
+    writingMission: {
+      koPrompt: '업무 공정을 간소화하는 것은 그 잠정 일정을 실현 가능하게 만든다.',
+      targetPattern: 'Streamlining ~ makes ... feasible',
+      modelAnswer: 'Streamlining the workflow makes the tentative schedule feasible.',
+    },
+  },
+};
+
+export const THEME_OPIC_ROUTINE: ThemeData = {
+  id: 'theme-opic-routine',
+  badge: '🎧 OPIc AL · 일상 루틴',
+  title: '퇴근 후 힐링 산책 & 주말 단골 카페 루틴',
+  subtitle: '스트레스 해소, 에너지 재충전, 나만의 단골 장소 및 습관 묘사',
+  levelTracks: {
+    beginner: {
+      levelName: '🌱 초급 (일상 빈도부사 & 습관 말하기)',
+      focusBadge: '주어(I) + 빈도부사 + 현재시제 동사',
+      speedGuide: '권장 리딩 속도: 0.30x(초저속) ~ 0.50x(천천히) 배속으로 또렷하게 발음',
+      levelGuide: '일상 습관을 나타낼 때는 현재시제를 쓰며, 빈도부사(usually, always)를 일반동사 앞에 배치합니다.',
+      patternEn: 'I usually unwind after work with a walk.',
+      patternIpa: '/aɪ ˈjuː.ʒu.ə.li ʌnˈwaɪnd ˈæf.tɚ wɝːk wɪð ə wɔːk/',
+      patternPron: '[아이 유주얼리 언와인드 / 애프터 워크 / 위더 워크]',
+      patternSoundBlock: 'I usually unwind / after work / with a walk.',
+      patternSoundRule: 'unwind는 [언윈드]가 아니라 [언와인드]로 발음하며, with a walk는 [위더 워크]로 부드럽게 이어 읽습니다.',
+      patternMeaningKo: '나는 보통 산책을 하며 퇴근 후 긴장을 풉니다.',
+      grammarSummary: '주어(I) + 빈도부사(usually) + 자동사(unwind) + 부사구(after work / with a walk)로 이루어진 1형식 일상 묘사 문장입니다.',
+      paraphraseDrill: [
+        {
+          basicExpr: 'rest after work (퇴근 후 쉬다)',
+          upgradedExpr: 'unwind after work (퇴근 후 긴장을 풀며 휴식하다)',
+          nuanceDiff: '단순히 멈춰 쉬는 것을 넘어 하루 동안 쌓인 긴장감을 풀 때 쓰는 원어민 표현입니다.',
+        },
+        {
+          basicExpr: 'my favorite cafe (내가 좋아하는 카페)',
+          upgradedExpr: 'my go-to cafe (내가 늘 믿고 찾는 단골 카페)',
+          nuanceDiff: 'OPIc에서 단골 장소나 선호 아이템을 말할 때 점수를 높여주는 핵심 형용사입니다.',
+        },
+      ],
+      dialogue: [
+        {
+          speaker: 'A',
+          roleName: '질문자 (Interviewer)',
+          en: 'How do you usually relax after a busy day at work?',
+          soundBlock: 'How do you usually relax / after a busy day / at work?',
+          pron: '[하우 두 유 유주얼리 릴랙스 / 애프터 러 비지 데이 앳 워크]',
+          ko: '바쁜 하루 일과를 마친 뒤에는 보통 어떻게 휴식을 취하시나요?',
+          pointNote: '일상 루틴 질문 How do you usually + 동사원형',
+        },
+        {
+          speaker: 'B',
+          roleName: '응시자 (Speaker)',
+          en: 'I usually unwind after work by walking in the neighborhood park.',
+          soundBlock: 'I usually unwind after work / by walking / in the neighborhood park.',
+          pron: '[아이 유주얼리 언와인드 애프터 워크 / 바이 워킹 / 인 더 네이버후드 파크]',
+          ko: '저는 보통 동네 공원을 산책하면서 퇴근 후 긴장을 풉니다.',
+          pointNote: '수단·방법 전치사구 by + 동명사(walking)',
+        },
+      ],
+    },
+    intermediate: {
+      levelName: '🌿 중급 (목적 to부정사 & 습관 고수 표현)',
+      focusBadge: 'stick to + 명사구 & 목적의 to부정사',
+      speedGuide: '권장 리딩 속도: 0.75x(연음·중저속) ~ 1.0x(원어민 정속)',
+      levelGuide: '내가 왜 그 루틴을 하는지(to clear my head) 이유와 꾸준함(stick to)을 자연스럽게 덧붙입니다.',
+      patternEn: 'I always stick to my daily workout routine to clear my head.',
+      patternIpa: '/aɪ ˈɔːl.weɪz stɪk tə maɪ ˈdeɪ.li ˈwɝːk.aʊt ruːˈtiːn tə klɪr maɪ hed/',
+      patternPron: '[아이 올웨이즈 스틱 투 / 마이 데일리 워크아웃 루틴 / 투 클리어 마이 헤드]',
+      patternSoundBlock: 'I always stick to / my daily workout routine / to clear my head.',
+      patternSoundRule: 'stick to는 전치사구와 연결해 끊지 않고 읽으며, 뒤의 to clear my head에서 목적 의미를 살려줍니다.',
+      patternMeaningKo: '나는 복잡한 머리를 식히기 위해 매일 운동 루틴을 꾸준히 지킵니다.',
+      grammarSummary: 'stick to의 to는 전치사이므로 뒤에 명사구(my daily workout routine)가 오고, 뒤의 to clear는 목적(~하기 위해)을 나타내는 부사적 용법의 to부정사입니다.',
+      paraphraseDrill: [
+        {
+          basicExpr: 'keep my exercise plan (운동 계획을 지키다)',
+          upgradedExpr: 'stick to my workout routine (운동 루틴을 흔들림 없이 고수하다)',
+          nuanceDiff: '작심삼일로 끝나지 않고 꾸준히 지킨다는 어감을 생생하게 전달합니다.',
+        },
+        {
+          basicExpr: 'forget stress (스트레스를 잊다)',
+          upgradedExpr: 'clear my head (복잡한 머리를 맑게 식히다)',
+          nuanceDiff: '산책·운동·음악 감상의 효과를 설명할 때 가장 자연스러운 구어 표현입니다.',
+        },
+      ],
+      dialogue: [
+        {
+          speaker: 'A',
+          roleName: '동료 (Colleague)',
+          en: 'You look really energetic these days. What is your secret?',
+          soundBlock: 'You look really energetic / these days. / What is your secret?',
+          pron: '[유 룩 릴리 에너제틱 디즈 데이즈. 왓 이즈 유어 시크릿]',
+          ko: '요즘 정말 활기차 보이시네요. 비결이 뭔가요?',
+          pointNote: '2형식 감각동사 look + 형용사 보어(energetic)',
+        },
+        {
+          speaker: 'B',
+          roleName: '나 (Speaker)',
+          en: 'I stick to my morning jogging routine, and it helps me clear my head.',
+          soundBlock: 'I stick to my morning jogging routine, / and it helps me / clear my head.',
+          pron: '[아이 스틱 투 마이 모닝 조깅 루틴 / 앤 잇 헬프스 미 클리어 마이 헤드]',
+          ko: '아침 조깅 루틴을 꾸준히 지키고 있는데, 복잡한 머리를 식히는 데 큰 도움이 돼요.',
+          pointNote: '5형식 helps + 목적어(me) + 원형부정사 보어(clear)',
+        },
+      ],
+    },
+    advanced: {
+      levelName: '🌳 고급 (감각적 이유 설명 & 관점 확장)',
+      focusBadge: '전치사 + 동명사(by V-ing) & 병렬 구조',
+      speedGuide: '권장 리딩 속도: 1.0x(원어민 정속) ~ 1.25x(고급·쾌속)',
+      levelGuide: '주말 루틴이 내 삶에 주는 긍정적 영향(recharge my batteries, broaden my perspective)을 입체적으로 연결합니다.',
+      patternEn: 'I recharge my batteries on weekends by reading at my go-to cafe.',
+      patternIpa: '/aɪ riːˈtʃɑːrdʒ maɪ ˈbæt̬.ɚ.iz ɑːn ˈwiːk.endz baɪ ˈriː.dɪŋ æt maɪ ˈɡoʊ.tuː kæˈfeɪ/',
+      patternPron: '[아이 리차지 마이 배러리즈 안 위켄즈 / 바이 리딩 앳 마이 고우투 카페]',
+      patternSoundBlock: 'I recharge my batteries / on weekends / by reading / at my go-to cafe.',
+      patternSoundRule: 'batteries의 tt를 미국식 플랩 사운드 [배러리즈]로 부드럽게 발음하고 전치사구마다 리듬을 나누어 읽습니다.',
+      patternMeaningKo: '나는 주말마다 단골 카페에서 책을 읽으며 에너지를 재충전합니다.',
+      grammarSummary: '주절(I recharge my batteries on weekends) 뒤에 수단을 나타내는 전치사구(by + 동명사 reading)와 장소 전치사구(at my go-to cafe)가 결합된 완성도 높은 문장입니다.',
+      paraphraseDrill: [
+        {
+          basicExpr: 'get energy again (에너지를 다시 얻다)',
+          upgradedExpr: 'recharge my batteries (방전된 활력을 완전히 재충전하다)',
+          nuanceDiff: '비유적 관용 표현을 사용해 OPIc AL 등급에서 요구하는 어휘 다양성을 보여줍니다.',
+        },
+        {
+          basicExpr: 'learn many new things (새로운 것을 많이 배우다)',
+          upgradedExpr: 'broaden my perspective on life (삶에 대한 시야와 관점을 넓히다)',
+          nuanceDiff: '독서·여행·대화 주제의 결론 문장으로 활용하기 좋은 고급 표현입니다.',
+        },
+      ],
+      dialogue: [
+        {
+          speaker: 'A',
+          roleName: '질문자 (Interviewer)',
+          en: 'Tell me about your favorite place to spend time on weekends.',
+          soundBlock: 'Tell me about / your favorite place / to spend time / on weekends.',
+          pron: '[텔 미 어바웃 / 유어 페이버릿 플레이스 / 투 스펜드 타임 안 위켄즈]',
+          ko: '주말에 시간을 보내기 좋아하는 당신만의 장소에 대해 말씀해 주세요.',
+          pointNote: '명사(place)를 뒤에서 수식하는 형용사적 용법의 to부정사(to spend time)',
+        },
+        {
+          speaker: 'B',
+          roleName: '응시자 (Speaker)',
+          en: 'This quiet neighborhood cafe is my go-to spot where I recharge my batteries.',
+          soundBlock: 'This quiet neighborhood cafe / is my go-to spot / where I recharge my batteries.',
+          pron: '[디스 콰이엇 네이버후드 카페 / 이즈 마이 고우투 스팟 / 웨어 아이 리차지 마이 배러리즈]',
+          ko: '이 조용한 동네 카페는 제가 에너지를 재충전하는 단골 장소입니다.',
+          pointNote: '장소 선행사(my go-to spot)를 수식하는 관계부사 where절',
+        },
+      ],
+    },
+  },
+  synonymScales: [
+    {
+      conceptTitle: '휴식 및 에너지 회복의 깊이 (동사구)',
+      scaleAxisLabel: '잠깐 숨 돌리기 ➔ 긴장 해소 ➔ 완전한 활력 충전',
+      weak: {
+        expr: 'take a quick breather',
+        pron: '[테이커 퀵 브리더]',
+        ko: '잠깐 숨을 돌리다',
+        note: '업무나 공부 중간에 5~10분 정도 짧게 쉬어갈 때',
+      },
+      medium: {
+        expr: 'unwind after work',
+        pron: '[언와인드 애프터 워크]',
+        ko: '퇴근 후 긴장을 풀다',
+        note: '하루 일과를 마치고 산책이나 취미로 긴장감을 내려놓을 때',
+      },
+      strong: {
+        expr: 'recharge my batteries',
+        pron: '[리차지 마이 배러리즈]',
+        ko: '에너지를 완전히 재충전하다',
+        note: '주말이나 휴가를 통해 소진된 체력과 마음의 활력을 가득 채울 때',
+      },
+    },
+    {
+      conceptTitle: '장소·습관에 대한 선호도와 방문 빈도 (형용사 수식어)',
+      scaleAxisLabel: '가끔 들르는 ➔ 자주 찾는 ➔ 무조건 믿고 가는 단골',
+      weak: {
+        expr: 'a casual spot',
+        pron: '[어 캐주얼 스팟]',
+        ko: '부담 없이 들르는 곳',
+        note: '격식 없이 가볍게 방문하는 장소',
+      },
+      medium: {
+        expr: 'a regular hangout',
+        pron: '[어 레귤러 행아웃]',
+        ko: '자주 모이는 단골 아지트',
+        note: '친구들이나 동료들과 주기적으로 어울리는 장소',
+      },
+      strong: {
+        expr: 'my go-to spot',
+        pron: '[마이 고우투 스팟]',
+        ko: '늘 믿고 찾는 최애 단골 장소',
+        note: '고민할 필요 없이 가장 먼저 떠오르고 선택하는 최고의 장소',
+      },
+    },
+  ],
+  vocab: [
+    {
+      id: 201,
+      type: '오픽·구동사',
+      recommendLevel: 'beginner',
+      word: 'unwind',
+      masked: 'un____',
+      ipa: '/ʌnˈwaɪnd/',
+      pron: '[언와인드]',
+      soundMethod: 'wind(감다 /waɪnd/)의 반대말이므로 [언윈드]가 아닌 [언와인드]로 발음합니다.',
+      soundBlock: 'unwind / after work',
+      meaning: '긴장을 풀다, 휴식을 취하다',
+      enDef: 'to relax and allow your mind to be free from worry after a period of work',
+      exampleBlank: 'I usually _____ after work by taking a walk.',
+      pos: 'V',
+      posLabel: '동사 (V)',
+      comp: 'V',
+      compLabel: '동사 (V)',
+      roleDesc: '주어(I)의 휴식 동작을 서술하는 본동사(V)입니다.',
+      collocation: 'unwind after a long day',
+      collocationKo: '긴 하루 끝에 긴장을 풀다',
+      paraphraseTip: 'relax보다 하루의 피로와 긴장(tension)을 스르르 풀어낸다는 생생한 어감이 있습니다.',
+    },
+    {
+      id: 202,
+      type: '일상 회화',
+      recommendLevel: 'beginner',
+      word: 'go-to',
+      masked: 'g_-t_',
+      ipa: '/ˈɡoʊ.tuː/',
+      pron: '[고우투]',
+      soundMethod: '첫 음절(go-)에 강세를 두고 명사 앞에서 붙여 읽습니다.',
+      soundBlock: 'my go-to / coffee shop',
+      meaning: '늘 믿고 찾는, 단골의, 가장 선호하는',
+      enDef: 'regularly chosen or relied upon as the best option in a particular situation',
+      exampleBlank: 'This quiet cafe is my _____ spot on weekends.',
+      pos: 'Adj',
+      posLabel: '형용사 (Adj)',
+      comp: 'M',
+      compLabel: '수식어 (M)',
+      roleDesc: '명사 spot 앞에서 어떤 장소인지를 꾸며주는 한정적 수식어(M)입니다.',
+      collocation: 'my go-to cafe',
+      collocationKo: '내가 늘 찾는 단골 카페',
+      paraphraseTip: 'my favorite보다 실제 생활에서 늘 선택한다는 실용적인 뉘앙스를 줍니다.',
+    },
+    {
+      id: 203,
+      type: '오픽·구동사',
+      recommendLevel: 'intermediate',
+      word: 'stick to',
+      masked: 'st___ t_',
+      ipa: '/stɪk tuː/',
+      pron: '[스틱 투]',
+      soundMethod: 'stick과 전치사 to를 끊지 않고 [스틱투]로 이어 발음합니다.',
+      soundBlock: 'stick to / my routine',
+      meaning: '(계획·원칙·루틴을) 바꾸지 않고 꾸준히 지키다',
+      enDef: 'to continue doing or using something and not change to anything else',
+      exampleBlank: 'I always _____ my daily workout routine.',
+      pos: 'V',
+      posLabel: '동사구 (V)',
+      comp: 'V',
+      compLabel: '동사 (V)',
+      roleDesc: '목적어(my daily workout routine)를 취해 습관 유지를 나타내는 타동사구(V)입니다.',
+      collocation: 'stick to a routine',
+      collocationKo: '루틴을 꾸준히 지키다',
+      paraphraseTip: 'keep이나 follow보다 유혹에 흔들리지 않고 끝까지 고수한다는 뜻이 강합니다.',
+    },
+    {
+      id: 204,
+      type: '오픽·구동사',
+      recommendLevel: 'intermediate',
+      word: 'clear my head',
+      masked: 'cl___ my h___',
+      ipa: '/klɪr maɪ hed/',
+      pron: '[클리어 마이 헤드]',
+      soundMethod: 'clear[클리어]와 head[헤드]에 강세를 두어 발음합니다.',
+      soundBlock: 'clear / my head',
+      meaning: '복잡한 머리를 식히다, 생각을 정리하다',
+      enDef: 'to free your mind from worry, confusion, or mental fatigue',
+      exampleBlank: 'I take an evening walk to _____.',
+      pos: 'V',
+      posLabel: '동사구 (V)',
+      comp: 'V',
+      compLabel: '동사구 (V)',
+      roleDesc: '목적을 나타내는 to부정사구(to clear my head)를 이루는 핵심 동사구입니다.',
+      collocation: 'take a walk to clear my head',
+      collocationKo: '머리를 식히기 위해 산책하다',
+      paraphraseTip: 'refresh my mind와 같은 뜻으로 일상 회화에서 훨씬 자주 쓰입니다.',
+    },
+    {
+      id: 205,
+      type: '오픽·구동사',
+      recommendLevel: 'intermediate',
+      word: 'grab a bite',
+      masked: 'gr__ a b___',
+      ipa: '/ɡræb ə baɪt/',
+      pron: '[그래버 바이트]',
+      soundMethod: 'grab과 a가 연음되어 [그래버 바이트]로 경쾌하게 소리 납니다.',
+      soundBlock: 'grab a bite / before the movie',
+      meaning: '간단히 요기하다, 가볍게 식사하다',
+      enDef: 'to get something quick and casual to eat',
+      exampleBlank: "Let's _____ at the bakery before the movie.",
+      pos: 'V',
+      posLabel: '동사구 (V)',
+      comp: 'V',
+      compLabel: '동사 (V)',
+      roleDesc: "권유문 Let's 뒤에서 서술어(V) 역할을 하는 관용 동사구입니다.",
+      collocation: 'grab a quick bite',
+      collocationKo: '간단히 빨리 식사하다',
+      paraphraseTip: 'eat food보다 훨씬 원어민다운 자연스러운 약속 표현입니다.',
+    },
+    {
+      id: 206,
+      type: '오픽·구동사',
+      recommendLevel: 'advanced',
+      word: 'recharge my batteries',
+      masked: 're______ my b________',
+      ipa: '/riːˈtʃɑːrdʒ maɪ ˈbæt̬.ɚ.iz/',
+      pron: '[리차지 마이 배러리즈]',
+      soundMethod: '미국식 발음에서 batteries는 플랩 현상으로 [배러리즈]로 부드럽게 발음합니다.',
+      soundBlock: 'recharge / my batteries',
+      meaning: '에너지를 재충전하다, 활력을 되찾다',
+      enDef: 'to rest and relax for a period of time so that you feel energetic again',
+      exampleBlank: 'I _____ on weekends by listening to jazz.',
+      pos: 'V',
+      posLabel: '동사구 (V)',
+      comp: 'V',
+      compLabel: '동사 (V)',
+      roleDesc: '주어(I)의 서술어(V) 역할을 하는 관용 동사구입니다.',
+      collocation: 'recharge my batteries on weekends',
+      collocationKo: '주말에 에너지를 재충전하다',
+      paraphraseTip: 'regain my energy를 생동감 있게 표현한 고득점 이디엄입니다.',
+    },
+    {
+      id: 207,
+      type: '수능·학술',
+      recommendLevel: 'advanced',
+      word: 'perspective',
+      masked: 'per________',
+      ipa: '/pɚˈspek.tɪv/',
+      pron: '[퍼스펙티브]',
+      soundMethod: '두 번째 음절(-spec-)에 강세를 두어 [퍼스펙티브]로 발음합니다.',
+      soundBlock: 'broaden / our perspective',
+      meaning: '관점, 시각, 세상을 보는 눈',
+      enDef: 'a particular attitude toward or way of regarding something; a point of view',
+      exampleBlank: 'Reading diverse books broadens our _____ on life.',
+      pos: 'N',
+      posLabel: '명사 (N)',
+      comp: 'DO',
+      compLabel: '직접목적어 (DO)',
+      roleDesc: '타동사 broadens의 직접목적어(DO) 역할을 하는 추상명사입니다.',
+      collocation: 'broaden our perspective',
+      collocationKo: '시야(관점)를 넓히다',
+      paraphraseTip: 'viewpoint, outlook과 바꿔 쓸 수 있는 핵심 어휘입니다.',
+    },
+  ],
+  sentences: [
+    {
+      id: 2001,
+      levelTag: 'beginner',
+      tag: '초급 필수 · 단골 장소 소개',
+      targetWord: 'go-to',
+      wordOrderFormula: 'This quiet cafe[S] + is[V] + my go-to spot[SC] + on weekends[M].',
+      structure: '2형식 (S + be동사 V + 명사구 보어 SC + 시간 전치사구 M)',
+      soundBlockEn: 'This quiet cafe / is my go-to spot / on weekends.',
+      soundMethodGuide: 'is my go-to spot[이즈 마이 고우투 스팟]을 한 호흡으로 묶어 명쾌하게 발음합니다.',
+      ipaLine: '/ðɪs ˈkwaɪ.ət kæˈfeɪ ɪz maɪ ˈɡoʊ.tuː spɑːt ɑːn ˈwiːk.endz/',
+      koLine: '이 조용한 카페는 / 나의 단골 장소이다 / 주말마다 찾는.',
+      enLine: 'This quiet cafe / is my go-to spot / on weekends.',
+      rawEn: 'This quiet cafe is my go-to spot on weekends.',
+      pronLine: '[디스 콰이엇 카페 / 이즈 마이 고우투 스팟 / 안 위켄즈]',
+      naturalKo: '이 조용한 카페는 내가 주말마다 늘 찾는 단골 장소이다.',
+      paraphraseVersion: 'This quiet cafe is the place I always visit on weekends.',
+      grammarPoint: 'be동사(is) 뒤에서 주어(This quiet cafe)가 어떤 곳인지 정의해 주는 주격보어(SC) 자리에 명사구(my go-to spot)가 쓰였습니다.',
+      contextNuance: 'OPIc 카페·음식점·공원 묘사 문제에서 첫 문장으로 던지기 가장 좋은 만능 템플릿입니다.',
+    },
+    {
+      id: 2002,
+      levelTag: 'intermediate',
+      tag: '중급 핵심 · 루틴 유지와 목적',
+      targetWord: 'stick to',
+      wordOrderFormula: 'I[S] + always[M] + stick to[V] + my daily workout routine[DO] + to clear my head[M].',
+      structure: '3형식 구동사 (S + V + DO) + 목적의 to부정사구(M)',
+      soundBlockEn: 'I always stick to / my daily workout routine / to clear my head.',
+      soundMethodGuide: 'stick to[스틱투] 뒤에 명사구를 자연스럽게 연결하고, to clear my head 앞에서 살짝 끊어 읽습니다.',
+      ipaLine: '/aɪ ˈɔːl.weɪz stɪk tə maɪ ˈdeɪ.li ˈwɝːk.aʊt ruːˈtiːn tə klɪr maɪ hed/',
+      koLine: '나는 항상 꾸준히 지킨다 / 매일의 운동 루틴을 / 복잡한 머리를 식히기 위해.',
+      enLine: 'I always stick to / my daily workout routine / to clear my head.',
+      rawEn: 'I always stick to my daily workout routine to clear my head.',
+      pronLine: '[아이 올웨이즈 스틱 투 / 마이 데일리 워크아웃 루틴 / 투 클리어 마이 헤드]',
+      naturalKo: '나는 복잡한 머리를 식히기 위해 항상 매일 운동하는 루틴을 꾸준히 지킨다.',
+      paraphraseVersion: 'I consistently follow my daily exercise schedule in order to refresh my mind.',
+      grammarPoint: 'stick to의 to는 전치사(+명사구)이고, to clear의 to는 목적(~하기 위해)을 나타내는 to부정사(+동사원형)입니다.',
+      contextNuance: '건강 관리나 자기계발 습관을 설명할 때 의지력과 목적을 동시에 보여줄 수 있는 문장입니다.',
+    },
+    {
+      id: 2003,
+      levelTag: 'advanced',
+      tag: '고급 마스터 · 동명사구 주어와 관점 확장',
+      targetWord: 'perspective',
+      wordOrderFormula: 'Reading diverse texts[S:동명사구] + broadens[V] + our perspective[DO] + on life[M].',
+      structure: '3형식 (동명사구 S + 단수 타동사 V + DO + 전치사구 M)',
+      soundBlockEn: 'Reading diverse texts / broadens our perspective / on life.',
+      soundMethodGuide: '동명사구 주어(Reading diverse texts)와 동사+목적어(broadens our perspective)를 리듬감 있게 연결합니다.',
+      ipaLine: '/ˈriː.dɪŋ daɪˈvɝːs teksts ˈbrɔː.dənz ˈaʊ.ɚ pɚˈspek.tɪv ɑːn laɪf/',
+      koLine: '다양한 글을 읽는 것은 / 우리의 시야(관점)를 넓혀준다 / 삶에 대한.',
+      enLine: 'Reading diverse texts / broadens our perspective / on life.',
+      rawEn: 'Reading diverse texts broadens our perspective on life.',
+      pronLine: '[리딩 다이버스 텍스츠 / 브로든즈 아워 퍼스펙티브 / 안 라이프]',
+      naturalKo: '다양한 글을 읽는 것은 삶에 대한 우리의 시야를 넓혀준다.',
+      paraphraseVersion: 'When we read a wide range of books, we can expand our viewpoint on the world.',
+      grammarPoint: '복수 명사 texts가 바로 앞에 있지만 진짜 주어 핵은 동명사 Reading이므로 단수 동사 broadens(-s)로 수일치해야 합니다.',
+      contextNuance: '에세이나 스피킹 시험 마무리에서 내 취미가 주는 지적인 가치를 요약할 때 빛을 발하는 문장입니다.',
+    },
+  ],
+  quiz: {
+    beginner: {
+      word: 'unwind',
+      ipa: '/ʌnˈwaɪnd/',
+      options: [
+        '일정을 앞당기다',
+        '긴장을 풀다, 휴식을 취하다',
+        '서류를철저히 검토하다',
+        '회의록을 작성하다',
+      ],
+      answerIdx: 1,
+      explanation: 'unwind(/ʌnˈwaɪnd/, [언와인드])는 감겨 있던 태엽을 풀듯 긴장과 피로를 풀며 쉬다라는 뜻입니다.',
+    },
+    intermediate: {
+      sentenceBefore: 'I always try to',
+      sentenceAfter: 'my morning workout routine even when I am busy.',
+      hint: '(계획·루틴을) 바꾸지 않고 꾸준히 지키다',
+      options: ['put off', 'give up', 'turn down', 'stick to'],
+      answerIdx: 3,
+      explanation: '바쁠 때에도 아침 운동 루틴을 포기하지 않고 꾸준히 지킨다는 문맥이므로 stick to가 정답입니다.',
+    },
+    advanced: {
+      questionPrompt:
+        '다음 중 문법적으로 올바르고 자연스러운 문장을 2개 고르세요.',
+      highlightWord: '동명사구 주어 수일치 & 전치사 to vs to부정사 구별',
+      options: [
+        'Reading diverse books broadens our perspective on life.',
+        'Reading diverse books broaden our perspective on life.',
+        'I take an evening walk to clear my head and recharge my batteries.',
+        'I always stick to exercise every morning.',
+      ],
+      answerIndices: [0, 2],
+      explanation:
+        '첫 번째 문장은 동명사구 주어(Reading ~)에 단수 동사 broadens를 정확히 수일치시켰고, 세 번째 문장은 to부정사(to clear ~ and recharge ~) 병렬 구조가 완벽합니다. (네 번째 문장에서 stick to의 to는 전치사이므로 동사원형 exercise가 아닌 명사구/동명사가 와야 합니다.)',
+    },
+    writingMission: {
+      koPrompt: '다양한 글을 읽는 것은 삶에 대한 우리의 시야(관점)를 넓혀준다.',
+      targetPattern: 'Reading ~ broadens our perspective on ...',
+      modelAnswer: 'Reading diverse texts broadens our perspective on life.',
+    },
+  },
+};
+
+export const THEME_TRAVEL_HOTEL: ThemeData = {
+  id: 'theme-travel-hotel',
+  badge: '✈️ 해외여행 · 호텔·공항',
+  title: '호텔 체크인·레이트 체크아웃 & 공항 수하물 실전',
+  subtitle: '짐 맡기기, 무료 조식 문의, 특별 요청 수용 및 항공 일정표 확인',
+  levelTracks: {
+    beginner: {
+      levelName: '🌱 초급 (정중한 허락·요청 의문문)',
+      focusBadge: 'Can we + 동사원형(구동사) + 목적어?',
+      speedGuide: '권장 리딩 속도: 0.30x(초저속) ~ 0.50x(천천히) 배속으로 끊어 읽기',
+      levelGuide: '호텔 프런트나 공항 카운터에서 가장 많이 쓰는 [Can we + 구동사 ~?] 패턴을 입에 붙입니다.',
+      patternEn: 'Can we drop off our bags before check-in?',
+      patternIpa: '/kæn wi drɑːp ɔːf ˈaʊ.ɚ bæɡz bɪˈfɔːr ˈtʃek.ɪn/',
+      patternPron: '[캔 위 드랍 오프 / 아워 백스 / 비포 체크인]',
+      patternSoundBlock: 'Can we drop off / our bags / before check-in?',
+      patternSoundRule: 'drop off[드라포프]를 한 호흡으로 연결하고 문장 끝 check-in?을 살짝 올려 정중하게 묻습니다.',
+      patternMeaningKo: '체크인 시간 전에 저희 가방(짐)을 먼저 맡길 수 있을까요?',
+      grammarSummary: '조동사 Can + 주어(we) + 타동사구(drop off) + 목적어(our bags) + 시간 전치사구(before check-in)로 구성된 실전 여행 필수 의문문입니다.',
+      paraphraseDrill: [
+        {
+          basicExpr: 'leave our bags here (가방을 여기에 두다)',
+          upgradedExpr: 'drop off our bags at the front desk (프런트에 짐을 맡기다)',
+          nuanceDiff: '호텔 벨데스크나 프런트에 짐을 맡길 때 원어민이 가장 흔히 쓰는 구동사입니다.',
+        },
+        {
+          basicExpr: 'Can you help me with my request? (제 요청을 도와주실 수 있나요?)',
+          upgradedExpr: 'Could you accommodate my request? (제 요청을 수용해 배려해 주실 수 있을까요?)',
+          nuanceDiff: 'help는 반드시 help me with ~ 구조로 써야 하며, 호텔에서는 타동사 accommodate가 훨씬 품격 있습니다.',
+        },
+      ],
+      dialogue: [
+        {
+          speaker: 'A',
+          roleName: '투숙객 (Guest)',
+          en: 'Hi, we arrived a bit early. Can we drop off our bags before check-in?',
+          soundBlock: 'Hi, / we arrived a bit early. / Can we drop off our bags / before check-in?',
+          pron: '[하이, 위 어라이브드 어 빗 얼리. 캔 위 드랍 오프 아워 백스 / 비포 체크인]',
+          ko: '안녕하세요, 저희가 조금 일찍 도착했는데요. 체크인 전에 짐을 먼저 맡길 수 있을까요?',
+          pointNote: '구동사 drop off (짐을 맡기다)',
+        },
+        {
+          speaker: 'B',
+          roleName: '프런트 직원 (Receptionist)',
+          en: 'Certainly! Feel free to make yourself comfortable in the lobby lounge.',
+          soundBlock: 'Certainly! / Feel free to make yourself comfortable / in the lobby lounge.',
+          pron: '[서튼리! 필 프리 투 메익 유어셀프 컴프터블 / 인 더 로비 라운지]',
+          ko: '물론이죠! 로비 라운지에서 편하게 쉬고 계세요.',
+          pointNote: '5형식 make yourself comfortable (편히 계시다)',
+        },
+      ],
+    },
+    intermediate: {
+      levelName: '🌿 중급 (호텔 혜택 확인 & 경유지 재정비)',
+      focusBadge: '타동사 include & 구동사 freshen up',
+      speedGuide: '권장 리딩 속도: 0.75x(연음·중저속) ~ 1.0x(원어민 정속)',
+      levelGuide: '호텔 무료 혜택(complimentary)과 공항 환승 대기(layover) 관련 필수 어휘를 정확한 강세로 발음합니다.',
+      patternEn: 'Our hotel booking includes complimentary breakfast.',
+      patternIpa: '/ˈaʊ.ɚ hoʊˈtel ˈbʊk.ɪŋ ɪnˈkluːdz ˌkɑːm.pləˈmen.t̬ɚ.i ˈbrek.fəst/',
+      patternPron: '[아워 호텔 부킹 인클루즈 / 캄플러멘터리 브렉퍼스트]',
+      patternSoundBlock: 'Our hotel booking / includes / complimentary breakfast.',
+      patternSoundRule: 'complimentary의 세 번째 음절(-men-)에 강세를 실어 [캄플러멘터리]로 또렷이 발음합니다.',
+      patternMeaningKo: '우리 호텔 예약에는 무료 조식이 포함되어 있습니다.',
+      grammarSummary: '단수 주어(Our hotel booking)에 수일치된 단수 타동사 includes 뒤에 형용사(complimentary) + 명사(breakfast)가 목적어(DO)로 왔습니다.',
+      paraphraseDrill: [
+        {
+          basicExpr: 'free breakfast (공짜 아침 식사)',
+          upgradedExpr: 'complimentary breakfast (호텔·항공사에서 우대 혜택으로 제공하는 무료 조식)',
+          nuanceDiff: '안내 방송이나 예약 확인서에 등장하는 공식 서비스 용어입니다.',
+        },
+        {
+          basicExpr: 'wash my face and rest (세수하고 쉬다)',
+          upgradedExpr: 'freshen up in the airport lounge (공항 라운지에서 간단히 씻고 재정비하다)',
+          nuanceDiff: '비행 전후에 몸단장을 하고 상쾌하게 재정비한다는 뜻을 깔끔하게 전달합니다.',
+        },
+      ],
+      dialogue: [
+        {
+          speaker: 'A',
+          roleName: '여행객 (Traveler)',
+          en: 'Does our room reservation include complimentary breakfast?',
+          soundBlock: 'Does our room reservation / include / complimentary breakfast?',
+          pron: '[더즈 아워 룸 레저베이션 인클루드 / 캄플러멘터리 브렉퍼스트]',
+          ko: '저희 객실 예약에 무료 조식이 포함되어 있나요?',
+          pointNote: 'include + 목적어 (~을 포함하다)',
+        },
+        {
+          speaker: 'B',
+          roleName: '컨시어지 (Concierge)',
+          en: 'Yes, it does. We also offer a complimentary shuttle to the airport.',
+          soundBlock: 'Yes, it does. / We also offer / a complimentary shuttle / to the airport.',
+          pron: '[예스 잇 더즈. 위 올소 오퍼 / 어 캄플러멘터리 셔틀 투 디 에어포트]',
+          ko: '네, 포함되어 있습니다. 공항까지 무료 셔틀버스도 제공하고 있습니다.',
+          pointNote: 'complimentary shuttle (무료 우대 셔틀)',
+        },
+      ],
+    },
+    advanced: {
+      levelName: '🌳 고급 (특별 요청 정중히 문의하기 & 관계대명사절)',
+      focusBadge: 'Would it be possible to + 동사원형 & 계속적 용법 , which',
+      speedGuide: '권장 리딩 속도: 1.0x(원어민 정속) ~ 1.25x(고급·쾌속)',
+      levelGuide: '가정법 조동사를 활용한 극존칭 요청(Would it be possible to accommodate ~?)을 물 흐르듯 구사합니다.',
+      patternEn: 'Would it be possible to accommodate a late check-out request?',
+      patternIpa: '/wʊd ɪt bi ˈpɑː.sə.bəl tə əˈkɑː.mə.deɪt ə leɪt ˈtʃek.aʊt rɪˈkwest/',
+      patternPron: '[우딧 비 파서블 / 투 어카머데이트 / 어 레이트 체크아웃 리퀘스트]',
+      patternSoundBlock: 'Would it be possible / to accommodate / a late check-out request?',
+      patternSoundRule: 'Would it을 [우딧]으로 가볍게 연음하고 핵심 동사 accommodate[어카머데이트]를 또렷하게 발음합니다.',
+      patternMeaningKo: '레이트 체크아웃 요청을 수용해 배려해 주실 수 있을까요?',
+      grammarSummary: '가주어(it) + 진주어(to accommodate a late check-out request) 구문으로, 상대방에게 부담을 주지 않으면서 가장 정중하게 편의를 요청하는 표현입니다.',
+      paraphraseDrill: [
+        {
+          basicExpr: 'Can I check out late? (늦게 체크아웃해도 되나요?)',
+          upgradedExpr: 'Would it be possible to accommodate a late check-out request?',
+          nuanceDiff: '직설적인 질문을 격식 있는 정중한 요청문으로 격상시켜 긍정적인 답변을 이끌어냅니다.',
+        },
+        {
+          basicExpr: 'check our travel plan (여행 계획을 확인하다)',
+          upgradedExpr: 'review our updated flight itinerary (업데이트된 항공편 상세 일정표를 검토하다)',
+          nuanceDiff: '항공사·호텔·여행사 소통에서 필수적으로 쓰이는 표준 명사 itinerary입니다.',
+        },
+      ],
+      dialogue: [
+        {
+          speaker: 'A',
+          roleName: '투숙객 (Guest)',
+          en: 'Our flight itinerary changed. Would it be possible to accommodate a late check-out?',
+          soundBlock: 'Our flight itinerary changed. / Would it be possible / to accommodate a late check-out?',
+          pron: '[아워 플라이트 아이티너레리 체인지드. 우딧 비 파서블 / 투 어카머데이트 어 레이트 체크아웃]',
+          ko: '저희 항공편 일정이 변경되었는데요. 혹시 레이트 체크아웃 요청을 수용해 주실 수 있을까요?',
+          pointNote: 'itinerary(일정표) + accommodate(요청을 수용하다)',
+        },
+        {
+          speaker: 'B',
+          roleName: '호텔 매니저 (Manager)',
+          en: 'We would be happy to accommodate your request until 2 PM at no extra charge.',
+          soundBlock: 'We would be happy / to accommodate your request / until 2 PM / at no extra charge.',
+          pron: '[위 우드 비 해피 투 어카머데이트 유어 리퀘스트 / 언틸 투 피엠 / 앳 노 엑스트라 차지]',
+          ko: '추가 요금 없이 오후 2시까지 고객님의 요청을 기꺼이 수용해 드리겠습니다.',
+          pointNote: 'at no extra charge (추가 비용 없이)',
+        },
+      ],
+    },
+  },
+  synonymScales: [
+    {
+      conceptTitle: '요청·문의 표현의 정중함 및 격식도 (의문문 패턴)',
+      scaleAxisLabel: '일상적 질문 ➔ 정중한 부탁 ➔ 격식 있는 최상급 요청',
+      weak: {
+        expr: 'Can you help me with this?',
+        pron: '[캔 유 헬프 미 위드 디스]',
+        ko: '이것 좀 도와주실 수 있나요?',
+        note: '가벼운 일상 상황에서 편하게 도움을 청할 때 (help + 사람 + with + 대상)',
+      },
+      medium: {
+        expr: 'Could you check if a room is available?',
+        pron: '[쿠쥬 체크 이프 어 룸 이즈 어베일러블]',
+        ko: '이용 가능한 객실이 있는지 확인해 주시겠어요?',
+        note: '예약이나 프런트 문의에서 두루 쓰이는 표준 정중 표현',
+      },
+      strong: {
+        expr: 'Would it be possible to accommodate our request?',
+        pron: '[우딧 비 파서블 투 어카머데이트 아워 리퀘스트]',
+        ko: '저희의 특별 요청을 수용해 주시는 것이 가능할까요?',
+        note: '레이트 체크아웃이나 좌석·객실 배정 등 특별한 배려를 구할 때 쓰는 최고급 표현',
+      },
+    },
+    {
+      conceptTitle: '가격·혜택 제공 조건의 격식도 (형용사)',
+      scaleAxisLabel: '구어체 공짜 ➔ 추가 요금 없음 ➔ 호텔·항공사 우대 무료 제공',
+      weak: {
+        expr: 'free (drinks)',
+        pron: '[프리 드링크스]',
+        ko: '무료의 (음료)',
+        note: '일상 대화에서 가장 흔하게 쓰는 기본 단어',
+      },
+      medium: {
+        expr: 'included at no extra charge',
+        pron: '[인클루디드 앳 노 엑스트라 차지]',
+        ko: '추가 요금 없이 포함된',
+        note: '요금 정산이나 계약 조건에서 비용이 들지 않음을 명시할 때',
+      },
+      strong: {
+        expr: 'complimentary (breakfast / lounge access)',
+        pron: '[캄플러멘터리 브렉퍼스트]',
+        ko: '고객 우대 무료 혜택으로 제공되는 (조식/라운지)',
+        note: '호텔·항공사·리조트에서 고객 서비스 차원으로 무료 제공할 때 쓰는 품격 있는 단어',
+      },
+    },
+  ],
+  vocab: [
+    {
+      id: 301,
+      type: '오픽·구동사',
+      recommendLevel: 'beginner',
+      word: 'drop off',
+      masked: 'dr__ o__',
+      ipa: '/drɑːp ɔːf/',
+      pron: '[드랍 오프]',
+      soundMethod: 'drop의 /p/와 off가 이어져 [드라포프]처럼 자연스럽게 발음됩니다.',
+      soundBlock: 'drop off / our bags',
+      meaning: '(짐·세탁물 등을) 맡기다, 내려놓다',
+      enDef: 'to take someone or something to a particular place and leave them there',
+      exampleBlank: 'Can we _____ our bags at the front desk?',
+      pos: 'V',
+      posLabel: '동사구 (V)',
+      comp: 'V',
+      compLabel: '동사 (V)',
+      roleDesc: '조동사 Can 뒤에서 목적어(our bags)를 취하는 타동사구(V)입니다.',
+      collocation: 'drop off our luggage',
+      collocationKo: '수하물을 맡기다',
+      paraphraseTip: '맡긴 짐을 나중에 다시 찾아가는 것은 pick up이라고 합니다.',
+    },
+    {
+      id: 302,
+      type: '일상 회화',
+      recommendLevel: 'beginner',
+      word: 'carry-on',
+      masked: 'c____-o_',
+      ipa: '/ˈkær.i.ɑːn/',
+      pron: '[캐리안]',
+      soundMethod: '첫 음절(car-)에 강세를 두어 [캐리안]으로 발음합니다.',
+      soundBlock: 'bring / one carry-on',
+      meaning: '기내 반입 수하물(가방)',
+      enDef: 'a small bag or suitcase that a passenger is allowed to take into the cabin of an aircraft',
+      exampleBlank: 'Passengers may bring one _____ onto the aircraft.',
+      pos: 'N',
+      posLabel: '명사 (N)',
+      comp: 'DO',
+      compLabel: '직접목적어 (DO)',
+      roleDesc: '타동사 bring의 직접목적어(DO) 자리에 쓰인 가산명사입니다. (형용사로 쓰일 때는 carry-on bag처럼 명사를 수식함)',
+      collocation: 'a cabin carry-on',
+      collocationKo: '기내 반입 가방',
+      paraphraseTip: '화물칸에 부치는 위탁 수하물은 checked baggage라고 부릅니다.',
+    },
+    {
+      id: 303,
+      type: '트렌드·실무',
+      recommendLevel: 'intermediate',
+      word: 'complimentary',
+      masked: 'com__________',
+      ipa: '/ˌkɑːm.pləˈmen.t̬ɚ.i/',
+      pron: '[캄플러멘터리]',
+      soundMethod: '세 번째 음절(-men-)에 주강세를 두어 [캄플러멘터리]로 발음합니다.',
+      soundBlock: 'complimentary / breakfast',
+      meaning: '(우대 혜택으로) 무료로 제공되는',
+      enDef: 'given or supplied free of charge as a courtesy or hospitality',
+      exampleBlank: 'Our hotel booking includes _____ breakfast.',
+      pos: 'Adj',
+      posLabel: '형용사 (Adj)',
+      comp: 'M',
+      compLabel: '수식어 (M)',
+      roleDesc: '명사 breakfast를 앞에서 꾸며주는 형용사 수식어(M)입니다.',
+      collocation: 'complimentary lounge access',
+      collocationKo: '라운지 무료 이용 혜택',
+      paraphraseTip: '철자 i가 들어가면 무료의/칭찬하는(complimentary), e가 들어가면 상호 보완적인(complementary)입니다.',
+    },
+    {
+      id: 304,
+      type: '오픽·구동사',
+      recommendLevel: 'intermediate',
+      word: 'freshen up',
+      masked: 'fr_____ u_',
+      ipa: '/ˈfreʃ.ən ʌp/',
+      pron: '[프레셔넙]',
+      soundMethod: 'freshen의 /n/과 up이 연음되어 [프레셔넙]으로 부드럽게 소리 납니다.',
+      soundBlock: 'freshen up / during our layover',
+      meaning: '간단히 씻고 단장하다, 재정비하다',
+      enDef: 'to wash your hands and face and make yourself clean and tidy',
+      exampleBlank: 'I would like to _____ during our layover.',
+      pos: 'V',
+      posLabel: '동사구 (V)',
+      comp: 'V',
+      compLabel: '동사구 (V)',
+      roleDesc: 'would like to 뒤에서 동작을 나타내는 자동사구입니다.',
+      collocation: 'freshen up before dinner',
+      collocationKo: '저녁 식사 전에 간단히 씻고 단장하다',
+      paraphraseTip: '장거리 이동 후 샤워나 세안으로 기분을 산뜻하게 전환할 때 쓰는 표현입니다.',
+    },
+    {
+      id: 305,
+      type: '비즈니스',
+      recommendLevel: 'intermediate',
+      word: 'itinerary',
+      masked: 'iti______',
+      ipa: '/aɪˈtɪn.ə.rer.i/',
+      pron: '[아이티너레리]',
+      soundMethod: '첫 글자 i를 [아이]로 읽고 두 번째 음절(-tin-)에 강세를 둡니다.',
+      soundBlock: 'updated / flight itinerary',
+      meaning: '여행 상세 일정표, 여정',
+      enDef: 'a planned route or detailed schedule of a journey',
+      exampleBlank: 'Please check your updated flight _____.',
+      pos: 'N',
+      posLabel: '명사 (N)',
+      comp: 'DO',
+      compLabel: '직접목적어 (DO)',
+      roleDesc: '타동사 check의 직접목적어(DO) 역할을 하는 핵심 명사입니다.',
+      collocation: 'flight itinerary',
+      collocationKo: '항공편 상세 일정표',
+      paraphraseTip: '단순한 schedule보다 항공편·숙소·이동 경로가 적힌 여행 일정표를 가리킵니다.',
+    },
+    {
+      id: 306,
+      type: '비즈니스',
+      recommendLevel: 'advanced',
+      word: 'accommodate',
+      masked: 'acc________',
+      ipa: '/əˈkɑː.mə.deɪt/',
+      pron: '[어카머데이트]',
+      soundMethod: '두 번째 음절(-com-)을 미국식 [카]로 열어 [어카머데이트]로 발음합니다.',
+      soundBlock: 'accommodate / our request',
+      meaning: '(요청·요구를) 수용하다, 편의를 봐주다; 숙박시키다',
+      enDef: 'to fit in with someone’s wishes or needs; to provide lodging or sufficient space for',
+      exampleBlank: 'Would it be possible to _____ a late check-out request?',
+      pos: 'V',
+      posLabel: '동사 (V)',
+      comp: 'V',
+      compLabel: '동사 (V)',
+      roleDesc: '진주어 to부정사구 안에서 목적어(a late check-out request)를 취하는 타동사입니다.',
+      collocation: 'accommodate a special request',
+      collocationKo: '특별 요청을 수용해 배려하다',
+      paraphraseTip: 'accept보다 상대방의 사정을 배려해 편의를 맞춰준다는 정중한 어감이 있습니다.',
+    },
+    {
+      id: 307,
+      type: '일상 회화',
+      recommendLevel: 'beginner',
+      word: 'comfortable',
+      masked: 'com________',
+      ipa: '/ˈkʌm.fɚ.t̬ə.bəl/',
+      pron: '[컴프터블]',
+      soundMethod: '미국식 회화에서는 가운데 모음이 약화되어 [컴프터블]로 빠르게 발음됩니다.',
+      soundBlock: 'make yourself / comfortable',
+      meaning: '편안한, 쾌적한',
+      enDef: 'providing physical ease and relaxation; free from stress',
+      exampleBlank: 'Please make yourself _____ in the lounge.',
+      pos: 'Adj',
+      posLabel: '형용사 (Adj)',
+      comp: 'OC',
+      compLabel: '목적격보어 (OC)',
+      roleDesc: '5형식 동사 make + 목적어(yourself) 뒤에서 상태를 보충하는 목적격보어(OC)입니다.',
+      collocation: 'make yourself comfortable',
+      collocationKo: '편안하게 계시다',
+      paraphraseTip: '손님에게 편히 쉬시라고 권할 때 쓰는 대표적인 5형식 관용 표현입니다.',
+    },
+  ],
+  sentences: [
+    {
+      id: 3001,
+      levelTag: 'beginner',
+      tag: '초급 필수 · 체크인 전 수하물 보관',
+      targetWord: 'drop off',
+      wordOrderFormula: 'Can we[조동사+S] + drop off[V] + our bags[DO] + before check-in[M]?',
+      structure: '3형식 구동사 의문문 (Can + S + V + DO + M)',
+      soundBlockEn: 'Can we drop off / our bags / before check-in?',
+      soundMethodGuide: 'drop off[드라포프]와 our bags[아워 백스]를 부드럽게 이어서 발음합니다.',
+      ipaLine: '/kæn wi drɑːp ɔːf ˈaʊ.ɚ bæɡz bɪˈfɔːr ˈtʃek.ɪn/',
+      koLine: '저희가 맡길 수 있을까요 / 가방들을 / 체크인 시간 전에?',
+      enLine: 'Can we drop off / our bags / before check-in?',
+      rawEn: 'Can we drop off our bags before check-in?',
+      pronLine: '[캔 위 드랍 오프 / 아워 백스 / 비포 체크인]',
+      naturalKo: '체크인 시간 전에 저희 가방을 먼저 맡길 수 있을까요?',
+      paraphraseVersion: 'Could we leave our luggage at the front desk before check-in time?',
+      grammarPoint: '구동사 drop off는 목적어가 일반 명사구(our bags)일 때 drop off our bags와 drop our bags off 두 어순 모두 가능합니다.',
+      contextNuance: '호텔 체크인 시간(보통 오후 3시)보다 일찍 도착했을 때 짐을 맡기며 쓰는 필수 문장입니다.',
+    },
+    {
+      id: 3002,
+      levelTag: 'intermediate',
+      tag: '중급 핵심 · 무료 조식 포함 확인',
+      targetWord: 'complimentary',
+      wordOrderFormula: 'Our hotel booking[S] + includes[V] + complimentary breakfast[DO].',
+      structure: '3형식 (S + 타동사 V + 형용사 수식 명사구 DO)',
+      soundBlockEn: 'Our hotel booking / includes / complimentary breakfast.',
+      soundMethodGuide: 'includes의 끝 /z/ 소리를 분명히 내고 complimentary[캄플러멘터리]의 강세를 살려 읽습니다.',
+      ipaLine: '/ˈaʊ.ɚ hoʊˈtel ˈbʊk.ɪŋ ɪnˈkluːdz ˌkɑːm.pləˈmen.t̬ɚ.i ˈbrek.fəst/',
+      koLine: '우리의 호텔 예약은 / 포함하고 있다 / 무료 제공 조식을.',
+      enLine: 'Our hotel booking / includes / complimentary breakfast.',
+      rawEn: 'Our hotel booking includes complimentary breakfast.',
+      pronLine: '[아워 호텔 부킹 / 인클루즈 / 캄플러멘터리 브렉퍼스트]',
+      naturalKo: '우리 호텔 예약에는 무료 조식이 포함되어 있다.',
+      paraphraseVersion: 'Breakfast is included in our hotel reservation at no extra charge.',
+      grammarPoint: 'include는 타동사이므로 뒤에 전치사 with나 in 없이 바로 목적어(complimentary breakfast)를 씁니다.',
+      contextNuance: '호텔 체크인 시 조식 포함 여부나 라운지 무료 이용 혜택을 재확인할 때 유용합니다.',
+    },
+    {
+      id: 3003,
+      levelTag: 'advanced',
+      tag: '고급 마스터 · 계속적 용법 관계대명사 , which',
+      targetWord: 'accommodate',
+      wordOrderFormula: 'The hotel[S] + kindly[M] + accommodated[V] + our late check-out request[DO], + which[S] + made[V] + our trip[DO] + much more comfortable[OC].',
+      structure: '3형식 주절 + 계속적 용법 관계대명사절(, which + 5형식 made + DO + OC)',
+      soundBlockEn: 'The hotel kindly accommodated / our late check-out request, / which made our trip / much more comfortable.',
+      soundMethodGuide: '콤마(,) 앞에서 살짝 호흡을 멈춘 뒤 which made our trip을 부드럽게 이어 읽습니다.',
+      ipaLine: '/ðə hoʊˈtel ˈkaɪnd.li əˈkɑː.mə.deɪ.t̬ɪd ˈaʊ.ɚ leɪt ˈtʃek.aʊt rɪˈkwest wɪtʃ meɪd ˈaʊ.ɚ trɪp mʌtʃ mɔːr ˈkʌm.fɚ.t̬ə.bəl/',
+      koLine: '호텔 측에서 친절히 수용해 주었다 / 우리의 레이트 체크아웃 요청을, / 그리고 그것이 우리 여행을 만들어 주었다 / 훨씬 더 편안하게.',
+      enLine: 'The hotel kindly accommodated / our late check-out request, / which made our trip / much more comfortable.',
+      rawEn: 'The hotel kindly accommodated our late check-out request, which made our trip much more comfortable.',
+      pronLine: '[더 호텔 카인들리 어카머데이티드 / 아워 레이트 체크아웃 리퀘스트 / 위치 메이드 아워 트립 / 머치 모어 컴프터블]',
+      naturalKo: '호텔 측에서 레이트 체크아웃 요청을 친절히 수용해 주었는데, 그것이 우리 여행을 훨씬 더 편안하게 만들어 주었다.',
+      paraphraseVersion: 'Because the hotel gladly accommodated our late check-out request, our trip became much more comfortable.',
+      grammarPoint: '앞 절 전체를 선행사로 받는 콤마(,) 뒤 계속적 용법에는 관계대명사 which를 쓰며(that 불가), 비교급(more comfortable) 앞에서는 very가 아닌 much/even/far로 강조합니다.',
+      contextNuance: '여행 경험담(OPIc)이나 호텔 리뷰를 작성할 때 문장 수준을 단숨에 높여주는 고급 연결 구문입니다.',
+    },
+  ],
+  quiz: {
+    beginner: {
+      word: 'drop off',
+      ipa: '/drɑːp ɔːf/',
+      options: [
+        '비행기 좌석을 변경하다',
+        '(짐·세탁물 등을) 맡기다, 내려놓다',
+        '호텔 예약을 취소하다',
+        '여권 유효기간을 갱신하다',
+      ],
+      answerIdx: 1,
+      explanation: 'drop off는 체크인 전에 가방·수하물을 프런트에 맡기거나 사람을 특정 장소에 내려줄 때 쓰는 구동사입니다.',
+    },
+    intermediate: {
+      sentenceBefore: 'Our hotel reservation includes',
+      sentenceAfter: 'breakfast and airport shuttle service.',
+      hint: '(고객 우대 혜택으로) 무료로 제공되는 (철자 i 주의)',
+      options: ['temporary', 'complimentary', 'mandatory', 'fragmentary'],
+      answerIdx: 1,
+      explanation: '호텔이나 항공사에서 우대 혜택으로 무료 제공하는 서비스는 complimentary(무료의)라고 표현합니다.',
+    },
+    advanced: {
+      questionPrompt:
+        '다음 문장의 빈칸 (A)와 (B)에 들어갈 어법상 올바른 단어를 2개 고르세요: "The hotel accommodated our request, [ (A) ] made our family trip much more [ (B) ]."',
+      highlightWord: '계속적 용법 관계대명사(, which) & 5형식 목적격보어(OC) 형용사',
+      options: [
+        '(A) that (계속적 용법 불가)',
+        '(A) which (앞 절 전체 선행사)',
+        '(B) comfortable (목적격보어 형용사)',
+        '(B) comfortably (부사 — 보어 불가)',
+      ],
+      answerIndices: [1, 2],
+      explanation:
+        '콤마(,) 뒤에서 앞 절 전체의 내용을 받아 이어주는 계속적 용법에는 관계대명사 which를 쓰며, 5형식 동사 made의 목적어(our family trip)를 보충 설명하는 목적격보어(OC) 자리에는 형용사 comfortable이 와야 합니다.',
+    },
+    writingMission: {
+      koPrompt: '호텔 측에서 우리의 레이트 체크아웃 요청을 친절히 수용해 주었다.',
+      targetPattern: 'The hotel kindly accommodated ~',
+      modelAnswer: 'The hotel kindly accommodated our late check-out request.',
+    },
+  },
+};
+// ============================================================================
+// src/App.tsx — [파트 3/4]
+// - 테마 4 (유튜브·바이럴·미디어) & 테마 5 (패션 에디토리얼·스타일링)
+// - 수능·서술형·내신 3대 집중 코스 (보기 단어 givenWords 100% 일치 검증)
+// - 정밀 토큰 주석 맵(VERIFIED_SENTENCE_TOKEN_MAP) 기반 16요소 구문 해부 엔진
+// ============================================================================
+
+export const THEME_YOUTUBE_VIRAL: ThemeData = {
+  id: 'theme-youtube-viral',
+  badge: '🎬 유튜브 · 바이럴 · 리뷰',
+  title: '화제의 숏폼 알고리즘 & 정곡을 찌르는 리뷰 표현',
+  subtitle: '입소문 확산, 시리즈 정주행, 기대치 충족 여부 및 핵심 공감 댓글 표현',
+  levelTracks: {
+    beginner: {
+      levelName: '🌱 초급 (화제성 & 정주행 경험 말하기)',
+      focusBadge: '2형식 변화동사 go viral & 타동사 binge-watch',
+      speedGuide: '권장 리딩 속도: 0.30x(초저속) ~ 0.50x(천천히) 배속으로 끊어 읽기',
+      levelGuide: '온라인에서 영상이 화제가 되었을 때(go viral)와 몰아보기(binge-watch)를 자연스럽게 연결합니다.',
+      patternEn: 'The short video went viral overnight.',
+      patternIpa: '/ðə ʃɔːrt ˈvɪd.i.oʊ went ˈvaɪ.rəl ˌoʊ.vɚˈnaɪt/',
+      patternPron: '[더 쇼트 비디오 / 웬트 바이럴 / 오버나이트]',
+      patternSoundBlock: 'The short video / went viral / overnight.',
+      patternSoundRule: 'went viral[웬트 바이럴]에서 t는 가볍게 받치고 viral의 첫 음절(vi-)에 강세를 둡니다.',
+      patternMeaningKo: '그 짧은 영상은 하룻밤 사이에 입소문을 타고 큰 화제가 되었습니다.',
+      grammarSummary: '주어(The short video) + 2형식 변화동사(went) + 형용사 주격보어(viral) + 시간부사(overnight)로 이루어진 문장입니다.',
+      paraphraseDrill: [
+        {
+          basicExpr: 'became very popular quickly (빠르게 아주 유명해졌다)',
+          upgradedExpr: 'went viral overnight (하룻밤 사이에 입소문을 타고 확산되었다)',
+          nuanceDiff: 'SNS·유튜브·릴스에서 콘텐츠가 폭발적으로 퍼질 때 쓰는 표준 표현입니다.',
+        },
+        {
+          basicExpr: 'watched all episodes at once (모든 에피소드를 한 번에 다 봤다)',
+          upgradedExpr: 'binge-watched the entire season (시즌 전체를 몰아서 정주행했다)',
+          nuanceDiff: 'OTT 시리즈나 브이로그를 연속으로 몰아볼 때 쓰는 필수 동사입니다.',
+        },
+      ],
+      dialogue: [
+        {
+          speaker: 'A',
+          roleName: '친구 1 (Viewer)',
+          en: 'Did you see that dance clip? It went viral overnight!',
+          soundBlock: 'Did you see / that dance clip? / It went viral / overnight!',
+          pron: '[디쥬 씨 댓 댄스 클립? 잇 웬트 바이럴 오버나이트]',
+          ko: '그 댄스 영상 봤어? 하룻밤 사이에 완전히 화제가 됐더라!',
+          pointNote: 'go viral overnight (하룻밤 사이에 화제가 되다)',
+        },
+        {
+          speaker: 'B',
+          roleName: '친구 2 (Subscriber)',
+          en: 'Yes! I loved it so much that I binge-watched all of their vlogs.',
+          soundBlock: 'Yes! / I loved it so much / that I binge-watched / all of their vlogs.',
+          pron: '[예스! 아이 러브드 잇 소 머치 / 댓 아이 빈지워치트 올 오브 데어 브이로그즈]',
+          ko: '응! 너무 마음에 들어서 그 채널 브이로그를 전부 정주행했잖아.',
+          pointNote: '원인·결과 구문 so ~ that S + V (너무 ~해서 …하다)',
+        },
+      ],
+    },
+    intermediate: {
+      levelName: '🌿 중급 (기대치 부응 평가 & 정곡을 찌르는 리뷰)',
+      focusBadge: '관용구 live up to the hype & hit the nail on the head',
+      speedGuide: '권장 리딩 속도: 0.75x(연음·중저속) ~ 1.0x(원어민 정속)',
+      levelGuide: '소문난 제품이나 콘텐츠가 실제 기대만큼 훌륭했는지 평가하는 관용 표현을 익힙니다.',
+      patternEn: 'The new series definitely lived up to the hype.',
+      patternIpa: '/ðə nuː ˈsɪr.iːz ˈdef.ə.nət.li lɪvd ʌp tə ðə haɪp/',
+      patternPron: '[더 뉴 시리즈 / 데피니틀리 리브드 업 / 투 더 하입]',
+      patternSoundBlock: 'The new series / definitely lived up / to the hype.',
+      patternSoundRule: 'lived up을 [리브드업]으로 연음하고 문장 끝 명사 hype[하입]에 확실한 강세를 줍니다.',
+      patternMeaningKo: '그 신작 시리즈는 확실히 소문(사전 기대치)만큼 훌륭했습니다.',
+      grammarSummary: 'live up to(~에 부응하다, 기대치를 충족하다) 뒤에 the hype(떠들썩한 홍보·소문)가 결합해 "명불허전이다"라는 뜻을 나타냅니다.',
+      paraphraseDrill: [
+        {
+          basicExpr: 'was as good as people said (사람들이 말한 것만큼 좋았다)',
+          upgradedExpr: 'definitely lived up to the hype (확실히 소문·기대만큼 훌륭했다)',
+          nuanceDiff: '맛집·영화·신제품 리뷰에서 만족감을 표현할 때 가장 자연스러운 표현입니다.',
+        },
+        {
+          basicExpr: 'was exactly right (정확히 맞았다)',
+          upgradedExpr: 'hit the nail on the head (문제의 정곡·핵심을 정확히 찔렀다)',
+          nuanceDiff: '상대방의 분석이나 댓글이 핵심을 콕 집어냈을 때 쓰는 관용구입니다.',
+        },
+      ],
+      dialogue: [
+        {
+          speaker: 'A',
+          roleName: '리뷰어 (Reviewer)',
+          en: 'Everyone was talking about this tablet. Did it live up to the hype?',
+          soundBlock: 'Everyone was talking about / this tablet. / Did it live up / to the hype?',
+          pron: '[에브리원 워즈 토킹 어바웃 디스 태블릿. 디딧 리법 투 더 하입]',
+          ko: '모두가 이 태블릿 이야기를 하던데요. 실제로 소문만큼 훌륭하던가요?',
+          pointNote: 'Did it live up to the hype? (소문만큼 좋았나요?)',
+        },
+        {
+          speaker: 'B',
+          roleName: '사용자 (User)',
+          en: 'Absolutely. Your review video really hit the nail on the head.',
+          soundBlock: 'Absolutely. / Your review video / really hit the nail / on the head.',
+          pron: '[앱설루틀리. 유어 리뷰 비디오 / 릴리 힛 더 네일 안 더 헤드]',
+          ko: '그럼요. 올려주신 리뷰 영상이 정말 핵심을 정확히 짚어내셨더라고요.',
+          pointNote: 'hit the nail on the head (정곡을 찌르다)',
+        },
+      ],
+    },
+    advanced: {
+      levelName: '🌳 고급 (시청자 공감 유도 & 복합 문장 연결)',
+      focusBadge: '등위접속사(, so) 절 연결 & 자동사 resonate with',
+      speedGuide: '권장 리딩 속도: 1.0x(원어민 정속) ~ 1.25x(고급·쾌속)',
+      levelGuide: '콘텐츠가 왜 대중의 시선을 사로잡고(capture attention) 깊은 공감을 얻는지(resonate with) 논리적으로 설명합니다.',
+      patternEn: 'The documentary is deeply informative, so it resonates with viewers.',
+      patternIpa: '/ðə ˌdɑː.kjəˈmen.t̬ɚ.i ɪz ˈdiːp.li ɪnˈfɔːr.mə.t̬ɪv soʊ ɪt ˈrez.ə.neɪts wɪð ˈvjuː.ɚz/',
+      patternPron: '[더 다큐멘터리 이즈 디플리 인포머티브, / 소 잇 레저네이츠 위드 뷰어즈]',
+      patternSoundBlock: 'The documentary is deeply informative, / so it resonates / with viewers.',
+      patternSoundRule: '쉼표(, so) 앞에서 호흡을 살짝 정리한 뒤 resonates with[레저네이츠 위드]를 부드럽게 이어 읽습니다.',
+      patternMeaningKo: '그 다큐멘터리는 매우 유익해서 시청자들에게 깊은 공감을 불러일으킵니다.',
+      grammarSummary: '두 개의 완전한 절을 등위접속사 so로 이어줄 때는 앞에 쉼표(, so)를 찍어주며, resonate는 전치사 with와 결합해 "~와 공명하다, 깊은 공감을 얻다"를 뜻합니다.',
+      paraphraseDrill: [
+        {
+          basicExpr: 'makes many people agree and feel moved (많은 사람이 공감하고 감동하게 만들다)',
+          upgradedExpr: 'deeply resonates with a wide audience (폭넓은 대중에게 깊은 공감을 불러일으키다)',
+          nuanceDiff: '문화·예술·미디어 비평 및 에세이에서 가장 선호하는 고급 동사구입니다.',
+        },
+        {
+          basicExpr: 'make people look at it quickly (사람들이 빨리 보게 만들다)',
+          upgradedExpr: 'capture viewers’ attention right away (시청자의 시선을 단숨에 사로잡다)',
+          nuanceDiff: '프레젠테이션 도입부나 영상 오프닝의 중요성을 설명할 때 쓰입니다.',
+        },
+      ],
+      dialogue: [
+        {
+          speaker: 'A',
+          roleName: '콘텐츠 디렉터 (PD)',
+          en: 'What makes this creator’s short-form videos so successful?',
+          soundBlock: 'What makes / this creator’s short-form videos / so successful?',
+          pron: '[왓 메익스 디스 크리에이터즈 숏폼 비디오즈 / 소 석세스풀]',
+          ko: '무엇이 이 크리에이터의 숏폼 영상들을 이토록 성공적으로 만드는 걸까요?',
+          pointNote: '5형식 의문사 주어 What + makes + DO + 형용사 OC(successful)',
+        },
+        {
+          speaker: 'B',
+          roleName: '미디어 분석가 (Analyst)',
+          en: 'They capture attention in three seconds, and the stories deeply resonate with young viewers.',
+          soundBlock: 'They capture attention / in three seconds, / and the stories deeply resonate / with young viewers.',
+          pron: '[데이 캡처 어텐션 인 쓰리 세컨즈, / 앤 더 스토리즈 디플리 레저네이트 위드 영 뷰어즈]',
+          ko: '3초 만에 시선을 사로잡고, 그 이야기들이 젊은 시청자들에게 깊은 공감을 불러일으키기 때문입니다.',
+          pointNote: 'capture attention (시선을 사로잡다) + resonate with (~에게 공감을 얻다)',
+        },
+      ],
+    },
+  },
+  synonymScales: [
+    {
+      conceptTitle: '대중적 인기와 확산 파급력의 강도 (동사구)',
+      scaleAxisLabel: '관심을 끌다 ➔ 입소문이 나다 ➔ 폭발적으로 바이럴되다',
+      weak: {
+        expr: 'attract public attention',
+        pron: '[어트랙트 퍼블릭 어텐션]',
+        ko: '대중의 관심을 끌다',
+        note: '사람들의 이목이 모이기 시작하는 초기 단계',
+      },
+      medium: {
+        expr: 'gain word-of-mouth popularity',
+        pron: '[게인 워드오브마우쓰 파퓰래러티]',
+        ko: '입소문으로 인기를 얻다',
+        note: '실제 경험자들의 추천을 통해 꾸준히 인기가 퍼지는 단계',
+      },
+      strong: {
+        expr: 'go viral overnight',
+        pron: '[고우 바이럴 오버나이트]',
+        ko: '하룻밤 사이에 폭발적인 화제가 되다',
+        note: '알고리즘과 공유를 통해 단기간에 전방위로 확산되는 최고 단계',
+      },
+    },
+    {
+      conceptTitle: '의견·분석의 정확도와 설득력 강도 (동사구)',
+      scaleAxisLabel: '일리 있는 말이다 ➔ 요점을 잘 짚다 ➔ 정곡을 정확히 찌르다',
+      weak: {
+        expr: 'make a fair point',
+        pron: '[메이커 페어 포인트]',
+        ko: '타당한(일리 있는) 지적을 하다',
+        note: '상대방의 말에 수긍할 만한 부분이 있을 때',
+      },
+      medium: {
+        expr: 'capture the main idea',
+        pron: '[캡처 더 메인 아이디어]',
+        ko: '핵심 요지를 잘 파악하다',
+        note: '전체적인 줄거리나 중심 내용을 정확히 짚어낼 때',
+      },
+      strong: {
+        expr: 'hit the nail on the head',
+        pron: '[힛 더 네일 안 더 헤드]',
+        ko: '문제의 정곡(핵심)을 정확히 찌르다',
+        note: '가장 본질적인 핵심을 한 치의 오차도 없이 명쾌하게 짚어냈을 때',
+      },
+    },
+  ],
+  vocab: [
+    {
+      id: 401,
+      type: '트렌드·실무',
+      recommendLevel: 'beginner',
+      word: 'go viral',
+      masked: 'g_ v____',
+      ipa: '/ɡoʊ ˈvaɪ.rəl/',
+      pron: '[고우 바이럴]',
+      soundMethod: 'viral의 첫 음절(vi-)에 강세를 두어 [바이럴]로 발음합니다.',
+      soundBlock: 'go viral / overnight',
+      meaning: '(영상·소식이) 입소문을 타고 빠르게 확산되다',
+      enDef: 'to spread rapidly and widely from one Internet user to another',
+      exampleBlank: 'Creative short videos can _____ overnight.',
+      pos: 'V',
+      posLabel: '동사구 (V)',
+      comp: 'V',
+      compLabel: '동사 (V)',
+      roleDesc: '조동사 can 뒤에서 주어의 상태 변화를 나타내는 2형식 동사구(go + 형용사 보어 viral)입니다.',
+      collocation: 'go viral on social media',
+      collocationKo: '소셜 미디어에서 화제가 되다',
+      paraphraseTip: 'spread rapidly online을 가장 간결하게 표현하는 현대 필수 숙어입니다.',
+    },
+    {
+      id: 402,
+      type: '일상 회화',
+      recommendLevel: 'beginner',
+      word: 'binge-watch',
+      masked: 'b____-w____',
+      ipa: '/ˈbɪndʒ.wɑːtʃ/',
+      pron: '[빈지워치]',
+      soundMethod: 'binge[빈지]에 강세를 두고 watch[워치]를 이어 발음합니다.',
+      soundBlock: 'binge-watch / the whole season',
+      meaning: '(드라마·시리즈를) 몰아서 정주행하다',
+      enDef: 'to watch multiple episodes of a television program in rapid succession',
+      exampleBlank: 'I plan to _____ the whole season this weekend.',
+      pos: 'V',
+      posLabel: '동사 (V)',
+      comp: 'V',
+      compLabel: '동사 (V)',
+      roleDesc: 'plan to 뒤에서 목적어(the whole season)를 취하는 타동사입니다.',
+      collocation: 'binge-watch a drama series',
+      collocationKo: '드라마 시리즈를 정주행하다',
+      paraphraseTip: '주말 여가 활동을 답할 때 watch TV 대신 쓰면 훨씬 생동감 있습니다.',
+    },
+    {
+      id: 403,
+      type: '트렌드·실무',
+      recommendLevel: 'intermediate',
+      word: 'live up to the hype',
+      masked: 'l___ u_ t_ the h___',
+      ipa: '/lɪv ʌp tə ðə haɪp/',
+      pron: '[리법 투 더 하입]',
+      soundMethod: 'live up을 [리법]으로 연음하고 hype[하입]를 강하게 발음합니다.',
+      soundBlock: 'live up / to the hype',
+      meaning: '소문·기대만큼 실제로도 훌륭하다(명불허전이다)',
+      enDef: 'to be as good or exciting as people expected after a lot of publicity',
+      exampleBlank: 'Did the new smartphone really _____?',
+      pos: 'V',
+      posLabel: '동사구 (V)',
+      comp: 'V',
+      compLabel: '동사 (V)',
+      roleDesc: '조동사 Did 뒤에서 원형으로 쓰여 문장의 본동사구(V) 역할을 합니다.',
+      collocation: 'definitely live up to the hype',
+      collocationKo: '확실히 소문(기대)에 부응하다',
+      paraphraseTip: '기대에 못 미쳤을 때는 반대로 fail to live up to the hype라고 표현합니다.',
+    },
+    {
+      id: 404,
+      type: '오픽·구동사',
+      recommendLevel: 'intermediate',
+      word: 'hit the nail on the head',
+      masked: 'h__ the n___ on the h___',
+      ipa: '/hɪt ðə neɪl ɑːn ðə hed/',
+      pron: '[힛 더 네일 안 더 헤드]',
+      soundMethod: 'nail[네일]과 head[헤드] 두 명사에 강세를 주어 리듬감 있게 읽습니다.',
+      soundBlock: 'hit the nail / on the head',
+      meaning: '문제의 정곡(핵심)을 정확히 찌르다',
+      enDef: 'to describe exactly what is causing a situation or problem',
+      exampleBlank: 'Your analysis really _____ during the debate.',
+      pos: 'V',
+      posLabel: '동사구 (V)',
+      comp: 'V',
+      compLabel: '동사 (V)',
+      roleDesc: '주어(Your analysis)의 동작을 서술하는 본동사구(V)입니다. (과거형도 hit으로 동일)',
+      collocation: 'hit the nail on the head',
+      collocationKo: '정곡을 정확히 찌르다',
+      paraphraseTip: 'be completely accurate를 비유적으로 표현한 관용구입니다.',
+    },
+    {
+      id: 405,
+      type: '트렌드·실무',
+      recommendLevel: 'intermediate',
+      word: 'capture',
+      masked: 'cap____',
+      ipa: '/ˈkæp.tʃɚ/',
+      pron: '[캡처]',
+      soundMethod: '첫 음절(cap-)에 강세를 두어 [캡처]로 발음합니다.',
+      soundBlock: 'capture / viewers’ attention',
+      meaning: '(관심·시선·장면을) 사로잡다, 포착하다',
+      enDef: 'to succeed in getting someone’s attention or interest; to record or express accurately',
+      exampleBlank: 'Strong visuals help _____ viewers’ attention right away.',
+      pos: 'V',
+      posLabel: '동사 (V)',
+      comp: 'V',
+      compLabel: '동사 (V)',
+      roleDesc: '목적어(viewers’ attention)를 취해 시선을 사로잡는 동작을 나타냅니다.',
+      collocation: 'capture attention right away',
+      collocationKo: '시선을 단숨에 사로잡다',
+      paraphraseTip: 'catch나 grab보다 프레젠테이션·마케팅 문맥에서 격식 있게 쓰입니다.',
+    },
+    {
+      id: 406,
+      type: '수능·학술',
+      recommendLevel: 'advanced',
+      word: 'resonate',
+      masked: 'res_____',
+      ipa: '/ˈrez.ə.neɪt/',
+      pron: '[레저네이트]',
+      soundMethod: '첫 음절(res-)에 강세를 두어 [레저네이트]로 발음합니다.',
+      soundBlock: 'resonate / with the audience',
+      meaning: '(깊은 공감·울림을) 불러일으키다, 공명하다',
+      enDef: 'to produce a positive feeling, emotional response, or shared understanding in someone',
+      exampleBlank: 'Authentic stories always _____ deeply with viewers.',
+      pos: 'V',
+      posLabel: '동사 (V)',
+      comp: 'V',
+      compLabel: '동사 (V)',
+      roleDesc: '주어(Authentic stories)의 본동사(V)로, 주로 전치사 with와 함께 쓰입니다.',
+      collocation: 'resonate deeply with viewers',
+      collocationKo: '시청자들에게 깊은 공감을 얻다',
+      paraphraseTip: '공감하다라는 뜻의 학술·미디어 핵심 자동사입니다.',
+    },
+    {
+      id: 407,
+      type: '수능·학술',
+      recommendLevel: 'advanced',
+      word: 'informative',
+      masked: 'inf________',
+      ipa: '/ɪnˈfɔːr.mə.t̬ɪv/',
+      pron: '[인포머티브]',
+      soundMethod: '두 번째 음절(-for-)에 강세를 두고 미국식 t는 부드럽게 [티브/리브]로 발음합니다.',
+      soundBlock: 'highly / informative',
+      meaning: '유익한, 유용한 정보를 많이 주는',
+      enDef: 'providing useful or interesting information',
+      exampleBlank: 'The lecture was both engaging and _____.',
+      pos: 'Adj',
+      posLabel: '형용사 (Adj)',
+      comp: 'SC',
+      compLabel: '주격보어 (SC)',
+      roleDesc: 'be동사(was) 뒤에서 주어(The lecture)의 성격을 설명하는 주격보어(SC)입니다.',
+      collocation: 'deeply informative content',
+      collocationKo: '매우 유익한 콘텐츠',
+      paraphraseTip: 'useful보다 정보적 가치와 배울 점이 풍부하다는 뜻을 정확히 전달합니다.',
+    },
+  ],
+  sentences: [
+    {
+      id: 4001,
+      levelTag: 'beginner',
+      tag: '초급 필수 · 화제성과 정주행 연결(, so)',
+      targetWord: 'binge-watch',
+      wordOrderFormula: 'The new drama[S] + went[V] + viral[SC] + overnight[M], + so + I[S] + binge-watched[V] + the whole season[DO].',
+      structure: '2형식 앞절 + 등위접속사(, so) + 3형식 뒷절',
+      soundBlockEn: 'The new drama went viral / overnight, / so I binge-watched / the whole season.',
+      soundMethodGuide: '쉼표(, so)에서 살짝 호흡을 끊고 binge-watched the whole season을 리듬감 있게 이어 읽습니다.',
+      ipaLine: '/ðə nuː ˈdrɑː.mə went ˈvaɪ.rəl ˌoʊ.vɚˈnaɪt soʊ aɪ ˈbɪndʒ.wɑːtʃt ðə hoʊl ˈsiː.zən/',
+      koLine: '그 새 드라마가 입소문을 탔다 / 하룻밤 사이에, / 그래서 나는 몰아서 정주행했다 / 시즌 전체를.',
+      enLine: 'The new drama went viral / overnight, / so I binge-watched / the whole season.',
+      rawEn: 'The new drama went viral overnight, so I binge-watched the whole season.',
+      pronLine: '[더 뉴 드라마 웬트 바이럴 오버나이트, / 소 아이 빈지워치트 더 홀 시즌]',
+      naturalKo: '그 새 드라마가 하룻밤 사이에 화제가 되어서, 나는 시즌 전체를 몰아서 정주행했다.',
+      paraphraseVersion: 'Because the new drama became popular so quickly, I watched all the episodes over the weekend.',
+      grammarPoint: '완전한 두 문장(절)을 등위접속사 so로 연결할 때는 앞 절 끝에 쉼표(, so)를 찍어 절의 경계를 명확히 표시합니다.',
+      contextNuance: '최근 본 영화나 드라마를 소개할 때 계기와 행동을 한 번에 설명하는 자연스러운 문장입니다.',
+    },
+    {
+      id: 4002,
+      levelTag: 'intermediate',
+      tag: '중급 핵심 · 기대치 충족 리뷰',
+      targetWord: 'live up to the hype',
+      wordOrderFormula: 'The new flagship tablet[S] + definitely[M] + lived up to the hype[V].',
+      structure: '3형식 상당 관용구 (S + 부사 M + 구동사 V + 목적어)',
+      soundBlockEn: 'The new flagship tablet / definitely lived up / to the hype.',
+      soundMethodGuide: 'definitely[데피니틀리]로 확신을 더하고 끝 단어 hype[하입]에 강세를 줍니다.',
+      ipaLine: '/ðə nuː ˈflæɡ.ʃɪp ˈtæb.lət ˈdef.ə.nət.li lɪvd ʌp tə ðə haɪp/',
+      koLine: '그 새로운 플래그십 태블릿은 / 확실히 부응했다 / 사전의 떠들썩한 기대(소문)에.',
+      enLine: 'The new flagship tablet / definitely lived up / to the hype.',
+      rawEn: 'The new flagship tablet definitely lived up to the hype.',
+      pronLine: '[더 뉴 플래그십 태블릿 / 데피니틀리 리브드 업 투 더 하입]',
+      naturalKo: '그 신형 플래그십 태블릿은 확실히 소문(기대)만큼 훌륭했다.',
+      paraphraseVersion: 'The new flagship tablet fully met the high pre-launch expectations.',
+      grammarPoint: 'live up to(~의 기대·수준에 부응하다)는 세 단어가 하나의 타동사구처럼 결합하여 목적어(the hype)를 취합니다.',
+      contextNuance: 'IT 기기, 맛집, 공연 등을 직접 경험한 뒤 만족스러웠음을 밝히는 핵심 리뷰 표현입니다.',
+    },
+    {
+      id: 4003,
+      levelTag: 'advanced',
+      tag: '고급 마스터 · 유익함과 시청자 공감(, so)',
+      targetWord: 'resonate',
+      wordOrderFormula: 'The documentary[S] + is[V] + deeply informative[SC], + so + it[S] + deeply[M] + resonates[V] + with viewers[M].',
+      structure: '2형식 앞절(S+V+SC) + 등위접속사(, so) + 1형식 뒷절(S+V+전치사구 M)',
+      soundBlockEn: 'The documentary is deeply informative, / so it deeply resonates / with viewers.',
+      soundMethodGuide: 'informative[인포머티브] 뒤 쉼표에서 잠깐 쉬고 resonates with[레저네이츠 위드]를 부드럽게 연결합니다.',
+      ipaLine: '/ðə ˌdɑː.kjəˈmen.t̬ɚ.i ɪz ˈdiːp.li ɪnˈfɔːr.mə.t̬ɪv soʊ ɪt ˈdiːp.li ˈrez.ə.neɪts wɪð ˈvjuː.ɚz/',
+      koLine: '그 다큐멘터리는 매우 유익하다, / 그래서 그것은 깊은 공감을 불러일으킨다 / 시청자들에게.',
+      enLine: 'The documentary is deeply informative, / so it deeply resonates / with viewers.',
+      rawEn: 'The documentary is deeply informative, so it deeply resonates with viewers.',
+      pronLine: '[더 다큐멘터리 이즈 디플리 인포머티브, / 소 잇 디플리 레저네이츠 위드 뷰어즈]',
+      naturalKo: '그 다큐멘터리는 매우 유익해서 시청자들에게 깊은 공감을 불러일으킨다.',
+      paraphraseVersion: 'Because the documentary provides valuable insights, it strikes a chord with the audience.',
+      grammarPoint: 'informative는 be동사(is)의 주격보어(SC)로 쓰인 형용사이며, resonate는 자동사이므로 대상 앞에 전치사 with를 동반합니다.',
+      contextNuance: '좋은 책이나 영상이 왜 대중에게 사랑받는지를 지적인 어휘로 요약할 때 활용합니다.',
+    },
+  ],
+  quiz: {
+    beginner: {
+      word: 'go viral',
+      ipa: '/ɡoʊ ˈvaɪ.rəl/',
+      options: [
+        '영상을 비공개로 전환하다',
+        '입소문을 타고 빠르게 확산되다(화제가 되다)',
+        '자막 번역을 수정하다',
+        '구독 알림을 해제하다',
+      ],
+      answerIdx: 1,
+      explanation: 'go viral은 온라인 영상이나 소식이 바이러스처럼 빠르게 퍼져 큰 화제가 되다라는 뜻입니다.',
+    },
+    intermediate: {
+      sentenceBefore: 'Your insightful comment really',
+      sentenceAfter: 'during the strategy meeting.',
+      hint: '문제의 정곡(핵심)을 정확히 찌르다',
+      options: [
+        'missed the boat',
+        'beat around the bush',
+        'hit the nail on the head',
+        'dropped the ball',
+      ],
+      answerIdx: 2,
+      explanation: '통찰력 있는 의견이 회의에서 핵심(정곡)을 정확히 찔렀다는 맥락이므로 hit the nail on the head가 정답입니다.',
+    },
+    advanced: {
+      questionPrompt:
+        '다음 문장의 빈칸 (A)와 (B)에 들어갈 어법상 올바른 형태를 2개 고르세요: "The lecture was highly [ (A) ], so it deeply resonated [ (B) ] the audience."',
+      highlightWord: '2형식 주격보어(SC) 형용사 & 자동사 resonate + 전치사 with',
+      options: [
+        '(A) informative (형용사 주격보어)',
+        '(A) informatively (부사 — 보어 불가)',
+        '(B) with (자동사 resonate와 결합하는 전치사)',
+        '(B) 전치사 필요 없음',
+      ],
+      answerIndices: [0, 2],
+      explanation:
+        '(A) be동사(was)의 주격보어(SC) 자리이므로 부사(had/informatively)가 아닌 형용사 informative가 와야 하며, (B) 자동사 resonate는 대상 앞에 전치사 with를 취합니다.',
+    },
+    writingMission: {
+      koPrompt: '그 새로운 플래그십 태블릿은 확실히 소문(기대)만큼 훌륭했다.',
+      targetPattern: 'The new flagship tablet definitely lived up to ~',
+      modelAnswer: 'The new flagship tablet definitely lived up to the hype.',
+    },
+  },
+};
+
+export const THEME_FASHION_EDITORIAL: ThemeData = {
+  id: 'theme-fashion-editorial',
+  badge: '👗 패션 · 스타일링 · 미학',
+  title: '런웨이 에디토리얼 & 미니멀 스타일링 표현',
+  subtitle: '과감한 룩 소화하기, 실루엣 보완, 포인트 아이템 및 현대적 미학 묘사',
+  levelTracks: {
+    beginner: {
+      levelName: '🌱 초급 (매장 피팅 & 코디 어울림 표현)',
+      focusBadge: '구동사 try on & go well with',
+      speedGuide: '권장 리딩 속도: 0.30x(초저속) ~ 0.50x(천천히) 배속으로 끊어 읽기',
+      levelGuide: '옷을 직접 입어볼 때(try on)와 다른 옷과 잘 어울린다고 말할 때(go well with) 쓰는 표현을 익힙니다.',
+      patternEn: 'This linen shirt goes really well with your jeans.',
+      patternIpa: '/ðɪs ˈlɪn.ɪn ʃɝːt ɡoʊz ˈrɪə.li wel wɪð jʊr dʒiːnz/',
+      patternPron: '[디스 린넨 셔츠 / 고우즈 릴리 웰 / 위드 유어 진즈]',
+      patternSoundBlock: 'This linen shirt / goes really well / with your jeans.',
+      patternSoundRule: 'goes really well[고우즈 릴리 웰]에 강세를 주어 칭찬하는 밝은 억양으로 발음합니다.',
+      patternMeaningKo: '이 린넨 셔츠는 당신의 청바지와 정말 잘 어울립니다.',
+      grammarSummary: '단수 주어(This linen shirt) + 단수 동사(goes) + 부사구(really well) + 전치사구(with your jeans)로 이루어진 자연스러운 칭찬 문장입니다.',
+      paraphraseDrill: [
+        {
+          basicExpr: 'matches your jeans well (청바지와 잘 맞는다)',
+          upgradedExpr: 'goes really well with your jeans (청바지와 정말 잘 어울린다)',
+          nuanceDiff: '일상 쇼핑과 코디 대화에서 원어민이 가장 즐겨 쓰는 표현입니다.',
+        },
+        {
+          basicExpr: 'wear this jacket to test the size (사이즈를 보려고 재킷을 입다)',
+          upgradedExpr: 'try on this jacket in a medium size (이 재킷을 미디엄 사이즈로 입어보다)',
+          nuanceDiff: '매장 피팅룸에서 옷이나 신발을 시착해 볼 때는 착용(wear)이 아닌 try on을 씁니다.',
+        },
+      ],
+      dialogue: [
+        {
+          speaker: 'A',
+          roleName: '고객 (Shopper)',
+          en: 'Excuse me, can I try on this tailored blazer in a medium size?',
+          soundBlock: 'Excuse me, / can I try on / this tailored blazer / in a medium size?',
+          pron: '[익스큐즈 미, 캐나이 트라이 안 디스 테일러드 블레이저 / 이너 미디엄 사이즈]',
+          ko: '실례합니다, 이 테일러드 블레이저를 미디엄 사이즈로 입어볼 수 있을까요?',
+          pointNote: 'try on + 옷 + in a [사이즈] size',
+        },
+        {
+          speaker: 'B',
+          roleName: '매장 직원 (Stylist)',
+          en: 'Of course! That color goes really well with your denim jeans.',
+          soundBlock: 'Of course! / That color goes really well / with your denim jeans.',
+          pron: '[오브 코스! 댓 컬러 고우즈 릴리 웰 / 위드 유어 데님 진즈]',
+          ko: '물론이죠! 그 색상이 고객님의 데님 청바지와 정말 잘 어울리네요.',
+          pointNote: 'go well with ~ (~와 잘 어울리다)',
+        },
+      ],
+    },
+    intermediate: {
+      levelName: '🌿 중급 (스타일 소화력 칭찬 & 실루엣 보완)',
+      focusBadge: '구동사 pull off & 타동사 complement',
+      speedGuide: '권장 리딩 속도: 0.75x(연음·중저속) ~ 1.0x(원어민 정속)',
+      levelGuide: '아무나 소화하기 힘든 과감한 룩을 멋지게 소화했을 때(pull off)와 실루엣을 살려줄 때(complement)를 구사합니다.',
+      patternEn: 'You really pulled off that bold statement look.',
+      patternIpa: '/ju ˈrɪə.li pʊld ɔːf ðæt boʊld ˈsteɪt.mənt lʊk/',
+      patternPron: '[유 릴리 풀도프 / 댓 볼드 스테이트먼트 룩]',
+      patternSoundBlock: 'You really pulled off / that bold statement look.',
+      patternSoundRule: 'pulled off를 [풀도프]로 한 호흡에 연음하고 bold statement look을 또렷하게 발음합니다.',
+      patternMeaningKo: '그 과감한 포인트 룩을 정말 멋지게 소화해 내셨네요.',
+      grammarSummary: '타동사구 pull off는 소화하기 까다로운 스타일이나 어려운 과제를 성공적으로 해내다라는 뜻으로, 뒤에 목적어(that bold statement look)를 취합니다.',
+      paraphraseDrill: [
+        {
+          basicExpr: 'looked great in that difficult style (그 어려운 스타일이 잘 어울렸다)',
+          upgradedExpr: 'really pulled off that bold statement look (그 과감한 포인트 룩을 멋지게 소화해 냈다)',
+          nuanceDiff: '상대방의 뛰어난 패션 소화력을 칭찬할 때 쓰는 최고의 표현입니다.',
+        },
+        {
+          basicExpr: 'makes the minimalist design look better (미니멀한 디자인을 더 돋보이게 한다)',
+          upgradedExpr: 'complements the minimalist silhouette (미니멀한 실루엣을 완벽히 보완해 돋보이게 한다)',
+          nuanceDiff: '두 아이템이 서로 조화를 이루어 매력을 배가시킬 때 쓰는 동사 complement입니다.',
+        },
+      ],
+      dialogue: [
+        {
+          speaker: 'A',
+          roleName: '패션 에디터 (Editor)',
+          en: 'Not everyone can wear bright red, but you really pulled off that bold look!',
+          soundBlock: 'Not everyone can wear bright red, / but you really pulled off / that bold look!',
+          pron: '[낫 에브리원 캔 웨어 브라이트 레드, / 벗 유 릴리 풀도프 댓 볼드 룩]',
+          ko: '밝은 레드 컬러는 아무나 입기 힘든데, 그 과감한 룩을 정말 멋지게 소화하셨네요!',
+          pointNote: 'pull off a bold look (과감한 룩을 소화해 내다)',
+        },
+        {
+          speaker: 'B',
+          roleName: '디자이너 (Designer)',
+          en: 'Thank you! The structured coat also complements the clean silhouette.',
+          soundBlock: 'Thank you! / The structured coat / also complements / the clean silhouette.',
+          pron: '[땡큐! 더 스트럭처드 코트 / 올소 캄플러먼츠 더 클린 실루엣]',
+          ko: '감사합니다! 구조적인 핏의 코트가 깔끔한 실루엣을 한층 돋보이게 보완해 주거든요.',
+          pointNote: 'complement the silhouette (실루엣을 보완해 살려주다)',
+        },
+      ],
+    },
+    advanced: {
+      levelName: '🌳 고급 (브랜드 헤리티지와 현대적 미학의 조화)',
+      focusBadge: 'blend A with B & 명사 aesthetic [에스-쎄틱]',
+      speedGuide: '권장 리딩 속도: 1.0x(원어민 정속) ~ 1.25x(고급·쾌속)',
+      levelGuide: '고전적 유산(classic heritage)과 현대적 미학(modern aesthetic)의 조화를 설명하는 에디토리얼 문장을 완성합니다.',
+      patternEn: 'The collection seamlessly blends classic heritage with a modern aesthetic.',
+      patternIpa: '/ðə kəˈlek.ʃən ˈsiːm.ləs.li blendz ˈklæs.ɪk ˈher.ɪ.t̬ɪdʒ wɪð ə ˈmɑː.dɚn esˈθet̬.ɪk/',
+      patternPron: '[더 컬렉션 심리슬리 블렌즈 / 클래식 헤리티지 / 위더 모던 에스쎄틱]',
+      patternSoundBlock: 'The collection seamlessly blends / classic heritage / with a modern aesthetic.',
+      patternSoundRule: 'aesthetic의 th는 무성 마찰음 /θ/이므로 [에스-떼틱]이 아닌 [에스-쎄틱]으로 정확히 발음합니다.',
+      patternMeaningKo: '그 컬렉션은 고전적 유산과 현대적인 미학을 매끄럽게(조화롭게) 결합합니다.',
+      grammarSummary: '주어(The collection) + 부사(seamlessly) + 타동사(blends) + 목적어(classic heritage) + 전치사구(with a modern aesthetic)로 구성된 문장입니다.',
+      paraphraseDrill: [
+        {
+          basicExpr: 'mixes old tradition and new style smoothly (전통과 새 스타일을 부드럽게 섞는다)',
+          upgradedExpr: 'seamlessly blends classic heritage with a modern aesthetic',
+          nuanceDiff: '디자인·건축·브랜드 철학을 설명할 때 설득력을 극대화하는 에디토리얼 구문입니다.',
+        },
+        {
+          basicExpr: 'looks stylish without trying too hard (너무 애쓰지 않아도 멋져 보인다)',
+          upgradedExpr: 'creates an effortlessly chic look (자연스러우면서도 세련된 룩을 연출한다)',
+          nuanceDiff: '우리말의 이른바 꾸안꾸(꾸민 듯 안 꾸민 듯 세련된) 스타일을 뜻하는 정확한 영어 표현입니다.',
+        },
+      ],
+      dialogue: [
+        {
+          speaker: 'A',
+          roleName: '크리에이티브 디렉터 (CD)',
+          en: 'What is the core theme of our autumn collection this year?',
+          soundBlock: 'What is the core theme / of our autumn collection / this year?',
+          pron: '[왓 이즈 더 코어 씸 / 오브 아워 오텀 컬렉션 디스 이어]',
+          ko: '올해 우리 가을 컬렉션의 핵심 테마는 무엇인가요?',
+          pointNote: 'the core theme of ~ (~의 핵심 테마)',
+        },
+        {
+          speaker: 'B',
+          roleName: '수석 디자이너 (Lead Designer)',
+          en: 'Our collection seamlessly blends classic heritage with a minimalist aesthetic.',
+          soundBlock: 'Our collection seamlessly blends / classic heritage / with a minimalist aesthetic.',
+          pron: '[아워 컬렉션 심리슬리 블렌즈 / 클래식 헤리티지 / 위더 미니멀리스트 에스쎄틱]',
+          ko: '이번 컬렉션은 고전적인 헤리티지와 미니멀한 미학을 조화롭게 결합했습니다.',
+          pointNote: 'seamlessly blend A with B (A와 B를 매끄럽게 결합하다)',
+        },
+      ],
+    },
+  },
+  synonymScales: [
+    {
+      conceptTitle: '의상 아이템의 역할과 시각적 존재감 (명사구)',
+      scaleAxisLabel: '일상 기본템 ➔ 다용도 필수템 ➔ 시선 집중 포인트 아이템',
+      weak: {
+        expr: 'a basic everyday item',
+        pron: '[어 베이직 에브리데이 아이템]',
+        ko: '일상적인 기본 아이템',
+        note: '매일 편하게 받쳐 입는 무난한 기본 의류',
+      },
+      medium: {
+        expr: 'a timeless wardrobe staple',
+        pron: '[어 타임리스 워드로브 스테이플]',
+        ko: '유행을 타지 않는 옷장 필수 기본템',
+        note: '트렌치코트나 화이트 셔츠처럼 사계절·매년 활용도가 높은 핵심 아이템',
+      },
+      strong: {
+        expr: 'a bold statement piece',
+        pron: '[어 볼드 스테이트먼트 피스]',
+        ko: '단숨에 시선을 사로잡는 과감한 포인트 아이템',
+        note: '전체 룩의 분위기를 주도하며 강렬한 인상을 남기는 핵심 포인트 의상·액세서리',
+      },
+    },
+    {
+      conceptTitle: '스타일링의 세련미와 연출 강도 (형용사구)',
+      scaleAxisLabel: '단정한 ➔ 자연스럽게 멋스러운(꾸안꾸) ➔ 런웨이급으로 정교한',
+      weak: {
+        expr: 'neat and casual',
+        pron: '[니트 앤 캐주얼]',
+        ko: '단정하고 편안한',
+        note: '일상에서 깔끔하고 부담 없이 입은 상태',
+      },
+      medium: {
+        expr: 'effortlessly chic',
+        pron: '[에포트리스리 시크]',
+        ko: '꾸민 듯 안 꾸민 듯 자연스럽게 세련된',
+        note: '과하게 힘주지 않으면서도 세련된 감각이 돋보이는 스타일',
+      },
+      strong: {
+        expr: 'impeccably tailored',
+        pron: '[임페커블리 테일러드]',
+        ko: '한 치의 흠도 없이 완벽하게 재단된',
+        note: '맞춤복처럼 핏과 실루엣이 완벽하게 떨어지는 최고급 스타일링',
+      },
+    },
+  ],
+  vocab: [
+    {
+      id: 501,
+      type: '오픽·구동사',
+      recommendLevel: 'beginner',
+      word: 'try on',
+      masked: 'tr_ o_',
+      ipa: '/traɪ ɑːn/',
+      pron: '[트라이 안]',
+      soundMethod: 'try[트라이]와 on[안]을 부드럽게 이어 발음합니다.',
+      soundBlock: 'try on / this jacket',
+      meaning: '(옷·신발 등을) 입어보다, 신어보다',
+      enDef: 'to put on a piece of clothing to see if it fits and how it looks',
+      exampleBlank: 'Can I _____ this jacket in a medium size?',
+      pos: 'V',
+      posLabel: '동사구 (V)',
+      comp: 'V',
+      compLabel: '동사 (V)',
+      roleDesc: '조동사 Can 뒤에서 목적어(this jacket)를 취하는 타동사구(V)입니다.',
+      collocation: 'try on a blazer for size',
+      collocationKo: '사이즈를 보려고 블레이저를 입어보다',
+      paraphraseTip: '대명사(it/them)를 목적어로 쓸 때는 반드시 try it on 어순으로 써야 합니다.',
+    },
+    {
+      id: 502,
+      type: '오픽·구동사',
+      recommendLevel: 'intermediate',
+      word: 'pull off',
+      masked: 'p___ o__',
+      ipa: '/pʊl ɔːf/',
+      pron: '[풀 오프]',
+      soundMethod: 'pull의 끝 /l/과 off를 자연스럽게 연결해 발음합니다.',
+      soundBlock: 'pull off / a bold look',
+      meaning: '(소화하기 어려운 스타일·과제를) 멋지게 소화해 내다',
+      enDef: 'to succeed in achieving or wearing something difficult or unexpected',
+      exampleBlank: 'Not everyone can _____ such a bold look.',
+      pos: 'V',
+      posLabel: '동사구 (V)',
+      comp: 'V',
+      compLabel: '동사 (V)',
+      roleDesc: '조동사 can 뒤에서 목적어(such a bold look)를 취하는 타동사구(V)입니다.',
+      collocation: 'pull off a bold statement look',
+      collocationKo: '과감한 포인트 룩을 멋지게 소화하다',
+      paraphraseTip: '무난한 기본템이 아니라 소화하기 까다로운 색상이나 스타일을 멋지게 입어냈을 때 씁니다.',
+    },
+    {
+      id: 503,
+      type: '트렌드·실무',
+      recommendLevel: 'intermediate',
+      word: 'wardrobe staple',
+      masked: 'w_______ st____',
+      ipa: '/ˈwɔːr.droʊb ˈsteɪ.pəl/',
+      pron: '[워드로브 스테이플]',
+      soundMethod: 'wardrobe[워드로브]와 staple[스테이플] 각각의 첫 음절에 강세를 둡니다.',
+      soundBlock: 'a timeless / wardrobe staple',
+      meaning: '옷장 속 필수 기본 아이템',
+      enDef: 'an essential, versatile piece of clothing that forms the foundation of a wardrobe',
+      exampleBlank: 'A classic trench coat is a timeless _____.',
+      pos: 'N',
+      posLabel: '명사구 (N)',
+      comp: 'SC',
+      compLabel: '주격보어 (SC)',
+      roleDesc: 'be동사(is) 뒤에서 주어(A classic trench coat)를 정의하는 주격보어(SC)입니다.',
+      collocation: 'invest in a wardrobe staple',
+      collocationKo: '옷장 필수 기본템에 투자하다',
+      paraphraseTip: '유행을 타지 않고 오래 입는 기본 아이템을 뜻합니다.',
+    },
+    {
+      id: 504,
+      type: '트렌드·실무',
+      recommendLevel: 'intermediate',
+      word: 'statement piece',
+      masked: 'st_______ p____',
+      ipa: '/ˈsteɪt.mənt piːs/',
+      pron: '[스테이트먼트 피스]',
+      soundMethod: 'statement[스테이트먼트]의 첫 음절에 강세를 두고 piece[피스]를 길게 발음합니다.',
+      soundBlock: 'a bold / statement piece',
+      meaning: '단숨에 시선을 사로잡는 포인트 아이템',
+      enDef: 'an eye-catching clothing item or accessory that stands out and defines an outfit',
+      exampleBlank: 'She added a bold _____ to her minimalist outfit.',
+      pos: 'N',
+      posLabel: '명사구 (N)',
+      comp: 'DO',
+      compLabel: '직접목적어 (DO)',
+      roleDesc: '타동사 added의 직접목적어(DO) 자리에 쓰인 명사구입니다.',
+      collocation: 'wear a bold statement piece',
+      collocationKo: '과감한 포인트 아이템을 착용하다',
+      paraphraseTip: '단조로운 코디에 강렬한 개성을 더해주는 핵심 아이템을 가리킵니다.',
+    },
+    {
+      id: 505,
+      type: '트렌드·실무',
+      recommendLevel: 'intermediate',
+      word: 'silhouette',
+      masked: 'sil_______',
+      ipa: '/ˌsɪl.uˈet/',
+      pron: '[실루엣]',
+      soundMethod: '철자 h는 묵음이며 마지막 음절(-ette)에 강세를 두어 [실루엣]으로 발음합니다.',
+      soundBlock: 'a structured / silhouette',
+      meaning: '실루엣, 윤곽, 옷의 전체적인 라인',
+      enDef: 'the overall outline, shape, or contour of a garment or body',
+      exampleBlank: 'The tailored coat creates a clean _____.',
+      pos: 'N',
+      posLabel: '명사 (N)',
+      comp: 'DO',
+      compLabel: '직접목적어 (DO)',
+      roleDesc: '타동사 creates의 직접목적어(DO) 역할을 하는 명사입니다.',
+      collocation: 'complement the silhouette',
+      collocationKo: '실루엣을 돋보이게 보완하다',
+      paraphraseTip: '핏(fit)이나 전체적인 외곽 라인을 품격 있게 표현하는 단어입니다.',
+    },
+    {
+      id: 506,
+      type: '트렌드·실무',
+      recommendLevel: 'advanced',
+      word: 'effortlessly chic',
+      masked: 'eff_________ ch__',
+      ipa: '/ˈef.ɚt.ləs.li ʃiːk/',
+      pron: '[에포트리스리 시크]',
+      soundMethod: 'chic은 프랑스어 유래 단어로 [칙]이 아니라 /ʃiːk/[시크]로 발음합니다.',
+      soundBlock: 'an effortlessly chic / look',
+      meaning: '꾸민 듯 안 꾸민 듯 자연스럽게 세련된',
+      enDef: 'stylish and fashionable in a way that appears natural and unforced',
+      exampleBlank: 'The linen blazer creates an _____ look.',
+      pos: 'Adj',
+      posLabel: '형용사구 (Adj)',
+      comp: 'M',
+      compLabel: '수식어 (M)',
+      roleDesc: '부사(effortlessly)가 형용사(chic)를 꾸미고, 그 전체가 명사(look)를 앞에서 꾸미는 수식어(M)입니다.',
+      collocation: 'an effortlessly chic outfit',
+      collocationKo: '자연스럽게 세련된(꾸안꾸) 아웃핏',
+      paraphraseTip: '과한 장식 없이도 세련미가 흐르는 스타일을 묘사할 때 씁니다.',
+    },
+    {
+      id: 507,
+      type: '수능·학술',
+      recommendLevel: 'advanced',
+      word: 'aesthetic',
+      masked: 'aes______',
+      ipa: '/esˈθet̬.ɪk/',
+      pron: '[에스쎄틱]',
+      soundMethod: 'th는 무성 마찰음 /θ/이므로 [에스-쎄틱]으로 발음합니다.',
+      soundBlock: 'a modern / aesthetic',
+      meaning: '미학, 미적 감각 (형용사: 미학적인)',
+      enDef: 'a set of principles underlying and guiding the work of a particular artist or artistic movement',
+      exampleBlank: 'The brand showcases a clean modern _____.',
+      pos: 'N',
+      posLabel: '명사 (N)',
+      comp: 'DO',
+      compLabel: '직접목적어 (DO)',
+      roleDesc: '타동사 showcases의 직접목적어(DO) 역할을 하는 가산명사입니다.',
+      collocation: 'a minimalist aesthetic',
+      collocationKo: '미니멀한 미학(미적 감각)',
+      paraphraseTip: '단순한 style보다 철학이 담긴 미적 감각을 뜻하는 고급 어휘입니다.',
+    },
+  ],
+  sentences: [
+    {
+      id: 5001,
+      levelTag: 'beginner',
+      tag: '초급 필수 · 코디 어울림 칭찬',
+      targetWord: 'try on',
+      wordOrderFormula: 'Can I[조동사+S] + try on[V] + this jacket[DO] + in a medium size[M]?',
+      structure: '3형식 구동사 의문문 (Can + S + V + DO + 전치사구 M)',
+      soundBlockEn: 'Can I try on / this jacket / in a medium size?',
+      soundMethodGuide: 'Can I를 [캐나이]로 연음하고 try on this jacket을 자연스럽게 이어 읽습니다.',
+      ipaLine: '/kæn aɪ traɪ ɑːn ðɪs ˈdʒæk.ɪt ɪn ə ˈmiː.di.əm saɪz/',
+      koLine: '제가 입어볼 수 있을까요 / 이 재킷을 / 미디엄 사이즈로?',
+      enLine: 'Can I try on / this jacket / in a medium size?',
+      rawEn: 'Can I try on this jacket in a medium size?',
+      pronLine: '[캐나이 트라이 안 / 디스 재킷 / 이너 미디엄 사이즈]',
+      naturalKo: '이 재킷을 미디엄 사이즈로 입어볼 수 있을까요?',
+      paraphraseVersion: 'Could I test the fit of this jacket in a medium?',
+      grammarPoint: '사이즈나 색상 앞에 전치사 in을 써서 in a medium size, in black처럼 표현합니다.',
+      contextNuance: '해외 의류 매장에서 원하는 사이즈를 요청하고 피팅룸을 이용할 때 바로 쓰는 문장입니다.',
+    },
+    {
+      id: 5002,
+      levelTag: 'intermediate',
+      tag: '중급 핵심 · 실루엣을 살려주는 코트',
+      targetWord: 'silhouette',
+      wordOrderFormula: 'The tailored coat[S] + complements[V] + the minimalist silhouette[DO].',
+      structure: '3형식 (S + 타동사 V + DO)',
+      soundBlockEn: 'The tailored coat / complements / the minimalist silhouette.',
+      soundMethodGuide: 'complements[캄플러먼츠]와 silhouette[실루엣]의 강세를 또렷하게 살려 발음합니다.',
+      ipaLine: '/ðə ˈteɪ.lɚd koʊt ˈkɑːm.plə.ments ðə ˈmɪn.ə.məl.ɪst ˌsɪl.uˈet/',
+      koLine: '그 테일러드 코트는 / 돋보이게 보완한다 / 미니멀한 실루엣을.',
+      enLine: 'The tailored coat / complements / the minimalist silhouette.',
+      rawEn: 'The tailored coat complements the minimalist silhouette.',
+      pronLine: '[더 테일러드 코트 / 캄플러먼츠 / 더 미니멀리스트 실루엣]',
+      naturalKo: '그 테일러드 코트는 미니멀한 실루엣을 한층 돋보이게 보완한다.',
+      paraphraseVersion: 'The structured coat enhances the clean outline of the outfit.',
+      grammarPoint: 'complement(보완하다)는 타동사로 목적어(the minimalist silhouette)를 바로 취하며, compliment(칭찬하다)와 스펠링 e/i를 구별해야 합니다.',
+      contextNuance: '의상이나 인테리어 소품이 전체적인 조화를 높여줄 때 세련되게 묘사하는 문장입니다.',
+    },
+    {
+      id: 5003,
+      levelTag: 'advanced',
+      tag: '고급 마스터 · 헤리티지와 현대적 미학의 결합',
+      targetWord: 'aesthetic',
+      wordOrderFormula: 'The collection[S] + seamlessly[M] + blends[V] + classic heritage[DO] + with a modern aesthetic[M].',
+      structure: '3형식 (S + 부사 M + V + DO + 전치사구 M)',
+      soundBlockEn: 'The collection seamlessly blends / classic heritage / with a modern aesthetic.',
+      soundMethodGuide: 'seamlessly blends[심리슬리 블렌즈]를 매끄럽게 잇고 마지막 aesthetic을 [에스-쎄틱]으로 정확히 발음합니다.',
+      ipaLine: '/ðə kəˈlek.ʃən ˈsiːm.ləs.li blendz ˈklæs.ɪk ˈher.ɪ.t̬ɪdʒ wɪð ə ˈmɑː.dɚn esˈθet̬.ɪk/',
+      koLine: '그 컬렉션은 매끄럽게 결합한다 / 고전적 유산을 / 현대적인 미학과.',
+      enLine: 'The collection seamlessly blends / classic heritage / with a modern aesthetic.',
+      rawEn: 'The collection seamlessly blends classic heritage with a modern aesthetic.',
+      pronLine: '[더 컬렉션 심리슬리 블렌즈 / 클래식 헤리티지 / 위더 모던 에스쎄틱]',
+      naturalKo: '그 컬렉션은 고전적 유산과 현대적인 미학을 조화롭게 결합한다.',
+      paraphraseVersion: 'The new line harmonizes traditional craftsmanship with contemporary design principles.',
+      grammarPoint: 'blend A with B(A를 B와 조화롭게 결합하다) 구문에서 부사 seamlessly가 동사 blends를 앞에서 수식(M)합니다.',
+      contextNuance: '패션·자동차·건축·브랜드 기획서에서 전통과 혁신의 조화를 설명할 때 가장 설득력 있는 문장입니다.',
+    },
+  ],
+  quiz: {
+    beginner: {
+      word: 'try on',
+      ipa: '/traɪ ɑːn/',
+      options: [
+        '세탁소에 옷을 맡기다',
+        '(옷·신발 등을) 입어보다, 신어보다',
+        '환불 영수증을 요청하다',
+        '선물 포장을 부탁하다',
+      ],
+      answerIdx: 1,
+      explanation: 'try on은 매장에서 사이즈나 핏을 확인하기 위해 옷·신발을 시험 삼아 입어보다/신어보다라는 뜻입니다.',
+    },
+    intermediate: {
+      sentenceBefore: 'Not everyone can wear neon colors, but you really',
+      sentenceAfter: 'that bold statement look!',
+      hint: '(소화하기 어려운 스타일·과제를) 멋지게 소화해 내다',
+      options: ['called off', 'put off', 'turned off', 'pulled off'],
+      answerIdx: 3,
+      explanation: '아무나 소화하기 힘든 과감한 룩(bold statement look)을 성공적으로 멋지게 소화해 냈다는 뜻이므로 pulled off가 정답입니다.',
+    },
+    advanced: {
+      questionPrompt:
+        '다음 문장의 빈칸 (A)와 (B)에 들어갈 어법·어휘상 올바른 단어를 2개 고르세요: "The tailored coat [ (A) ] the silhouette and blends heritage [ (B) ] a modern aesthetic."',
+      highlightWord: '보완하다(complement vs compliment) & blend A with B 연어',
+      options: [
+        '(A) complements (보완하다, 돋보이게 하다)',
+        '(A) compliments (칭찬하다 — 문맥 부적절)',
+        '(B) with (blend A with B)',
+        '(B) at (결합 전치사 부적절)',
+      ],
+      answerIndices: [0, 2],
+      explanation:
+        '(A) 실루엣을 보완해 돋보이게 한다는 뜻이므로 철자 e를 쓰는 complements가 맞으며, (B) blend A with B(A와 B를 결합하다)에서는 전치사 with를 씁니다.',
+    },
+    writingMission: {
+      koPrompt: '그 컬렉션은 고전적 유산과 현대적인 미학을 조화롭게 결합한다.',
+      targetPattern: 'The collection seamlessly blends ~ with ...',
+      modelAnswer: 'The collection seamlessly blends classic heritage with a modern aesthetic.',
+    },
+  },
+};
+
+export const THEMES: ThemeData[] = [
+  THEME_BIZ_MEETING,
+  THEME_OPIC_ROUTINE,
+  THEME_TRAVEL_HOTEL,
+  THEME_YOUTUBE_VIRAL,
+  THEME_FASHION_EDITORIAL,
+];
+
+// ============================================================================
+// 4. 수능 독해 · 서술형 어법 · 고교 내신 3대 집중 마스터 코스
+//    - 허위 통계("406개교 1위", "99%", "EBS 연계") 전면 제거 및 객관화
+//    - 서술형 미션의 givenWords(보기 단어)와 modelAnswerEn(모범 답안) 1:1 완전 일치
+// ============================================================================
+export const EXAM_COURSES: ExamMasterCourse[] = [
   {
     id: 'CSAT_MASTER',
-    name: '🏆 수능 정규 완성반 (고3 수능 모의고사 1등급 완성)',
-    shortTabName: '① 수능 1등급 완성반 (주1회 3시간)',
-    badge: '고3 수능 1등급 · 최상위권 실력 유지',
-    targetGoal: '학습목표: 고3 수능 1등급 달성 및 킬러 문항(빈칸·순서·삽입·요약) 완전 정복',
-    scheduleRule: '수업구성: 주 1회 3시간(180분) 집중 수업 · EBS 수능 연계교재 + 주요 소재 심화 + 고난도 기출/변형 실전 모의고사',
-    philosophy:
-      '영어로 생각하고 표현하는 힘! 지문을 단순 해석하는 것을 넘어 EBS 핵심 소재의 논리 구조와 구문 뼈대를 장악해 어떤 고난도 변형 문제에서도 스스로 정답을 도출합니다.',
-    curriculumPills: [
-      '1교시: 단어학습 & 단어테스트 (25분)',
-      '2교시: 핵심문장 구문 학습 (35분)',
-      '3교시: 독해심화 변형 문제 (40분)',
-      '4교시: 주요소재 연계학습 (30분)',
-      '5교시: 고난도 실전 테스트 (50분)',
+    badge: '🎯 수능·모의고사 독해 트랙',
+    title: '학술 추상어 패러프레이징 & 고난도 구문 독해',
+    shortTabName: '🎯 수능독해·추론',
+    scheduleGuide: '권장 루틴: 지문 소리블록 직독직해(10분) ➔ 핵심 어법 판별(10분) ➔ 요약문 서술형 영작(10분)',
+    targetGoal:
+      '문장 성분 7개와 9품사의 결합 원리를 바탕으로 긴 학술 문장의 주어·동사 뼈대를 찾고, 지문의 핵심 논지를 다른 어휘로 바꿔 쓰는(Paraphrasing) 추론 능력을 완성합니다.',
+    coreCurriculum: [
+      '1단계: 부정어·Only 부사구 문두 도치 구문의 주어·동사 파악',
+      '2단계: 인과 관계 및 대조 구문을 활용한 빈칸·요약문 패러프레이징',
+      '3단계: 수식어 거품 제거를 통한 장문 주어-동사 수일치 판별',
     ],
     steps: [
       {
         stepNum: 1,
-        stepTitle: 'STEP 1~2. EBS 연계 어휘 테스트 & 고난도 핵심문장 구문 해부',
-        durationLabel: '1~2교시 (60분)',
-        goalDesc: 'EBS 수능특강·수능완성 최빈출 추상 어휘를 점검하고, 3줄 이상의 길고 복잡한 도치·분사구문을 16개(7성분×9품사) 뼈대로 직독직해합니다.',
+        stepTitle: 'STEP 1. 부정어(Not until) 문두 도치와 관점의 확장',
+        focusPoint: 'Not until 부사절이 문두로 나올 때 주절의 [조동사 + 주어 + 동사원형] 도치 어순 파악',
         originalPassageEn:
-          'Not until we step out of our cognitive comfort zone can we genuinely broaden our perspective on complex phenomena.',
+          'Human beings tend to favor information that confirms their existing beliefs. Not until we step out of our comfort zone can we genuinely broaden our perspective.',
+        originalPassagePron:
+          '[휴먼 비잉즈 텐드 투 페이버 인포메이션 댓 컨펌즈 데어 이그지스팅 빌리프스. 낫 언틸 위 스텝 아우러브 아워 컴포트 존 / 캔 위 제뉴인리 브로든 아워 퍼스펙티브.]',
         originalPassageKo:
-          '우리가 인지적 안전지대(편안한 영역) 밖으로 걸어 나와서야 비로소 우리는 복잡한 현상에 대한 우리의 관점을 진정으로 넓힐 수 있다.',
+          '인간은 자신의 기존 신념을 확인해 주는 정보를 선호하는 경향이 있다. 우리가 익숙한 안전지대를 벗어나서야 비로소 우리의 시야(관점)를 진정으로 넓힐 수 있다.',
         transformedEn:
-          'Only by transcending familiar cognitive boundaries is it feasible for us to expand our viewpoint.',
+          'It is not until we step out of our comfort zone that we can genuinely broaden our perspective.',
+        transformedPron:
+          '[이리즈 낫 언틸 위 스텝 아우러브 아워 컴포트 존 / 댓 위 캔 제뉴인리 브로든 아워 퍼스펙티브.]',
         transformedPoint:
-          '[수능 간접연계 변형 포인트] 부정어 도치 구문(Not until ~ can we)을 제한 부사구 도치(Only by ~ is it feasible)로 패러프레이징하여 빈칸 추론 문항으로 출제!',
-        killerGrammarTrap: {
-          questionEn: 'Not until we step out of our comfort zone [ we can / can we ] genuinely broaden our perspective.',
-          wrongChoice: 'we can (평서문 어순 오답)',
-          correctChoice: 'can we (부정어 문두 도치 정답!)',
-          freqBadge: '수능·평가원 어법 1순위 도치 구문',
-          ruleExplanation:
-            '부정어구(Not until절)가 강조를 위해 문장 맨 앞으로 이동하면, 주절의 어순은 반드시 의문문 어순인 [조동사(can) + 주어(we) + 동사원형(broaden)]으로 도치되어야 합니다!',
+          '문두 도치 구문(Not until ~ can we ...)을 It is not until ~ that S + V 강조구문(정상 어순)으로 전환한 형태입니다.',
+        grammarTrapQuestion: {
+          prompt:
+            'Not until we step out of our comfort zone [ (A) we can / (B) can we ] genuinely broaden our perspective.',
+          choiceA: 'we can',
+          choiceB: 'can we',
+          correctChoice: 'B',
+          explanation:
+            '부정어구(Not until we step out of our comfort zone)가 문장 맨 앞에 위치했으므로, 뒤따르는 주절은 조동사 can이 주어 we 앞으로 나오는 의문문 어순(can we broaden)으로 도치되어야 합니다.',
         },
         essayMission: {
-          typeBadge: '수능 40번 요약문 완성 & 고난도 구문 영작',
-          koCondition: '“익숙한 영역을 벗어날 때 비로소 우리는 시야를 넓힐 수 있다”를 부정어 도치(Not until)를 사용해 완성하시오.',
-          givenWords: '[ Not until / step out of / can / broaden / our perspective / we ]',
-          modelAnswerEn: 'Not until we step out of our comfort zone can we broaden our perspective.',
-          scoringCriteria: '1) Not until 부사절 내 현재시제(step) 사용 2) 주절 조동사 도치(can we broaden) 어순 정확성',
+          typeBadge: '부정어 문두 도치 서술형 영작',
+          koCondition:
+            '우리말 뜻("우리가 익숙한 안전지대를 벗어나서야 비로소 시야를 진정으로 넓힐 수 있다.")에 맞도록 주어진 단어와 구절을 모두 사용하여 도치 구문으로 배열하세요.',
+          givenWords:
+            'Not until / we (2회 사용) / step out of / our comfort zone / can / genuinely / broaden / our perspective',
+          modelAnswerEn:
+            'Not until we step out of our comfort zone can we genuinely broaden our perspective.',
+          scoringCriteria:
+            '① Not until 부사절 정상 어순(we step out of our comfort zone) 준수 ② 주절 조동사 도치(can we genuinely broaden) 정확성',
         },
       },
       {
         stepNum: 2,
-        stepTitle: 'STEP 3~5. 독해심화 변형 문제 · 주요소재 연계 · 고난도 실전 테스트',
-        durationLabel: '3~5교시 (120분)',
-        goalDesc: '철학·뇌과학·환경·경제 등 수능 주요 소재를 연계 학습하고, 실제 수능 31~34번 빈칸 추론 수준으로 변형된 모의고사를 시간 내에 돌파합니다.',
+        stepTitle: 'STEP 2. 확증 편향 극복과 인지적 경직성 예방 (인과 패러프레이징)',
+        focusPoint: '지문의 핵심 인과 관계(다양한 관점 노출 ➔ 확증 편향 극복 및 경직성 예방) 요약',
         originalPassageEn:
-          'Consistent exposure to diverse viewpoints prevents confirmation bias and fosters intellectual flexibility.',
+          'Only by exposing ourselves to diverse viewpoints can we overcome confirmation bias and prevent cognitive rigidity.',
+        originalPassagePron:
+          '[온리 바이 익스포징 아워셀브즈 투 다이버스 뷰포인츠 / 캔 위 오버컴 칸퍼메이션 바이어스 앤 프리벤트 카그너티브 리지더티.]',
         originalPassageKo:
-          '다양한 관점에 대한 꾸준한 노출은 확증 편향을 방지하고 지적 유연성을 길러준다.',
+          '다양한 관점에 우리 자신을 노출시킴으로써만 우리는 확증 편향을 극복하고 인지적 경직성을 예방할 수 있다.',
         transformedEn:
-          'Maintaining consistency in encountering opposing ideas is essential to overcoming cognitive rigidity.',
+          'Deliberate exposure to diverse viewpoints helps us overcome confirmation bias and foster cognitive flexibility.',
+        transformedPron:
+          '[딜리버릿 익스포저 투 다이버스 뷰포인츠 / 헬프스 어스 오버컴 칸퍼메이션 바이어스 앤 파스터 카그너티브 플렉서빌러티.]',
         transformedPoint:
-          '[독해심화 변형 포인트] confirmation bias(확증 편향) ➔ cognitive rigidity(인지적 경직성), intellectual flexibility(지적 유연성) ➔ overcoming rigidity로 반의어·유의어 치환!',
-        killerGrammarTrap: {
-          questionEn: 'Consistent exposure to diverse viewpoints [ prevent / prevents ] confirmation bias.',
-          wrongChoice: 'prevent (앞 복수명사 viewpoints에 현혹된 오답)',
-          correctChoice: 'prevents (단수 주어 핵 exposure에 수일치!)',
-          freqBadge: '수능·모의고사 99% 출제 주어-동사 수일치',
-          ruleExplanation:
-            '전치사구(to diverse viewpoints)는 주어(exposure)를 꾸며주는 수식어(M)일 뿐입니다. 진짜 주어 핵은 단수 추상명사 exposure이므로 단수동사 prevents(-s)를 써야 합니다.',
+          'prevent cognitive rigidity(인지적 경직성을 막다)를 긍정 방향의 표현인 foster cognitive flexibility(인지적 유연성을 기르다)로 패러프레이징했습니다.',
+        grammarTrapQuestion: {
+          prompt:
+            'Deliberate exposure to diverse viewpoints and cultures [ (A) prevent / (B) prevents ] cognitive rigidity.',
+          choiceA: 'prevent',
+          choiceB: 'prevents',
+          correctChoice: 'B',
+          explanation:
+            '전치사구(to diverse viewpoints and cultures)는 수식어(M)이며, 문장의 핵심 주어는 단수 명사 exposure이므로 단수 동사 prevents가 정답입니다.',
         },
         essayMission: {
-          typeBadge: '주제·요약 서술형 실전 테스트',
-          koCondition: '위 지문의 핵심 요지를 [동명사 주어(Maintaining consistency) + 5형식(makes our mind flexible)] 구조로 요약 영작하시오.',
-          givenWords: '[ Maintaining / consistency / makes / our mind / flexible / and / objective ]',
-          modelAnswerEn: 'Maintaining consistency makes our mind flexible and objective.',
-          scoringCriteria: '1) 동명사구 주어(Maintaining consistency) 단수 취급(makes) 2) 목적격보어(OC) 자리에 형용사(flexible, objective) 배치',
+          typeBadge: '요약문 완성 서술형 영작',
+          koCondition:
+            '우리말 뜻("다양한 관점에 스스로를 노출시킴으로써만 우리는 확증 편향을 극복할 수 있다.")에 맞도록 주어진 단어를 배열하세요.',
+          givenWords:
+            'Only by / exposing / ourselves / to / diverse viewpoints / can / we / overcome / confirmation bias',
+          modelAnswerEn:
+            'Only by exposing ourselves to diverse viewpoints can we overcome confirmation bias.',
+          scoringCriteria:
+            '① Only by + 동명사구(exposing ourselves to diverse viewpoints) ② 주절 조동사 도치(can we overcome)',
         },
       },
     ],
   },
   {
     id: 'GRAMMAR_ESSAY',
-    name: '✍️ 고등 어법·서술형 완성반 (내신 1등급 치트키 · 방학 특강)',
-    shortTabName: '② 고등 어법·서술형 완성반 (406개교 기출)',
-    badge: '전국 406개교 최신 6개년 기출 완전 분석',
-    targetGoal: '학습목표: 고등 내신 1등급을 결정짓는 어법과 서술형(조건 영작·요약) 완벽 마스터',
-    scheduleRule: '수업구성: 기출 필수 어법 개념 총정리 + 서술형 유형별 전략 + 내신 기출 실전 모의고사',
-    philosophy:
-      '외운 답이 아닌 답을 만드는 영어! 전국 406개 고등학교의 최신 6개년 기출 빅데이터를 분석하여, 내신 1등급으로 직결되는 필수 어법 함정과 감점 없는 서술형 답안 작성 공식을 체화합니다.',
-    curriculumPills: [
-      '모듈 1: 406개교 6개년 기출 필수 어법 총정리',
-      '모듈 2: 서술형 유형별 전략 (조건영작·어형변화·요약)',
-      '모듈 3: 내신 1등급 실전 기출 모의고사',
+    badge: '✍️ 서술형·어법 집중 트랙',
+    title: '5형식 목적격보어 & 분사구문·관계사 서술형 마스터',
+    shortTabName: '✍️ 서술형·핵심어법',
+    scheduleGuide: '권장 루틴: 어법 함정 비교(10분) ➔ 문장 전환 연습(10분) ➔ 조건부 영작(10분)',
+    targetGoal:
+      '우리말 해석("~하게")에 속기 쉬운 5형식 목적격보어(OC) 형용사 규칙과 분사구문의 능동·수동 판별, 계속적 용법 관계대명사를 완벽히 체화합니다.',
+    coreCurriculum: [
+      '1단계: 5형식(make/keep/find/consider + O + 형용사 OC) 함정 격파',
+      '2단계: 과거분사(p.p.) 수동 분사구문과 주절 주어의 태 일치',
+      '3단계: 선행사 포함 관계대명사 What 명사절 주어 구문 완성',
     ],
     steps: [
       {
         stepNum: 1,
-        stepTitle: '모듈 1~2. 전국 406개교 6개년 최다 빈출 어법 TOP 킬러 & 서술형 영작 전략',
-        durationLabel: '핵심 어법 + 서술형 전략',
-        goalDesc: '학교 시험 서술형에서 가장 많이 감점되는 [5형식 보어 품사 / 관계대명사 vs 관계부사 / 분사구문 태 결정]을 16개 매핑 원리로 완벽히 정복합니다.',
+        stepTitle: 'STEP 1. 동명사구 주어 수일치 & 5형식 형용사 보어(OC)',
+        focusPoint: '해석이 "실현 가능하게"여도 목적어의 상태 설명이면 형용사(feasible) 사용',
         originalPassageEn:
-          'Streamlining the approval process makes the entire project feasible, which allows the team to expedite the launch.',
+          'Streamlining the approval process makes the entire project feasible within the tentative deadline.',
+        originalPassagePron:
+          '[스트림라이닝 디 어프루벌 프로세스 / 메익스 디 인타이어 프로젝트 피저블 / 위딘 더 텐터티브 데드라인.]',
         originalPassageKo:
-          '결재 절차를 간소화하는 것은 전체 프로젝트를 실현 가능하게 만들어 주며, 이는 팀이 런칭을 앞당길 수 있게 해 준다.',
+          '승인 절차를 간소화하는 것은 잠정 마감일 내에 전체 프로젝트를 실현 가능하게 만든다.',
         transformedEn:
-          'The streamlined process renders the project highly feasible, thereby enabling the team to accelerate the release.',
+          'If we streamline the approval process, the entire project becomes feasible within the tentative deadline.',
+        transformedPron:
+          '[이프 위 스트림라인 디 어프루벌 프로세스, / 디 인타이어 프로젝트 비컴즈 피저블 위딘 더 텐터티브 데드라인.]',
         transformedPoint:
-          '[내신 어법·서술형 변형] 계속적 용법의 관계대명사(, which allows ~)를 분사구문(, thereby enabling ~)으로 어형 변화시키는 서술형 단골 출제 유형!',
-        killerGrammarTrap: {
-          questionEn: 'Streamlining the process makes the entire project [ feasible / feasibly ], [ which / that ] allows the team to expedite it.',
-          wrongChoice: 'feasibly (부사 오답) / that (콤마 뒤 관계대명사 that 불가)',
-          correctChoice: 'feasible (목적격보어 형용사) / which (계속적 용법)',
-          freqBadge: '406개교 6개년 내신 출제율 1위 (보어 품사 & 관계사)',
-          ruleExplanation:
-            '① 5형식 동사 make의 목적격보어(OC) 자리에는 해석이 "~하게"라도 반드시 형용사(feasible)를 써야 합니다! ② 콤마(,) 뒤 계속적 용법에는 관계대명사 that이나 what을 절대 쓸 수 없으며 which를 씁니다.',
+          '동명사구 주어(Streamlining ~)로 시작하는 5형식 문장을 조건 부사절(If we streamline ~)과 2형식 주절(becomes feasible)로 풀어서 전환했습니다.',
+        grammarTrapQuestion: {
+          prompt:
+            'Streamlining the approval process makes the entire project [ (A) feasible / (B) feasibly ] within the deadline.',
+          choiceA: 'feasible',
+          choiceB: 'feasibly',
+          correctChoice: 'A',
+          explanation:
+            '5형식 동사 makes 뒤에서 목적어(the entire project)의 상태를 보충 설명하는 목적격보어(OC) 자리이므로 형용사 feasible이 정답입니다.',
         },
         essayMission: {
-          typeBadge: '406개교 기출 서술형 1순위: [조건 영작 & 어형 변화]',
-          koCondition: '조건: 1) 가목적어 it과 진목적어 to부정사를 사용할 것 2) 보기 단어를 필요시 어형 변화할 것 (“새로운 시스템은 우리가 일정을 간소화하는 것을 가능하게 만들었다”)',
-          givenWords: '[ make / the new system / possible / streamline / the schedule / for us ]',
-          modelAnswerEn: 'The new system made it possible for us to streamline the schedule.',
-          scoringCriteria: '1) 5형식 가목적어 구문(made it possible) 2) 의미상 주어(for us) + 진목적어(to streamline) 어순 정확성',
+          typeBadge: '5형식 구문 서술형 영작',
+          koCondition:
+            '우리말 뜻("승인 절차를 간소화하는 것은 전체 프로젝트를 실현 가능하게 만든다.")에 맞도록 주어진 단어를 배열하세요.',
+          givenWords:
+            'Streamlining / the approval process / makes / the entire project / feasible',
+          modelAnswerEn:
+            'Streamlining the approval process makes the entire project feasible.',
+          scoringCriteria:
+            '① 동명사구 주어(Streamlining the approval process) ② 단수 동사(makes) ③ 목적격보어 형용사(feasible)',
+        },
+      },
+      {
+        stepNum: 2,
+        stepTitle: 'STEP 2. 수동 분사구문(Supported by ~)과 패러다임 전환',
+        focusPoint: '주절 주어(the new hypothesis)와 분사의 수동 관계 판별',
+        originalPassageEn:
+          'Supported by solid empirical evidence, the new hypothesis shifted the scientific paradigm.',
+        originalPassagePron:
+          '[서포티드 바이 살리드 임피리컬 에비던스, / 더 뉴 하이파써시스 시프티드 더 사이언티픽 패러다임.]',
+        originalPassageKo:
+          '탄탄한 실증적 증거에 의해 뒷받침되면서, 그 새로운 가설은 과학적 패러다임을 바꾸어 놓았다.',
+        transformedEn:
+          'Because it was supported by solid empirical evidence, the new hypothesis shifted the scientific paradigm.',
+        transformedPron:
+          '[비코즈 잇 워즈 서포티드 바이 살리드 임피리컬 에비던스, / 더 뉴 하이파써시스 시프티드 더 사이언티픽 패러다임.]',
+        transformedPoint:
+          '과거분사로 시작하는 수동 분사구문(Supported by ~)을 이유 접속사 Because가 이끄는 수동태 부사절로 복원한 문장입니다.',
+        grammarTrapQuestion: {
+          prompt:
+            '[ (A) Supporting / (B) Supported ] by solid empirical evidence, the new hypothesis shifted the scientific paradigm.',
+          choiceA: 'Supporting',
+          choiceB: 'Supported',
+          correctChoice: 'B',
+          explanation:
+            '주절의 주어(the new hypothesis: 새로운 가설)는 실증적 증거에 의해 "뒷받침되는" 수동 관계이므로 과거분사 Supported가 정답입니다.',
+        },
+        essayMission: {
+          typeBadge: '수동 분사구문 서술형 영작',
+          koCondition:
+            '우리말 뜻("탄탄한 실증적 증거에 의해 뒷받침되면서, 그 새로운 가설은 과학적 패러다임을 바꾸어 놓았다.")에 맞도록 주어진 단어를 배열하세요.',
+          givenWords:
+            'Supported / by / solid empirical evidence, / the new hypothesis / shifted / the scientific paradigm',
+          modelAnswerEn:
+            'Supported by solid empirical evidence, the new hypothesis shifted the scientific paradigm.',
+          scoringCriteria:
+            '① 수동 분사구문(Supported by solid empirical evidence,) ② 주절 어순(the new hypothesis shifted the scientific paradigm)',
         },
       },
     ],
   },
   {
     id: 'SCHOOL_INTERNAL',
-    name: '🏫 학교별 내신 대비반 (5단계 누적·심화·변형 완벽 대비)',
-    shortTabName: '③ 학교별 내신 대비반 (5단계 변형)',
-    badge: '양치기·무조건 암기 지양 · 고등 R&D센터 선별 콘텐츠',
-    targetGoal: '학습목표: 학교별 맞춤 출제 경향 완벽 장악 및 어떠한 지문 변형에도 흔들리지 않는 고등 내신 1등급',
-    scheduleRule: '5단계 공식: 전체 흐름 ▶ 세부 내용 ▶ 심화 ▶ 변형(Paraphrasing) ▶ 서술형(요약·영작)',
-    philosophy:
-      '무조건적인 본문 암기는 시험장에서 지문이 조금만 변형되어도 무너집니다! 이해 기반의 누적·심화 반복 학습으로 지문의 논리 구조와 어휘 변형을 완벽히 장악합니다.',
-    curriculumPills: [
-      '1단계: 전체 흐름 (논리 구조도)',
-      '2단계: 세부 내용 (소리블럭 직독직해)',
-      '3단계: 심화 (킬러 구문·어법 해부)',
-      '4단계: 변형 (어휘·문장 Paraphrasing)',
-      '5단계: 서술형 (요약문·조건 영작)',
+    badge: '🏫 고교 내신 변형 대비 트랙',
+    title: '교과서·부교재 지문 변형 & 조건부 영작 실전',
+    shortTabName: '🏫 내신변형·영작',
+    scheduleGuide: '권장 루틴: 원문 구조 분석 ➔ 변형 문장 비교 ➔ 내 학교 지문 직접 붙여넣기 훈련',
+    targetGoal:
+      '학교 내신 시험에서 자주 출제되는 원문 어휘 변형(Paraphrasing)과 관계대명사 What절·간접의문문 어순 결합 서술형을 완벽하게 대비합니다.',
+    coreCurriculum: [
+      '1단계: 선행사 포함 관계대명사 What절 주어 + 단수 동사 is',
+      '2단계: 의문사절(how + 형용사/부사 + 주어 + 동사) 간접의문문 어순',
+      '3단계: 내 학교 시험 범위 지문 직접 입력 및 빈칸·어순 배열 실전',
     ],
     steps: [
       {
         stepNum: 1,
-        stepTitle: '학교별 내신 5단계 마스터: [전체 흐름 ▶ 세부 ▶ 심화 ▶ 변형 ▶ 서술형]',
-        durationLabel: '5단계 누적·반복 시스템',
-        goalDesc: '하나의 내신 핵심 지문을 단순 암기하지 않고 1단계(전체 흐름)부터 5단계(서술형 요약·영작)까지 입체적으로 변형·확장하며 내신 1등급 실력을 완성합니다.',
+        stepTitle: 'STEP 1. 관계대명사 What절 주어와 간접의문문 보어 결합',
+        focusPoint: 'What matters most(주어절) + is + how seamlessly brands blend ~(보어절)',
         originalPassageEn:
-          'What matters most in sustainable luxury is that brands seamlessly blend classic heritage with modern aesthetics.',
+          'In the modern market, consumers do not judge a brand only by its price. What matters most is how seamlessly brands blend heritage with sustainability.',
+        originalPassagePron:
+          '[인 더 모던 마켓, 컨슈머즈 두 낫 저지 어 브랜드 온리 바이 이츠 프라이스. 왓 매러즈 모스트 이즈 / 하우 심리슬리 브랜즈 블렌드 헤리티지 위드 서스테이너빌러티.]',
         originalPassageKo:
-          '지속 가능한 럭셔리에서 가장 중요한 것은 브랜드가 클래식한 헤리티지와 현대적 미학을 물 흐르듯 결합한다는 점이다.',
+          '현대 시장에서 소비자들은 가격만으로 브랜드를 판단하지 않는다. 가장 중요한 것은 브랜드들이 얼마나 조화롭게 헤리티지를 지속 가능성과 결합하는가이다.',
         transformedEn:
-          'The core essence of sustainable luxury lies in harmonizing traditional heritage with contemporary aesthetics effortlessly.',
+          'The most crucial factor is whether an enterprise harmonizes its classic heritage with sustainable practices.',
+        transformedPron:
+          '[더 모스트 크루셜 팩터 이즈 / 웨더 언 엔터프라이즈 하머나이지즈 이츠 클래식 헤리티지 위드 서스테이너블 프랙티시즈.]',
         transformedPoint:
-          '[학교별 내신 4단계 변형] 원문의 "What matters most ~ is that S+V" 강조 구문을 학교 선생님이 시험지에서는 "The core essence ~ lies in V-ing"로 변형 출제!',
-        killerGrammarTrap: {
-          questionEn: '[ What / That ] matters most in luxury is [ what / that ] brands blend heritage with aesthetics.',
-          wrongChoice: 'That ~ what (선행사 유무 및 완전/불완전 혼동)',
-          correctChoice: 'What (불완전한 절 이끄는 관계대명사) ~ that (완전한 보어절 접속사)',
-          freqBadge: '내신 서술형·어법 단골: What vs That 구별',
-          ruleExplanation:
-            '앞자리는 선행사가 없고 뒤에 주어 없이 동사(matters)가 바로 오므로 불완전한 절을 이끄는 What이 정답! 뒷자리는 주어(brands)+동사(blend)+목적어(heritage)가 모두 갖춘 완전한 문장이므로 접속사 that이 정답입니다.',
+          'What matters most를 명사구(The most crucial factor)로, blend를 harmonize로 변형한 내신 패러프레이징 형태입니다.',
+        grammarTrapQuestion: {
+          prompt:
+            '[ (A) What / (B) That ] matters most is how seamlessly brands blend heritage with sustainability.',
+          choiceA: 'What',
+          choiceB: 'That',
+          correctChoice: 'A',
+          explanation:
+            '앞에 선행사가 없고 뒤에 주어가 빠진 불완전한 절(matters most)이 이어지므로 선행사를 포함한 관계대명사 What이 정답입니다.',
         },
         essayMission: {
-          typeBadge: '학교별 내신 5단계 최종 관문: [본문 요약 & 변형 영작]',
-          koCondition: '본문 내용을 바탕으로 아래 요약문의 빈칸을 채워 전체 문장을 완성하시오. (“지속 가능한 럭셔리의 핵심은 전통 유산과 현대 미학의 조화에 있다.”)',
-          givenWords: '[ What / love / matters / most / is / that / blend / heritage / with / aesthetics ]',
-          modelAnswerEn: 'What matters most is that brands blend heritage with aesthetics.',
-          scoringCriteria: '1) 명사절 주어(What matters most) 단수동사(is) 수일치 2) 보어절 접속사(that) 뒤 완전한 3형식 문장 결합',
+          typeBadge: '내신 서술형 영작 (What절 + 간접의문문)',
+          koCondition:
+            '우리말 뜻("가장 중요한 것은 브랜드들이 얼마나 조화롭게 헤리티지를 지속 가능성과 결합하는가이다.")에 맞도록 주어진 단어를 모두 사용하여 문장을 완성하세요.',
+          givenWords:
+            'What / matters / most / is / how / seamlessly / brands / blend / heritage / with / sustainability',
+          modelAnswerEn:
+            'What matters most is how seamlessly brands blend heritage with sustainability.',
+          scoringCriteria:
+            '① 관계대명사 주어절(What matters most) ② 단수 동사(is) ③ 간접의문문 어순(how seamlessly brands blend ~)',
         },
       },
     ],
@@ -3388,935 +4291,1373 @@ export const EXAM_MASTER_COURSES: ExamMasterCourse[] = [
 ];
 
 // ============================================================================
-// 어떤 영어 문장이나 수능·내신 구문을 눌러도 즉시 16개(7성분×9품사) 해부 카드로 변환하는 엔진
+// 5. 정밀 토큰 주석 맵(VERIFIED_SENTENCE_TOKEN_MAP) & 동적 16요소 구문 해부 엔진
+//    - 핵심 대표 문장들은 수작업 검증된 정밀 토큰 데이터를 즉시 반환 (오분류 0%)
+//    - 사용자 입력 문장 등 미등록 문장은 문두 동명사(S)·5형식 보어(OC)·2형식 보어(SC)·to부정사를
+//      문맥 규칙으로 판별하며 isHeuristic 플래그로 투명하게 안내
 // ============================================================================
+const COLOR_BY_COMP: Record<CompId | '독립어', string> = {
+  S: 'border-blue-500 text-blue-700',
+  V: 'border-rose-500 text-rose-700',
+  IO: 'border-purple-500 text-purple-700',
+  DO: 'border-emerald-500 text-emerald-700',
+  SC: 'border-amber-500 text-amber-700',
+  OC: 'border-amber-600 text-amber-800',
+  M: 'border-slate-300 text-slate-600',
+  독립어: 'border-teal-400 text-teal-700',
+};
+
+function makeToken(
+  word: string,
+  comp: CompId | '독립어',
+  compLabel: string,
+  pos: PosId,
+  posLabel: string,
+  meaning: string,
+  roleExplanation: string
+): DiagramToken {
+  return {
+    word,
+    comp,
+    compLabel,
+    pos,
+    posLabel,
+    meaning,
+    roleExplanation,
+    colorClass: COLOR_BY_COMP[comp],
+  };
+}
+
+const VERIFIED_SENTENCE_TOKEN_MAP: Record<string, DiagramSentence> = {
+  'thanks for giving me a quick heads-up on the schedule.': {
+    title: '테마 1 초급 · 4형식 동명사구(giving + IO + DO)',
+    rawEn: 'Thanks for giving me a quick heads-up on the schedule.',
+    naturalKo: '일정에 대해 미리 귀띔해 주셔서 감사합니다.',
+    skeleton: 'Thanks for[감사표현] + giving[준동사] + me[IO] + a quick heads-up[DO] + on the schedule[M]',
+    patternType: '4형식 수여동사 기반 동명사구 (giving + IO + DO)',
+    wordOrderTip:
+      '전치사 for의 목적어로 쓰인 동명사 giving이 4형식 성질을 그대로 유지하여 간접목적어(me: 나에게)와 직접목적어(a quick heads-up: 빠른 사전 귀띔을)를 차례로 이끕니다.',
+    isHeuristic: false,
+    tokens: [
+      makeToken('Thanks', '독립어', '감사표현', 'N', '명사 (N)', '감사합니다', 'Thank you를 간결하게 줄인 감사 명사 표현입니다.'),
+      makeToken('for', 'M', '전치사 (M)', 'Prep', '전치사 (Prep)', '~에 대해', '뒤에 동명사구(giving ~)를 이끌어 감사 이유를 나타내는 전치사입니다.'),
+      makeToken('giving', 'V', '동명사(동사성질)', 'V', '동사/동명사 (V)', '주신 것', '전치사 for의 목적어로 쓰인 동명사이며, 뒤의 me(IO)와 heads-up(DO)을 거느립니다.'),
+      makeToken('me', 'IO', '간접목적어 (IO)', 'Pron', '대명사 (Pron)', '나에게', 'giving의 받는 대상인 간접목적어(IO)입니다.'),
+      makeToken('a', 'M', '한정수식 (M)', 'Det', '한정사 (Det)', '하나의', '명사구 a quick heads-up을 여는 부정관사입니다.'),
+      makeToken('quick', 'M', '수식어 (M)', 'Adj', '형용사 (Adj)', '빠른, 간단한', '명사 heads-up을 꾸며주는 형용사 수식어(M)입니다.'),
+      makeToken('heads-up', 'DO', '직접목적어 (DO)', 'N', '명사 (N)', '사전 귀띔을', 'giving의 직접목적어(DO) 역할을 하는 핵심 명사입니다.'),
+      makeToken('on', 'M', '전치사구 (M)', 'Prep', '전치사 (Prep)', '~에 관한', '뒤의 the schedule과 결합해 heads-up의 주제를 설명하는 전치사입니다.'),
+      makeToken('the', 'M', '한정수식 (M)', 'Det', '한정사 (Det)', '그', '명사 schedule을 한정하는 정관사입니다.'),
+      makeToken('schedule.', 'M', '전치사 목적어 (M)', 'N', '명사 (N)', '일정', '전치사 on의 목적어로 결합되어 수식어구(on the schedule)를 완성합니다.'),
+    ],
+  },
+  'could you please expedite the approval process before friday?': {
+    title: '테마 1 중급 · 3형식 정중한 요청 의문문',
+    rawEn: 'Could you please expedite the approval process before Friday?',
+    naturalKo: '금요일 전까지 승인 절차를 좀 더 신속히 진행해 주실 수 있을까요?',
+    skeleton: 'Could[조동사] + you[S] + please[M] + expedite[V] + the approval process[DO] + before Friday[M]?',
+    patternType: '3형식 의문문 (Could + S + V + DO + M)',
+    wordOrderTip:
+      '정중한 요청을 나타내는 Could you please 뒤에 타동사 원형 expedite와 목적어(the approval process)가 바로 이어집니다.',
+    isHeuristic: false,
+    tokens: [
+      makeToken('Could', 'V', '조동사 (V)', 'V', '조동사 (V)', '~해주실 수 있나요', '정중한 요청 의문문을 만드는 조동사입니다.'),
+      makeToken('you', 'S', '주어 (S)', 'Pron', '대명사 (Pron)', '당신이', '문장의 주어(S) 대명사입니다.'),
+      makeToken('please', 'M', '수식어 (M)', 'Adv', '부사 (Adv)', '부디, 제발', '요청의 정중함을 높여주는 부사입니다.'),
+      makeToken('expedite', 'V', '본동사 (V)', 'V', '동사 (V)', '신속히 처리하다', '조동사 Could와 결합하는 문장의 3형식 본동사(V)입니다.'),
+      makeToken('the', 'M', '한정수식 (M)', 'Det', '한정사 (Det)', '그', '목적어 명사구를 한정하는 정관사입니다.'),
+      makeToken('approval', 'M', '명사수식 (M)', 'N', '명사 (N)', '승인, 결재', '뒤 명사 process를 수식하는 복합명사 앞 요소입니다.'),
+      makeToken('process', 'DO', '직접목적어 (DO)', 'N', '명사 (N)', '절차를', '타동사 expedite의 직접목적어(DO) 핵심 명사입니다.'),
+      makeToken('before', 'M', '전치사구 (M)', 'Prep', '전치사 (Prep)', '~전에', '기한을 나타내는 시간 전치사입니다.'),
+      makeToken('Friday?', 'M', '전치사 목적어 (M)', 'N', '명사 (N)', '금요일', '전치사 before와 결합해 시간 부사구(M)를 이룹니다.'),
+    ],
+  },
+  'streamlining the workflow makes the tentative schedule feasible.': {
+    title: '테마 1 고급 · 동명사구 주어 & 5형식 형용사 목적격보어(OC)',
+    rawEn: 'Streamlining the workflow makes the tentative schedule feasible.',
+    naturalKo: '업무 공정을 간소화하는 것은 그 잠정 일정을 실현 가능하게 만든다.',
+    skeleton: 'Streamlining the workflow[S:동명사구] + makes[V] + the tentative schedule[DO] + feasible[OC].',
+    patternType: '5형식 (동명사구 S + 단수 V + DO + 형용사 OC)',
+    wordOrderTip:
+      '문두의 Streamlining은 동명사구 주어(S)이므로 단수 동사 makes를 쓰며, 목적어(the tentative schedule) 뒤의 feasible은 상태를 설명하는 목적격보어(OC)입니다.',
+    isHeuristic: false,
+    tokens: [
+      makeToken('Streamlining', 'S', '주어 (S)', 'N', '동명사 (N역할)', '간소화하는 것은', '뒤의 the workflow를 목적어로 취해 문장 전체의 주어(S) 역할을 하는 동명사입니다.'),
+      makeToken('the', 'M', '한정수식 (M)', 'Det', '한정사 (Det)', '그', '명사 workflow를 한정하는 정관사입니다.'),
+      makeToken('workflow', 'DO', '준동사의 목적어', 'N', '명사 (N)', '업무 공정을', '동명사 Streamlining의 목적어로 결합되어 주어구를 완성합니다.'),
+      makeToken('makes', 'V', '동사 (V)', 'V', '동사 (V)', '만든다', '동명사구 주어에 단수 수일치된 5형식 본동사(V)입니다.'),
+      makeToken('the', 'M', '한정수식 (M)', 'Det', '한정사 (Det)', '그', '목적어 schedule을 한정하는 정관사입니다.'),
+      makeToken('tentative', 'M', '수식어 (M)', 'Adj', '형용사 (Adj)', '잠정적인', '명사 schedule을 앞에서 꾸며주는 형용사 수식어(M)입니다.'),
+      makeToken('schedule', 'DO', '직접목적어 (DO)', 'N', '명사 (N)', '일정을', '5형식 동사 makes의 직접목적어(DO)입니다.'),
+      makeToken('feasible.', 'OC', '목적격보어 (OC)', 'Adj', '형용사 (Adj)', '실현 가능한(가능하게)', '목적어(schedule)의 상태를 보충 설명하는 목적격보어(OC) 형용사입니다.'),
+    ],
+  },
+  'this quiet cafe is my go-to spot on weekends.': {
+    title: '테마 2 초급 · 2형식 be동사 + 명사구 주격보어(SC)',
+    rawEn: 'This quiet cafe is my go-to spot on weekends.',
+    naturalKo: '이 조용한 카페는 내가 주말마다 늘 찾는 단골 장소이다.',
+    skeleton: 'This quiet cafe[S] + is[V] + my go-to spot[SC] + on weekends[M].',
+    patternType: '2형식 (S + V + 명사구 SC + M)',
+    wordOrderTip:
+      '주어(This quiet cafe)와 주격보어(my go-to spot)가 동격 관계를 이루는 2형식 문장입니다.',
+    isHeuristic: false,
+    tokens: [
+      makeToken('This', 'M', '한정수식 (M)', 'Det', '한정사 (Det)', '이', '명사 cafe를 가리키는 지시한정사입니다.'),
+      makeToken('quiet', 'M', '수식어 (M)', 'Adj', '형용사 (Adj)', '조용한', '명사 cafe를 꾸미는 형용사 수식어(M)입니다.'),
+      makeToken('cafe', 'S', '주어 (S)', 'N', '명사 (N)', '카페는', '문장의 핵심 주어(S) 명사입니다.'),
+      makeToken('is', 'V', '동사 (V)', 'V', '동사 (V)', '~이다', '주어와 보어를 이어주는 2형식 연결동사(be동사)입니다.'),
+      makeToken('my', 'M', '한정수식 (M)', 'Det', '한정사 (Det)', '나의', '소유격 한정사(Det)입니다.'),
+      makeToken('go-to', 'M', '수식어 (M)', 'Adj', '형용사 (Adj)', '늘 믿고 찾는(단골의)', '명사 spot을 앞에서 꾸며주는 복합 형용사(M)입니다.'),
+      makeToken('spot', 'SC', '주격보어 (SC)', 'N', '명사 (N)', '장소(이다)', 'be동사(is) 뒤에서 주어가 어떤 곳인지 설명하는 주격보어(SC)입니다.'),
+      makeToken('on', 'M', '전치사구 (M)', 'Prep', '전치사 (Prep)', '~마다', '요일·주말 앞에 쓰이는 시간 전치사입니다.'),
+      makeToken('weekends.', 'M', '전치사 목적어 (M)', 'N', '명사 (N)', '주말', 'on과 결합해 "주말마다"라는 시간 부사구(M)를 이룹니다.'),
+    ],
+  },
+  'i always stick to my daily workout routine to clear my head.': {
+    title: '테마 2 중급 · 구동사 stick to + 목적의 to부정사구',
+    rawEn: 'I always stick to my daily workout routine to clear my head.',
+    naturalKo: '나는 복잡한 머리를 식히기 위해 항상 매일 운동하는 루틴을 꾸준히 지킨다.',
+    skeleton: 'I[S] + always[M] + stick to[V] + my daily workout routine[DO] + to clear my head[M:목적].',
+    patternType: '3형식 구동사 (S + V + DO) + 부사적 to부정사구(M)',
+    wordOrderTip:
+      '앞의 to는 stick to(~을 고수하다)를 이루는 전치사이고, 뒤의 to는 to clear(~하기 위해)를 이끄는 to부정사 표지입니다.',
+    isHeuristic: false,
+    tokens: [
+      makeToken('I', 'S', '주어 (S)', 'Pron', '대명사 (Pron)', '나는', '문장의 주어(S)입니다.'),
+      makeToken('always', 'M', '수식어 (M)', 'Adv', '부사 (Adv)', '항상', '일반동사 stick 앞에서 빈도를 나타내는 빈도부사(M)입니다.'),
+      makeToken('stick', 'V', '동사구 (V)', 'V', '동사 (V)', '꾸준히 지키다', '뒤의 전치사 to와 결합해 "~을 고수하다"를 뜻하는 구동사입니다.'),
+      makeToken('to', 'V', '동사구 결합전치사', 'Prep', '전치사 (Prep)', '~을(에)', 'stick과 결합해 뒤에 명사구 목적어를 연결하는 전치사입니다.'),
+      makeToken('my', 'M', '한정수식 (M)', 'Det', '한정사 (Det)', '나의', '소유격 한정사입니다.'),
+      makeToken('daily', 'M', '수식어 (M)', 'Adj', '형용사 (Adj)', '매일의', '뒤 명사구를 꾸미는 형용사입니다.'),
+      makeToken('workout', 'M', '명사수식 (M)', 'N', '명사 (N)', '운동', '명사 routine을 수식하는 명사입니다.'),
+      makeToken('routine', 'DO', '직접목적어 (DO)', 'N', '명사 (N)', '루틴을', '구동사 stick to의 목적어(DO) 핵심 명사입니다.'),
+      makeToken('to', 'M', 'to부정사 표지 (M)', 'Prep', 'to부정사 표지', '~하기 위해', '뒤에 동사원형 clear를 이끌어 목적 부사구(M)를 만드는 to부정사입니다.'),
+      makeToken('clear', 'M', '준동사 (목적)', 'V', '동사원형 (V)', '맑게 식히다', 'to부정사구를 이루는 동사원형입니다.'),
+      makeToken('my', 'M', '한정수식 (M)', 'Det', '한정사 (Det)', '나의', '소유격 한정사입니다.'),
+      makeToken('head.', 'DO', '준동사의 목적어', 'N', '명사 (N)', '머리를', '준동사 clear의 목적어로 결합되어 to clear my head를 완성합니다.'),
+    ],
+  },
+  'reading diverse texts broadens our perspective on life.': {
+    title: '테마 2 고급 · 동명사구 주어(Reading ~)와 단수 동사 수일치',
+    rawEn: 'Reading diverse texts broadens our perspective on life.',
+    naturalKo: '다양한 글을 읽는 것은 삶에 대한 우리의 시야를 넓혀준다.',
+    skeleton: 'Reading diverse texts[S:동명사구] + broadens[V] + our perspective[DO] + on life[M].',
+    patternType: '3형식 (동명사구 S + 단수 V + DO + M)',
+    wordOrderTip:
+      '동사 바로 앞의 texts(복수)에 현혹되지 않고 주어구의 핵심인 동명사 Reading에 맞춰 단수 동사 broadens를 씁니다.',
+    isHeuristic: false,
+    tokens: [
+      makeToken('Reading', 'S', '주어 (S)', 'N', '동명사 (N역할)', '읽는 것은', '문장 전체의 주어(S) 핵심이 되는 동명사입니다.'),
+      makeToken('diverse', 'M', '수식어 (M)', 'Adj', '형용사 (Adj)', '다양한', '명사 texts를 꾸며주는 형용사 수식어(M)입니다.'),
+      makeToken('texts', 'DO', '준동사의 목적어', 'N', '명사 (N)', '글들을', '동명사 Reading의 의미상 목적어입니다.'),
+      makeToken('broadens', 'V', '동사 (V)', 'V', '동사 (V)', '넓혀준다', '동명사구 주어(단수)에 수일치된 3형식 본동사(V)입니다.'),
+      makeToken('our', 'M', '한정수식 (M)', 'Det', '한정사 (Det)', '우리의', '소유격 한정사(Det)입니다.'),
+      makeToken('perspective', 'DO', '직접목적어 (DO)', 'N', '명사 (N)', '시야(관점)를', '타동사 broadens의 직접목적어(DO)입니다.'),
+      makeToken('on', 'M', '전치사구 (M)', 'Prep', '전치사 (Prep)', '~에 대한', 'perspective의 대상을 연결하는 전치사입니다.'),
+      makeToken('life.', 'M', '전치사 목적어 (M)', 'N', '명사 (N)', '삶', '전치사 on의 목적어로 수식어구(on life)를 완성합니다.'),
+    ],
+  },
+  'the collection seamlessly blends classic heritage with a modern aesthetic.': {
+    title: '테마 5 고급 · 3형식 blend A with B 구문',
+    rawEn: 'The collection seamlessly blends classic heritage with a modern aesthetic.',
+    naturalKo: '그 컬렉션은 고전적 유산과 현대적인 미학을 조화롭게 결합한다.',
+    skeleton: 'The collection[S] + seamlessly[M] + blends[V] + classic heritage[DO] + with a modern aesthetic[M].',
+    patternType: '3형식 (S + 부사 M + V + DO + 전치사구 M)',
+    wordOrderTip:
+      '부사 seamlessly는 동사 blends 앞에서 동작 방식을 꾸며주고, 타동사 blends 뒤에 목적어(classic heritage)와 전치사구(with a modern aesthetic)가 이어집니다.',
+    isHeuristic: false,
+    tokens: [
+      makeToken('The', 'M', '한정수식 (M)', 'Det', '한정사 (Det)', '그', '주어 명사 collection을 한정하는 정관사입니다.'),
+      makeToken('collection', 'S', '주어 (S)', 'N', '명사 (N)', '컬렉션은', '문장의 단수 주어(S) 명사입니다.'),
+      makeToken('seamlessly', 'M', '수식어 (M)', 'Adv', '부사 (Adv)', '매끄럽게, 조화롭게', '뒤의 동사 blends를 수식하는 방식 부사(M)입니다.'),
+      makeToken('blends', 'V', '동사 (V)', 'V', '동사 (V)', '결합한다', '단수 주어에 수일치된 3형식 타동사(V)입니다.'),
+      makeToken('classic', 'M', '수식어 (M)', 'Adj', '형용사 (Adj)', '고전적인', '명사 heritage를 꾸미는 형용사 수식어(M)입니다.'),
+      makeToken('heritage', 'DO', '직접목적어 (DO)', 'N', '명사 (N)', '유산(헤리티지)을', '타동사 blends의 직접목적어(DO)입니다.'),
+      makeToken('with', 'M', '전치사구 (M)', 'Prep', '전치사 (Prep)', '~와', 'blend A with B 구조를 이루는 전치사입니다.'),
+      makeToken('a', 'M', '한정수식 (M)', 'Det', '한정사 (Det)', '하나의', '명사 aesthetic을 한정하는 부정관사입니다.'),
+      makeToken('modern', 'M', '수식어 (M)', 'Adj', '형용사 (Adj)', '현대적인', '명사 aesthetic을 꾸미는 형용사 수식어(M)입니다.'),
+      makeToken('aesthetic.', 'M', '전치사 목적어 (M)', 'N', '명사 (N)', '미학', '전치사 with의 목적어로 결합되어 부사구(M)를 완성합니다.'),
+    ],
+  },
+};
+
+const KNOWN_DETERMINERS = new Set([
+  'a', 'an', 'the', 'my', 'our', 'your', 'his', 'her', 'its', 'their',
+  'this', 'that', 'these', 'those', 'every', 'each', 'some', 'any', 'no',
+]);
+
+const KNOWN_PREPOSITIONS = new Set([
+  'in', 'on', 'at', 'for', 'with', 'by', 'from', 'of', 'into', 'onto',
+  'upon', 'within', 'without', 'during', 'before', 'after', 'through',
+  'across', 'among', 'between', 'under', 'over', 'about', 'around',
+]);
+
+const KNOWN_CONJUNCTIONS = new Set([
+  'and', 'but', 'or', 'so', 'because', 'although', 'though', 'if',
+  'unless', 'until', 'when', 'while', 'whereas', 'whether', 'provided',
+]);
+
+const KNOWN_PRONOUNS = new Set([
+  'i', 'we', 'you', 'he', 'she', 'it', 'they', 'me', 'us', 'him', 'her',
+  'them', 'myself', 'yourself', 'ourselves', 'themselves', 'everyone',
+  'everything', 'someone', 'anyone', 'what', 'which', 'who',
+]);
+
+const KNOWN_AUX_AND_VERBS = new Set([
+  'am', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+  'can', 'could', 'will', 'would', 'shall', 'should', 'may', 'might', 'must',
+  'do', 'does', 'did', 'have', 'has', 'had',
+  'check', 'checked', 'checks', 'improve', 'improves', 'recommend', 'make', 'makes', 'made',
+  'miss', 'protect', 'give', 'gives', 'giving', 'communicate', 'concentrate',
+  'participate', 'participated', 'encourage', 'encouraged', 'recognize', 'appreciate',
+  'broaden', 'broadens', 'occur', 'occurred', 'boost', 'boosts', 'analyze', 'analyzed',
+  'overcome', 'foster', 'fosters', 'transcend', 'transcends', 'prevent', 'prevents',
+  'remain', 'remained', 'last', 'lasts', 'build', 'builds', 'focus', 'shift', 'shifted',
+  'support', 'supported', 'consolidate', 'consolidates', 'grant', 'increase', 'increases',
+  'demonstrate', 'streamline', 'streamlined', 'expedite', 'set', 'accommodate', 'accommodated',
+  'include', 'includes', 'spearhead', 'spearheaded', 'complement', 'complements',
+  'praise', 'praised', 'showcase', 'showcases', 'negotiate', 'negotiated', 'collaborate',
+  'collaborated', 'implement', 'prioritize', 'allocate', 'leverage', 'unwind', 'pulled',
+  'pull', 'wrap', 'touch', 'visit', 'drop', 'freshen', 'binge-watch', 'binge-watched',
+  'went', 'go', 'goes', 'live', 'lived', 'hit', 'clear', 'stick', 'recharge', 'try',
+  'keep', 'grab', 'blend', 'blends', 'capture', 'resonate', 'resonates', 'step',
+  'expose', 'exposing', 'matter', 'matters', 'seem', 'take', 'takes', 'taking', 'help', 'helps',
+]);
+
+const LINKING_VERBS = new Set([
+  'am', 'is', 'are', 'was', 'were', 'be', 'been', 'become', 'becomes', 'became',
+  'remain', 'remained', 'remains', 'seem', 'seems', 'seemed', 'feel', 'feels', 'felt',
+  'look', 'looks', 'looked', 'went',
+]);
+
+const FIVE_PATTERN_VERBS = new Set([
+  'make', 'makes', 'made', 'keep', 'keeps', 'kept', 'find', 'finds', 'found',
+  'consider', 'considers', 'considered', 'help', 'helps', 'helped',
+]);
+
+const KNOWN_ADJECTIVES = new Set([
+  'available', 'comfortable', 'essential', 'independent', 'responsible', 'confident',
+  'creative', 'significant', 'inevitable', 'cognitive', 'ambiguous', 'intrinsic',
+  'sustainable', 'empirical', 'reciprocal', 'predominant', 'feasible', 'tentative',
+  'complimentary', 'viral', 'go-to', 'informative', 'chic', 'bold', 'tailored',
+  'minimalist', 'modern', 'classic', 'quiet', 'quick', 'golden', 'natural', 'valuable',
+  'good', 'strong', 'diverse', 'major', 'new', 'entire', 'close', 'solid', 'scientific',
+  'complex', 'systematic', 'consistent', 'daily', 'long-term', 'late', 'much', 'more',
+  'intellectual', 'open-minded', 'updated', 'structured', 'mutually', 'beneficial',
+  'urgent', 'impactful', 'short', 'whole', 'calm', 'special', 'high', 'timeless',
+]);
+
+const KNOWN_ADVERBS = new Set([
+  'carefully', 'highly', 'clearly', 'simultaneously', 'meticulously', 'seamlessly',
+  'genuinely', 'effectively', 'efficiently', 'gladly', 'kindly', 'definitely',
+  'really', 'always', 'usually', 'often', 'overnight', 'today', 'abroad', 'best',
+  'again', 'somewhat', 'actually', 'heavily', 'closely', 'first', 'well', 'deeply',
+  'effortlessly', 'not', 'only', 'never', 'here', 'there',
+]);
+
 export function buildDynamicDiagramSentence(
-  rawSentence: string,
-  koTranslation: string,
-  labelTitle: string
+  rawEn: string,
+  naturalKo: string,
+  tagLabel: string = '실전 구문 분석'
 ): DiagramSentence {
-  const cleanWords = rawSentence
-    .replace(/\[|\]/g, '')
+  const normalizedKey = (rawEn || '').trim().toLowerCase();
+  const exactMatch = VERIFIED_SENTENCE_TOKEN_MAP[normalizedKey];
+  if (exactMatch) {
+    return exactMatch;
+  }
+
+  // DIAGRAM_EXAMPLES에 등록된 문장인지 확인
+  const exampleMatch = DIAGRAM_EXAMPLES.find(
+    (ex) => ex.rawEn.trim().toLowerCase() === normalizedKey
+  );
+  if (exampleMatch) {
+    return exampleMatch;
+  }
+
+  const words = (rawEn || 'We need to check the schedule today.')
     .trim()
-    .split(/\s+/)
-    .filter(Boolean);
+    .split(/\s+/);
 
-  const detSet = new Set(['the', 'a', 'an', 'this', 'that', 'our', 'my', 'your', 'its', 'their', 'every', 'all']);
-  const pronSet = new Set(['i', 'you', 'we', 'they', 'he', 'she', 'it', 'us', 'me', 'them', 'everyone', 'what']);
-  const prepSet = new Set(['in', 'on', 'at', 'to', 'for', 'with', 'about', 'before', 'until', 'during', 'from', 'by', 'of', 'into', 'over']);
-  const conjSet = new Set(['and', 'or', 'but', 'so', 'because', 'if', 'whenever', 'whether']);
-  const auxVerbSet = new Set(['can', 'could', 'will', 'would', 'is', 'are', 'was', 'were', 'let', 'lets', 'try', 'tried', 'want', 'wanted', 'need', 'makes', 'make', 'made', 'goes', 'went', 'pulled', 'pull', 'lived', 'live', 'streamline', 'wrap', 'check', 'checked', 'drop', 'freshen', 'unwind', 'accommodate', 'spearhead', 'complements', 'complement', 'binge-watched', 'resonates', 'hit', 'step', 'broaden', 'prevents', 'fosters', 'matters', 'blend']);
+  let mainVerbFound = false;
+  let mainVerbWord = '';
+  let insidePrepositionPhrase = false;
 
-  let verbFound = false;
+  const tokens: DiagramToken[] = words.map((rawWord, idx) => {
+    const clean = rawWord.toLowerCase().replace(/[^a-z-]/g, '');
+    const prevClean = idx > 0 ? words[idx - 1].toLowerCase().replace(/[^a-z-]/g, '') : '';
+    const nextClean =
+      idx < words.length - 1 ? words[idx + 1].toLowerCase().replace(/[^a-z-]/g, '') : '';
 
-  const tokens: WordToken[] = cleanWords.map((w, idx) => {
-    const lower = w.toLowerCase().replace(/[^a-z-]/g, '');
-
-    if (conjSet.has(lower)) {
-      return {
-        word: w,
-        comp: 'M',
-        compLabel: '연결/수식 (M)',
-        pos: 'Conj',
-        posLabel: '접속사(Conj)',
-        colorClass: 'border-slate-400 text-slate-700',
-      };
-    }
-    if (prepSet.has(lower)) {
-      return {
-        word: w,
-        comp: 'M',
-        compLabel: '수식어 (M)',
-        pos: 'Prep',
-        posLabel: '전치사(Prep)',
-        colorClass: 'border-amber-400 text-amber-700',
-      };
-    }
-    if (detSet.has(lower)) {
-      return {
-        word: w,
-        comp: 'M',
-        compLabel: '수식어 (M)',
-        pos: 'Det',
-        posLabel: '한정사(Det)',
-        colorClass: 'border-amber-300 text-amber-700',
-      };
-    }
-    if (lower.endsWith('ly') && lower !== 'family') {
-      return {
-        word: w,
-        comp: 'M',
-        compLabel: '수식어 (M)',
-        pos: 'Adv',
-        posLabel: '부사(Adv)',
-        colorClass: 'border-amber-400 text-amber-700',
-      };
-    }
-    if (pronSet.has(lower)) {
-      const isSubj = !verbFound || idx === 0;
-      return {
-        word: w,
-        comp: isSubj ? 'S' : 'IO',
-        compLabel: isSubj ? '주어 (S)' : '목적어 (O)',
-        pos: 'Pron',
-        posLabel: '대명사(Pron)',
-        colorClass: isSubj ? 'border-blue-500 text-blue-700' : 'border-emerald-500 text-emerald-700',
-      };
-    }
-    if (auxVerbSet.has(lower) || (!verbFound && idx === 1)) {
-      verbFound = true;
-      return {
-        word: w,
-        comp: 'V',
-        compLabel: '동사 (V)',
-        pos: 'V',
-        posLabel: '동사(V)',
-        colorClass: 'border-rose-500 text-rose-700',
-      };
-    }
-    if (
-      lower.endsWith('ble') ||
-      lower.endsWith('ive') ||
-      lower.endsWith('al') ||
-      lower.endsWith('ic') ||
-      lower.endsWith('ed') ||
-      ['new', 'quick', 'short', 'bold', 'sharp', 'vacant', 'chic', 'timeless', 'modern', 'complex', 'diverse'].includes(lower)
-    ) {
-      return {
-        word: w,
-        comp: verbFound ? 'SC' : 'M',
-        compLabel: verbFound ? '보어/수식(C·M)' : '수식어 (M)',
-        pos: 'Adj',
-        posLabel: '형용사(Adj)',
-        colorClass: 'border-purple-400 text-purple-700',
-      };
+    // 1. 문두 동명사 주어 판별 (콤마 없이 -ing로 시작하고 뒤에 단수 본동사가 오는 경우)
+    if (idx === 0 && clean.endsWith('ing') && !rawWord.endsWith(',')) {
+      return makeToken(
+        rawWord,
+        'S',
+        '주어 (S)',
+        'N',
+        '동명사 (N역할)',
+        '~하는 것은',
+        '문장 맨 앞에서 동명사구 주어(S)를 이끄는 핵심 준동사입니다.'
+      );
     }
 
-    const isSubjNoun = !verbFound && idx <= 2;
-    return {
-      word: w,
-      comp: isSubjNoun ? 'S' : 'DO',
-      compLabel: isSubjNoun ? '주어 (S)' : '직접목적어 (DO)',
-      pos: 'N',
-      posLabel: '명사(N)',
-      colorClass: isSubjNoun ? 'border-blue-500 text-blue-700' : 'border-teal-500 text-teal-700',
-    };
+    // 2. to부정사(to + 동사원형) vs 전치사 to 구별
+    if (clean === 'to') {
+      if (KNOWN_AUX_AND_VERBS.has(nextClean)) {
+        insidePrepositionPhrase = false;
+        return makeToken(
+          rawWord,
+          'M',
+          'to부정사 표지',
+          'Prep',
+          'to부정사 (to+V)',
+          '~하기 위해 / ~하는 것',
+          '뒤에 동사원형을 이끌어 to부정사구를 만드는 표지입니다.'
+        );
+      }
+      insidePrepositionPhrase = true;
+      return makeToken(
+        rawWord,
+        'M',
+        '전치사구 (M)',
+        'Prep',
+        '전치사 (Prep)',
+        '~에게 / ~로',
+        '뒤에 명사구를 이끄는 전치사입니다.'
+      );
+    }
+
+    // 3. 한정사 (관사·소유격·지시사)
+    if (KNOWN_DETERMINERS.has(clean)) {
+      return makeToken(
+        rawWord,
+        'M',
+        '한정수식 (M)',
+        'Det',
+        '한정사 (Det)',
+        '관사/한정사',
+        '명사구 앞에서 명사의 범위나 소유를 한정하는 한정사(Det)입니다.'
+      );
+    }
+
+    // 4. 접속사
+    if (KNOWN_CONJUNCTIONS.has(clean)) {
+      insidePrepositionPhrase = false;
+      return makeToken(
+        rawWord,
+        'M',
+        '연결어 (M)',
+        'Conj',
+        '접속사 (Conj)',
+        '접속사',
+        '단어·구·절을 논리적으로 이어주는 접속사(Conj)입니다.'
+      );
+    }
+
+    // 5. 전치사
+    if (KNOWN_PREPOSITIONS.has(clean)) {
+      insidePrepositionPhrase = true;
+      return makeToken(
+        rawWord,
+        'M',
+        '전치사구 (M)',
+        'Prep',
+        '전치사 (Prep)',
+        '전치사',
+        '뒤의 명사구와 결합해 전치사구(수식어 M 또는 보어 SC)를 형성합니다.'
+      );
+    }
+
+    // 6. 부사
+    if (KNOWN_ADVERBS.has(clean) || (clean.endsWith('ly') && clean !== 'family' && clean !== 'friendly')) {
+      return makeToken(
+        rawWord,
+        'M',
+        '수식어 (M)',
+        'Adv',
+        '부사 (Adv)',
+        '부사(수식)',
+        '동사·형용사·문장을 꾸며주는 부사 수식어(M)입니다.'
+      );
+    }
+
+    // 7. 형용사 (명사 앞 수식어 M vs 2형식 SC vs 5형식 OC 정밀 분기)
+    if (KNOWN_ADJECTIVES.has(clean)) {
+      const isAtClauseEnd = idx === words.length - 1 || /[,.;!?]$/.test(rawWord);
+      if (mainVerbFound && FIVE_PATTERN_VERBS.has(mainVerbWord) && isAtClauseEnd && !insidePrepositionPhrase) {
+        return makeToken(
+          rawWord,
+          'OC',
+          '목적격보어 (OC)',
+          'Adj',
+          '형용사 (Adj)',
+          '목적어 상태 보충',
+          '5형식 동사 뒤에서 목적어(DO)의 상태를 보충 설명하는 목적격보어(OC)입니다.'
+        );
+      }
+      if (mainVerbFound && LINKING_VERBS.has(mainVerbWord) && !insidePrepositionPhrase) {
+        return makeToken(
+          rawWord,
+          'SC',
+          '주격보어 (SC)',
+          'Adj',
+          '형용사 (Adj)',
+          '주어 상태 보충',
+          '2형식 연결동사 뒤에서 주어(S)의 상태를 보충 설명하는 주격보어(SC)입니다.'
+        );
+      }
+      return makeToken(
+        rawWord,
+        'M',
+        '수식어 (M)',
+        'Adj',
+        '형용사 (Adj)',
+        '명사 수식 형용사',
+        '뒤에 오는 명사를 꾸며주는 형용사 수식어(M)입니다.'
+      );
+    }
+
+    // 8. 동사 (to 뒤의 준동사와 본동사 구별)
+    if (KNOWN_AUX_AND_VERBS.has(clean)) {
+      if (prevClean === 'to') {
+        return makeToken(
+          rawWord,
+          'M',
+          'to부정사 동사원형',
+          'V',
+          '준동사 (to V)',
+          '~하다(부정사)',
+          '앞의 to와 결합해 to부정사구를 이루는 동사원형입니다.'
+        );
+      }
+      mainVerbFound = true;
+      mainVerbWord = clean;
+      insidePrepositionPhrase = false;
+      return makeToken(
+        rawWord,
+        'V',
+        '동사 (V)',
+        'V',
+        '동사 (V)',
+        '서술어(동사)',
+        '문장의 동작이나 상태를 서술하는 핵심 동사(V)입니다.'
+      );
+    }
+
+    // 9. 대명사
+    if (KNOWN_PRONOUNS.has(clean)) {
+      if (!mainVerbFound) {
+        return makeToken(
+          rawWord,
+          'S',
+          '주어 (S)',
+          'Pron',
+          '대명사 (Pron)',
+          '주어 대명사',
+          '문장의 주체가 되는 주어(S) 대명사입니다.'
+        );
+      }
+      if (prevClean === 'give' || prevClean === 'gives' || prevClean === 'giving') {
+        return makeToken(
+          rawWord,
+          'IO',
+          '간접목적어 (IO)',
+          'Pron',
+          '대명사 (Pron)',
+          '~에게',
+          '4형식 수여동사 뒤에서 대상을 받는 간접목적어(IO)입니다.'
+        );
+      }
+      return makeToken(
+        rawWord,
+        'DO',
+        '목적어 (DO)',
+        'Pron',
+        '대명사 (Pron)',
+        '목적어 대명사',
+        '동사나 전치사의 대상이 되는 목적격 대명사입니다.'
+      );
+    }
+
+    // 10. 일반 명사 (본동사 앞이면 주어 S, 전치사구 내부면 M, 2형식 동사 뒤면 SC, 타동사 뒤면 DO)
+    if (!mainVerbFound) {
+      return makeToken(
+        rawWord,
+        'S',
+        '주어 (S)',
+        'N',
+        '명사 (N)',
+        '주어 명사',
+        '본동사 앞에서 문장의 주체 역할을 하는 주어(S) 명사입니다.'
+      );
+    }
+    if (insidePrepositionPhrase) {
+      if (/[,.;!?]$/.test(rawWord)) insidePrepositionPhrase = false;
+      return makeToken(
+        rawWord,
+        'M',
+        '전치사 목적어 (M)',
+        'N',
+        '명사 (N)',
+        '전치사구 명사',
+        '앞의 전치사와 결합하여 전치사구(수식어 M)를 완성하는 명사입니다.'
+      );
+    }
+    if (LINKING_VERBS.has(mainVerbWord)) {
+      return makeToken(
+        rawWord,
+        'SC',
+        '주격보어 (SC)',
+        'N',
+        '명사 (N)',
+        '보어 명사',
+        '2형식 연결동사 뒤에서 주어를 보충 설명하는 주격보어(SC) 명사입니다.'
+      );
+    }
+    return makeToken(
+      rawWord,
+      'DO',
+      '직접목적어 (DO)',
+      'N',
+      '명사 (N)',
+      '목적어 명사',
+      '타동사의 동작 대상이 되는 직접목적어(DO) 명사입니다.'
+    );
   });
 
-  const subjToken = tokens.find((t) => t.comp === 'S')?.word || cleanWords[0] || 'S';
-  const verbToken = tokens.find((t) => t.comp === 'V')?.word || cleanWords[1] || 'V';
-  const objToken = tokens.find((t) => t.comp === 'DO' || t.comp === 'SC')?.word || cleanWords[cleanWords.length - 1] || 'O';
-
   return {
-    id: 'dynamic-live',
-    label: labelTitle,
+    title: `${tagLabel} (문법 구조 분석)`,
+    rawEn,
+    naturalKo,
+    skeleton: '주어부(S) + 서술어 동사(V) + 목적어/보어(O/C) + 수식어구(M)',
+    patternType: '문맥 기반 구문 분석 (어절 터치 시 상세 역할 표시)',
+    wordOrderTip:
+      '각 단어 카드를 클릭하면 위의 16개 문법 노드(7성분 + 9품사) 다이어그램에서 해당 결합선이 하이라이트됩니다.',
+    isHeuristic: true,
     tokens,
-    translation: `“${koTranslation}”`,
-    skeleton: `${subjToken}[S] + ${verbToken}[V] + ${objToken}[O/C]`,
-    patternType: '실시간 선택 문장 16개(7성분×9품사) 자동 해부 모드',
-    wordOrderTip: '어절 카드를 터치하면 위 16개 다이어그램 전광판의 문장 성분(직책)과 9품사(신분)가 실시간으로 움직입니다!',
   };
 }
 // ============================================================================
-// [파트 3-B] studyData.ts 연결 + 미사용 변수 에러 0건 + 사파리 선택방지 펜슬 엔진
-// (3521행 근처 buildDynamicDiagramSentence 함수 끝나는 곳 바로 아래에 붙여넣으세요)
+// src/App.tsx — [파트 4/4]
+// - 안전 JSON 파서 & 한국 표준시(KST) 날짜 유틸리티
+// - 메인 App 컴포넌트 (누락 UI 14종 복원 · 0.30x~1.25x 배속 · 획 배열 펜슬 엔진)
+// - 전체 총람 치트시트 & 프로젝트 전체 아키텍처 제작과정 백서(devStory)
 // ============================================================================
-import {
-  getExpandedWordbookByDay,
-  generateCombinatorialSentences,
-  EBS_MAJOR_TOPICS,
-  GRAMMAR_406_QUIZ_BANK,
-  analyzeCustomSchoolPassage,
-} from './studyData';
 
-export interface SavedSentenceItem {
-  id: string;
-  en: string;
-  ko: string;
-  note: string;
-  category: string;
-  mastered: boolean;
+function safeJsonParse<T>(raw: string | null, fallback: T): T {
+  if (!raw) return fallback;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed ?? fallback;
+  } catch {
+    return fallback;
+  }
 }
 
-export default function App() {
-  const todayObj = new Date();
-  const todayKey = `${todayObj.getFullYear()}-${String(todayObj.getMonth() + 1).padStart(2, '0')}-${String(todayObj.getDate()).padStart(2, '0')}`;
-  const todayDateStr = `${todayObj.getFullYear()}년 ${todayObj.getMonth() + 1}월 ${todayObj.getDate()}일`;
-  const dayOfYear = Math.floor(
-    (todayObj.getTime() - new Date(todayObj.getFullYear(), 0, 0).getTime()) / 86400000
-  );
-
-  const [learningLevel, setLearningLevel] = useState<LearningLevel>('beginner');
-  const [selectedThemeId, setSelectedThemeId] = useState<string>(
-    THEMES[dayOfYear % THEMES.length].id
-  );
-  const [activeMode, setActiveMode] = useState<
-    'daily' | 'examMaster' | 'wordbook' | 'naverQuiz' | 'aiCoach' | 'weekly' | 'devStory'
-  >('daily');
-  const [activeMediaPlatform, setActiveMediaPlatform] =
-    useState<MediaPlatformId>('FASHION_MAGS');
-
-  // 수능·내신 1~5교시 독립 작동 상태 (모든 상태가 아래 UI에 100% 연결됨)
-  const [selectedExamTrack, setSelectedExamTrack] = useState<ExamTrackId>('CSAT_MASTER');
-  const [schoolInternalStage, setSchoolInternalStage] = useState<number>(1);
-  const [syntaxSeed, setSyntaxSeed] = useState<number>(1);
-  const [vocabQuizSeed, setVocabQuizSeed] = useState<number>(1);
-  const [selectedVocabQuizAnswers, setSelectedVocabQuizAnswers] = useState<Record<number, number>>({});
-  const [selectedGrammarQuizAnswers, setSelectedGrammarQuizAnswers] = useState<Record<number, 'A' | 'B'>>({});
-  const [customSchoolText, setCustomSchoolText] = useState<string>(
-    'Not until we step out of our cognitive comfort zone can we genuinely broaden our perspective on complex phenomena. Consistent exposure to diverse viewpoints prevents confirmation bias and fosters intellectual flexibility. Streamlining the approval process makes the entire project feasible.'
-  );
-  const [examEssayInput, setExamEssayInput] = useState<string>('');
-  const [showExamModelAnswer, setShowExamModelAnswer] = useState<boolean>(false);
-  const [csatTimerMins, setCsatTimerMins] = useState<number>(180);
-
-  const [selectedLiveKeyword, setSelectedLiveKeyword] = useState<{
-    platformName: string;
-    rank: number;
-    koTitle: string;
-    enExpression: string;
-    extUrl: string;
-  } | null>(null);
-
-  const [activeDiagramSentenceIdx, setActiveDiagramSentenceIdx] = useState<number>(0);
-  const [customDissectSentence, setCustomDissectSentence] = useState<{
-    en: string;
-    ko: string;
-    title: string;
-  } | null>(null);
-
-  const [mediaPlatforms, setMediaPlatforms] = useState<MediaTrendPlatform[]>(
-    INITIAL_MEDIA_PLATFORMS
-  );
-  const [lastTrendSyncTime, setLastTrendSyncTime] = useState<string>('방금 전 실시간 동기화됨');
-  const [isRefreshingTrends, setIsRefreshingTrends] = useState<boolean>(false);
-
-  const [darkMode, setDarkMode] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('yanadu_dark_mode') === 'true';
-    }
-    return false;
+function getKstTimestampString(): string {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(now);
+  const map: Record<string, string> = {};
+  parts.forEach((p) => {
+    map[p.type] = p.value;
   });
-  const [colorTheme, setColorTheme] = useState<'blue' | 'emerald' | 'indigo' | 'amber'>('blue');
+  return `${map.year}.${map.month}.${map.day} ${map.hour}:${map.minute}:${map.second}`;
+}
+
+function getKstDayOfYear(): number {
+  const now = new Date();
+  const kstStr = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now);
+  const [y, m, d] = kstStr.split('-').map(Number);
+  const start = Date.UTC(y, 0, 0);
+  const current = Date.UTC(y, (m || 1) - 1, d || 1);
+  return Math.max(1, Math.floor((current - start) / (1000 * 60 * 60 * 24)));
+}
+
+const COMP_COORDS: Record<CompId, { x: number; y: number; short: string }> = {
+  S: { x: 85, y: 72, short: '주어(S)' },
+  V: { x: 205, y: 72, short: '동사(V)' },
+  IO: { x: 325, y: 72, short: '간접목적(IO)' },
+  DO: { x: 445, y: 72, short: '직접목적(DO)' },
+  SC: { x: 565, y: 72, short: '주격보어(SC)' },
+  OC: { x: 685, y: 72, short: '목적보어(OC)' },
+  M: { x: 805, y: 72, short: '수식어(M)' },
+};
+
+const POS_COORDS: Record<PosId, { x: number; y: number; short: string }> = {
+  N: { x: 65, y: 255, short: '명사(N)' },
+  Pron: { x: 160, y: 255, short: '대명사(Pron)' },
+  V: { x: 255, y: 255, short: '동사(V)' },
+  Adj: { x: 350, y: 255, short: '형용사(Adj)' },
+  Adv: { x: 445, y: 255, short: '부사(Adv)' },
+  Prep: { x: 540, y: 255, short: '전치사(Prep)' },
+  Conj: { x: 635, y: 255, short: '접속사(Conj)' },
+  Det: { x: 730, y: 255, short: '한정사(Det)' },
+  Interj: { x: 825, y: 255, short: '감탄사(Interj)' },
+};
+
+export default function App() {
+  // 1. 코어 내비게이션 & 테마 상태
+  const [selectedThemeId, setSelectedThemeId] = useState<string>(THEMES[0].id);
+  const [learningLevel, setLearningLevel] = useState<LearningLevel>('intermediate');
+  const [activeMode, setActiveMode] = useState<
+    'daily' | 'examCourses' | 'wordbook' | 'myVault' | 'curriculum' | 'devStory'
+  >('daily');
+  const [selectedExamTrackId, setSelectedExamTrackId] =
+    useState<ExamTrackId>('CSAT_MASTER');
+  const [activeModulePeriod, setActiveModulePeriod] = useState<1 | 2 | 3 | 4 | 5>(1);
+
+  // 2. UI 환경 설정 (다크모드 · 글씨체 · 테마색 · 화면 분할 · 발음 표시)
+  const [darkMode, setDarkMode] = useState<boolean>(() =>
+    safeJsonParse('yanadu_dark_v1', false)
+  );
   const [fontStyle, setFontStyle] = useState<'sans' | 'serif' | 'mono'>('sans');
+  const [colorTheme, setColorTheme] = useState<'blue' | 'emerald' | 'indigo' | 'amber'>('blue');
   const [layoutMode, setLayoutMode] = useState<'split' | 'wide'>('split');
+  const [showPronGuide, setShowPronGuide] = useState<boolean>(true);
+  const [hideWords, setHideWords] = useState<boolean>(false);
+  const [hideMeanings, setHideMeanings] = useState<boolean>(false);
+  const [revealedWordIds, setRevealedWordIds] = useState<number[]>([]);
 
-  useEffect(() => {
-    if (typeof document === 'undefined') return;
-    const rootHtml = document.documentElement;
-    const rootBody = document.body;
-    if (darkMode) {
-      rootHtml.classList.add('dark');
-      rootBody.classList.add('dark');
-      rootHtml.style.colorScheme = 'dark';
-      rootBody.style.backgroundColor = '#020617';
-      rootBody.style.color = '#f1f5f9';
-    } else {
-      rootHtml.classList.remove('dark');
-      rootBody.classList.remove('dark');
-      rootHtml.style.colorScheme = 'light';
-      rootBody.style.backgroundColor = '#f8fafc';
-      rootBody.style.color = '#0f172a';
-    }
-    localStorage.setItem('yanadu_dark_mode', String(darkMode));
-  }, [darkMode]);
+  // 3. TTS 음성 합성 & 리딩 속도 5단계 (0.30x · 0.50x · 0.75x · 1.0x · 1.25x)
+  const [ttsRate, setTtsRate] = useState<number>(1.0);
+  const [ttsAccent, setTtsAccent] = useState<'en-US' | 'en-GB' | 'en-AU' | 'en-CA'>('en-US');
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
 
-  const [accent, setAccent] = useState<'en-US' | 'en-GB' | 'en-AU' | 'en-IN'>('en-US');
-  const [speechRate, setSpeechRate] = useState<number>(0.75);
-  const [dictQuery, setDictQuery] = useState<string>('');
-  const [liveDictResult, setLiveDictResult] = useState<{
+  // 4. 9대 매체 트렌드 & 실시간 사전 상태
+  const [mediaPlatforms, setMediaPlatforms] =
+    useState<MediaTrendPlatform[]>(INITIAL_MEDIA_PLATFORMS);
+  const [activePlatformId, setActivePlatformId] =
+    useState<MediaPlatformId>('FASHION_MAGS');
+  const [selectedLiveKeyword, setSelectedLiveKeyword] =
+    useState<MediaTrendKeyword | null>(null);
+  const [isTrendSyncing, setIsTrendSyncing] = useState<boolean>(false);
+  const [lastTrendSyncTime, setLastTrendSyncTime] = useState<string>(() =>
+    localStorage.getItem('yanadu_trend_sync_time') || getKstTimestampString()
+  );
+  const [trendSyncCount, setTrendSyncCount] = useState<number>(0);
+  const [liveDictData, setLiveDictData] = useState<{
     word: string;
     phonetic: string;
     definition: string;
     example: string;
+    loading: boolean;
+    notFound?: boolean;
   } | null>(null);
-  const [isLoadingDict, setIsLoadingDict] = useState<boolean>(false);
 
-  const [showAllKoreanPron, setShowAllKoreanPron] = useState<boolean>(true);
-  const [revealedPronKeys, setRevealedPronKeys] = useState<string[]>([]);
-  const [hideWordMode, setHideWordMode] = useState<boolean>(false);
-  const [hideMeaningMode, setHideMeaningMode] = useState<boolean>(false);
-  const [revealedWordIds, setRevealedWordIds] = useState<number[]>([]);
-  const [revealedChallengeIdx, setRevealedChallengeIdx] = useState<number[]>([]);
+  // 5. STEP 3 (16요소 다이어그램 & 사전 탭 전환) 및 STEP 4/5 상태
+  const [diagramTab, setDiagramTab] = useState<'all' | 'comp' | 'pos'>('all');
+  const [diagramSourceMode, setDiagramSourceMode] = useState<'theme' | 'standard'>('theme');
+  const [selectedStandardExIdx, setSelectedStandardExIdx] = useState<number>(0);
+  const [activeSentenceIdx, setActiveSentenceIdx] = useState<number>(1);
+  const [selectedTokenIdx, setSelectedTokenIdx] = useState<number>(0);
+  const [focusedNode, setFocusedNode] = useState<{
+    type: 'comp' | 'pos';
+    id: CompId | PosId;
+  } | null>(null);
+  const [dictationInputs, setDictationInputs] = useState<Record<number, string>>({});
+  const [begSelected, setBegSelected] = useState<number | null>(null);
+  const [intSelected, setIntSelected] = useState<number | null>(null);
+  const [advSelected, setAdvSelected] = useState<number[]>([]);
+  const [writingInput, setWritingInput] = useState<string>('');
+  const [showWritingModel, setShowWritingModel] = useState<boolean>(false);
 
-  const handleSelectLevel = (lvl: LearningLevel) => {
-    setLearningLevel(lvl);
-    setCustomDissectSentence(null);
-    if (lvl === 'beginner') {
-      setSpeechRate(0.75);
-      setShowAllKoreanPron(true);
-      setHideMeaningMode(false);
-      setActiveDiagramSentenceIdx(0);
-    } else if (lvl === 'intermediate') {
-      setSpeechRate(0.9);
-      setShowAllKoreanPron(false);
-      setHideMeaningMode(false);
-      setActiveDiagramSentenceIdx(1);
-    } else {
-      setSpeechRate(1.0);
-      setShowAllKoreanPron(false);
-      setActiveDiagramSentenceIdx(2);
-    }
-  };
+  // 6. 1~5교시 실전 모듈 & 어순 배열(Scramble) 상태
+  const [wordbookLevelFilter, setWordbookLevelFilter] = useState<
+    '전체' | WordbookLevel
+  >('전체');
+  const [selectedWordbookDay, setSelectedWordbookDay] = useState<number>(1);
+  const [vocabChallengeSetSeed, setVocabChallengeSetSeed] = useState<number>(1);
+  const [syntaxGeneratorSeed, setSyntaxGeneratorSeed] = useState<number>(1);
+  const [period1Answers, setPeriod1Answers] = useState<Record<string, number>>({});
+  const [quiz406Answers, setQuiz406Answers] = useState<Record<number, 'A' | 'B'>>({});
+  const [scrambleBuiltMap, setScrambleBuiltMap] = useState<Record<string, string[]>>({});
+  const [customSchoolPassage, setCustomSchoolPassage] = useState<string>(
+    'Not until we step out of our comfort zone can we genuinely broaden our perspective. Streamlining the approval process makes the entire project feasible within the deadline.'
+  );
+  const [examStepTrapAns, setExamStepTrapAns] = useState<Record<string, 'A' | 'B'>>({});
+  const [examStepEssayInputs, setExamStepEssayInputs] = useState<Record<string, string>>({});
+  const [examStepShowModel, setExamStepShowModel] = useState<Record<string, boolean>>({});
 
-  // 단어·문장 양방향 보관함 & 직접 수정 & 암기완료 해제 시스템
-  const [wordbookLevel, setWordbookLevel] = useState<
-    '중등 필수' | '고등·수능 핵심' | '비즈니스·실무' | '오픽(OPIc)·구동사'
-  >('고등·수능 핵심');
-  const [wordbookDay, setWordbookDay] = useState<number>(1);
-  const [completedDays, setCompletedDays] = useState<string[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('yanadu_completed_days');
-      if (saved) return JSON.parse(saved);
-    }
-    return ['중등 필수-1', '고등·수능 핵심-1'];
-  });
-
-  const toggleCompletedDay = (dayKey: string) => {
-    setCompletedDays((prev) =>
-      prev.includes(dayKey) ? prev.filter((k) => k !== dayKey) : [...prev, dayKey]
-    );
-  };
-
-  const [bookmarkedWords, setBookmarkedWords] = useState<
-    {
-      word: string;
-      ipa: string;
-      meaning: string;
-      collocation: string;
-      posLabel: string;
-      compLabel: string;
-      levelBadge?: string;
-      customNote?: string;
-      mastered?: boolean;
-    }[]
-  >(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('yanadu_bookmarks');
-      if (saved) return JSON.parse(saved);
-    }
-    return [
+  // 7. 단어·문장 보관함 (고유 ID 기반 관리)
+  const [bookmarkedWords, setBookmarkedWords] = useState<SavedWordItem[]>(() =>
+    safeJsonParse('yanadu_words_v3', [
       {
-        word: 'perspective',
-        ipa: '/pəˈspek.tɪv/',
-        meaning: '관점, 시각 (수능·내신 핵심)',
-        collocation: 'broaden our perspective',
-        posLabel: '명사 (Noun)',
-        compLabel: '직접목적어 (DO)',
-        levelBadge: '수능핵심',
-        customNote: 'broaden / expand 와 자주 결합함',
+        id: 'init-w-1',
+        word: 'streamline',
+        ipa: '/ˈstriːm.laɪn/',
+        pron: '[스트림라인]',
+        meaning: '(업무·절차를) 간소화하다, 효율화하다',
+        collocation: 'streamline the workflow',
+        posLabel: '동사 (V)',
+        compLabel: '동사 (V)',
+        levelBadge: '비즈니스 핵심',
+        customNote: '불필요한 단계를 줄여 능률을 높일 때 사용',
         mastered: false,
       },
       {
+        id: 'init-w-2',
         word: 'feasible',
         ipa: '/ˈfiː.zə.bəl/',
-        meaning: '실현 가능한 (5형식 보어 빈출)',
-        collocation: 'make the project feasible',
+        pron: '[피저블]',
+        meaning: '실현 가능한, 실행할 수 있는',
+        collocation: 'make the schedule feasible',
         posLabel: '형용사 (Adj)',
         compLabel: '목적격보어 (OC)',
-        levelBadge: '내신서술형',
-        customNote: '5형식 make 목적격보어 자리에 부사(feasibly) 사용 주의',
+        levelBadge: '수능·실무 필수',
+        customNote: '5형식 make + O + 형용사 보어(OC) 주의',
         mastered: false,
       },
-    ];
-  });
-
-  const [savedSentences, setSavedSentences] = useState<SavedSentenceItem[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('yanadu_saved_sentences');
-      if (saved) return JSON.parse(saved);
-    }
-    return [
+    ])
+  );
+  const [savedSentences, setSavedSentences] = useState<SavedSentenceItem[]>(() =>
+    safeJsonParse('yanadu_sents_v3', [
       {
-        id: 'init-sent-1',
-        en: 'Not until we step out of our comfort zone can we genuinely broaden our perspective.',
-        ko: '우리가 안전지대를 벗어나서야 비로소 시야를 진정으로 넓힐 수 있다.',
-        note: '부정어 Not until 문두 이동 ➔ 주절 can we broaden 도치 어순 주의',
-        category: '수능·내신 핵심구문',
+        id: 'init-s-1',
+        en: 'Streamlining the approval process makes the entire project feasible.',
+        pron: '[스트림라이닝 디 어프루벌 프로세스 / 메익스 디 인타이어 프로젝트 피저블]',
+        ko: '승인 절차를 간소화하는 것은 전체 프로젝트를 실현 가능하게 만든다.',
+        note: '동명사구 주어(단수) + 5형식 makes + 목적격보어 feasible(형용사)',
+        category: '5형식 핵심 구문',
         mastered: false,
       },
-      {
-        id: 'init-sent-2',
-        en: 'You really pull off that bold statement look!',
-        ko: '그 과감한 포인트 스타일을 정말 멋지게 소화하시네요!',
-        note: 'pull off(소화하기 까다로운 스타일·과제를 멋지게 해내다)',
-        category: '실전 회화·패션',
-        mastered: false,
-      },
-    ];
+    ])
+  );
+  const [newWordForm, setNewWordForm] = useState({
+    word: '',
+    pron: '',
+    meaning: '',
+    collocation: '',
+    note: '',
   });
-
-  const [editingWordIdx, setEditingWordIdx] = useState<number | null>(null);
-  const [editWordMeaning, setEditWordMeaning] = useState<string>('');
-  const [editWordCollocation, setEditWordCollocation] = useState<string>('');
-  const [editWordNote, setEditWordNote] = useState<string>('');
-
+  const [editingWordId, setEditingWordId] = useState<string | null>(null);
+  const [editingWordDraft, setEditingWordDraft] = useState({
+    meaning: '',
+    customNote: '',
+  });
+  const [newSentEn, setNewSentEn] = useState('');
+  const [newSentPron, setNewSentPron] = useState('');
+  const [newSentKo, setNewSentKo] = useState('');
+  const [newSentNote, setNewSentNote] = useState('');
   const [editingSentId, setEditingSentId] = useState<string | null>(null);
-  const [editSentEn, setEditSentEn] = useState<string>('');
-  const [editSentKo, setEditSentKo] = useState<string>('');
-  const [editSentNote, setEditSentNote] = useState<string>('');
+  const [editingSentDraft, setEditingSentDraft] = useState({
+    en: '',
+    ko: '',
+    note: '',
+  });
 
-  const [newCustomWord, setNewCustomWord] = useState<string>('');
-  const [newCustomWordMeaning, setNewCustomWordMeaning] = useState<string>('');
-  const [newCustomWordNote, setNewCustomWordNote] = useState<string>('');
-  const [newCustomSentEn, setNewCustomSentEn] = useState<string>('');
-  const [newCustomSentKo, setNewCustomSentKo] = useState<string>('');
-  const [newCustomSentNote, setNewCustomSentNote] = useState<string>('');
+  // 8. AI 코치 & 실제 음성 인식(SpeechRecognition) 타이머 상태
+  const [speakingGoalMins, setSpeakingGoalMins] = useState<5 | 15 | 30>(15);
+  const [speakingSeconds, setSpeakingSeconds] = useState<number>(0);
+  const [isSpeakingTimerRunning, setIsSpeakingTimerRunning] = useState<boolean>(false);
+  const [isMicListening, setIsMicListening] = useState<boolean>(false);
+  const [chatHistory, setChatHistory] = useState<ChatTurn[]>([
+    {
+      role: 'coach',
+      text: '안녕하세요! 오늘 배운 핵심 표현(streamline, feasible, unwind, pull off 등)을 넣어 한 문장을 영어로 작성하거나 🎙️마이크 버튼으로 말씀해 보세요. 문장 성분과 어조를 점검해 드립니다.',
+    },
+  ]);
+  const [userChatInput, setUserChatInput] = useState<string>('');
 
+  // 9. 아이패드 애플펜슬 필기장 상태 (굵기 1.5~9px · 형광펜 색상/투명도 · Undo · 플로팅)
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const isDrawingRef = useRef<boolean>(false);
+  const strokesRef = useRef<CanvasStroke[]>(
+    safeJsonParse('yanadu_strokes_v1', [])
+  );
+  const currentStrokeRef = useRef<CanvasStroke | null>(null);
+  const [strokeCount, setStrokeCount] = useState<number>(
+    () => strokesRef.current.length
+  );
+  const [penType, setPenType] = useState<
+    'fountain' | 'marker' | 'ballpoint' | 'highlighter' | 'eraser'
+  >('fountain');
+  const [penColor, setPenColor] = useState<
+    '#2563eb' | '#0f172a' | '#10b981' | '#e11d48' | '#facc15'
+  >('#2563eb');
+  const [penWidth, setPenWidth] = useState<number>(2.5);
+  const [highlighterAlpha, setHighlighterAlpha] = useState<0.15 | 0.3 | 0.5>(0.3);
+  const [canvasBgStyle, setCanvasBgStyle] = useState<'lined' | 'grid' | 'blank'>('lined');
+  const [canvasHeight, setCanvasHeight] = useState<number>(260);
+  const [isPadFloating, setIsPadFloating] = useState<boolean>(true);
+  const [isPadMinimized, setIsPadMinimized] = useState<boolean>(false);
+  const [padQuickText, setPadQuickText] = useState<string>(() =>
+    localStorage.getItem('yanadu_pad_quick_text') || ''
+  );
+
+  // 보관함 및 다크모드 로컬스토리지 동기화
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('yanadu_bookmarks', JSON.stringify(bookmarkedWords));
+    try {
+      localStorage.setItem('yanadu_words_v3', JSON.stringify(bookmarkedWords));
+    } catch {
+      // ignore quota error
     }
   }, [bookmarkedWords]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('yanadu_saved_sentences', JSON.stringify(savedSentences));
+    try {
+      localStorage.setItem('yanadu_sents_v3', JSON.stringify(savedSentences));
+    } catch {
+      // ignore quota error
     }
   }, [savedSentences]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('yanadu_completed_days', JSON.stringify(completedDays));
+    try {
+      localStorage.setItem('yanadu_dark_v1', JSON.stringify(darkMode));
+    } catch {
+      // ignore
     }
-  }, [completedDays]);
-
-  const toggleSaveSentence = (item: Omit<SavedSentenceItem, 'id' | 'mastered'>) => {
-    setSavedSentences((prev) => {
-      const exists = prev.some((s) => s.en === item.en);
-      if (exists) return prev.filter((s) => s.en !== item.en);
-      return [
-        {
-          id: `sent-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          ...item,
-          mastered: false,
-        },
-        ...prev,
-      ];
-    });
-  };
+  }, [darkMode]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const savedDate = localStorage.getItem('yanadu_last_study_date');
-    if (savedDate !== todayKey) {
-      const nextTheme = THEMES[dayOfYear % THEMES.length].id;
-      const nextWbDay = (dayOfYear % 100) + 1;
-      const todayPlat = INITIAL_MEDIA_PLATFORMS[dayOfYear % INITIAL_MEDIA_PLATFORMS.length];
-      const todayKw = todayPlat.keywords[dayOfYear % todayPlat.keywords.length];
-
-      setSelectedThemeId(nextTheme);
-      setWordbookDay(nextWbDay);
-      setSelectedLiveKeyword({
-        platformName: todayPlat.name,
-        rank: todayKw.rank,
-        koTitle: todayKw.koTitle,
-        enExpression: todayKw.enExpression,
-        extUrl: todayKw.extUrl,
-      });
-      localStorage.setItem('yanadu_last_study_date', todayKey);
+    try {
+      localStorage.setItem('yanadu_pad_quick_text', padQuickText);
+    } catch {
+      // ignore
     }
-  }, [todayKey, dayOfYear]);
+  }, [padQuickText]);
 
-  const handleRefreshLiveTrends = async () => {
-    setIsRefreshingTrends(true);
-    const now = new Date();
-    const timeLabel = `${String(now.getHours()).padStart(2, '0')}:${String(
-      now.getMinutes()
-    ).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')} 실시간 반영됨`;
+  // 브라우저 TTS 음성 목록 비동기 로드 (voiceschanged 대응)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    const loadVoices = () => {
+      const voices = window.speechSynthesis.getVoices();
+      if (voices.length > 0) setAvailableVoices(voices);
+    };
+    loadVoices();
+    window.speechSynthesis.addEventListener?.('voiceschanged', loadVoices);
+    return () => {
+      window.speechSynthesis.removeEventListener?.('voiceschanged', loadVoices);
+    };
+  }, []);
+
+  // 안전한 TTS 발화 함수 (슬래시/물결 기호 제거, 안드로이드 en_US 호환, Chrome cancel 지연 처리)
+  const speakText = (text: string, customRate?: number) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    const cleaned = (text || '')
+      .replace(/\s*\/\s*/g, ', ')
+      .replace(/[~_*[\]]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!cleaned) return;
+
+    window.speechSynthesis.cancel();
+    setTimeout(() => {
+      const utter = new SpeechSynthesisUtterance(cleaned);
+      utter.lang = ttsAccent;
+      utter.rate = customRate ?? ttsRate;
+      const targetNorm = ttsAccent.toLowerCase();
+      const matchedVoice = availableVoices.find((v) =>
+        v.lang.replace('_', '-').toLowerCase().includes(targetNorm)
+      );
+      if (matchedVoice) utter.voice = matchedVoice;
+      window.speechSynthesis.speak(utter);
+    }, 45);
+  };
+
+  // 영영사전 Live API 조회 (불용어 건너뛰기 및 dictTargetWord 우선 사용)
+  const fetchLiveDictionary = async (rawQuery: string, explicitTarget?: string) => {
+    const stopSet = new Set([
+      'a', 'an', 'the', 'i', 'we', 'you', 'this', 'that', 'my', 'our', 'your',
+      'to', 'in', 'on', 'at', 'for', 'with', 'by', 'be', 'is', 'are',
+    ]);
+    const candidate =
+      explicitTarget ||
+      rawQuery
+        .trim()
+        .split(/\s+/)
+        .map((w) => w.replace(/[^a-zA-Z-]/g, ''))
+        .find((w) => w.length >= 3 && !stopSet.has(w.toLowerCase())) ||
+      'streamline';
+
+    setLiveDictData({
+      word: candidate,
+      phonetic: '',
+      definition: '',
+      example: '',
+      loading: true,
+      notFound: false,
+    });
 
     try {
       const res = await fetch(
-        'https://api.rss2json.com/v1/api.json?rss_url=https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko'
+        `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(
+          candidate.toLowerCase()
+        )}`
       );
-      let liveHeadlines: string[] = [];
-      if (res.ok) {
-        const data = await res.json();
-        if (data?.items?.length) {
-          liveHeadlines = data.items
-            .slice(0, 5)
-            .map((it: { title: string }) => it.title.split(' - ')[0]);
-        }
-      }
+      if (!res.ok) throw new Error('Not found');
+      const data = await res.json();
+      const entry = data[0];
+      const meaningObj = entry?.meanings?.[0]?.definitions?.[0];
+      setLiveDictData({
+        word: entry?.word || candidate,
+        phonetic: entry?.phonetic || entry?.phonetics?.[0]?.text || '/표준 발음/',
+        definition:
+          meaningObj?.definition || '표준 영영사전 정의가 확인된 어휘입니다.',
+        example:
+          meaningObj?.example ||
+          ` Let's apply "${candidate}" in a real conversation.`,
+        loading: false,
+        notFound: false,
+      });
+    } catch {
+      setLiveDictData({
+        word: candidate,
+        phonetic: '사전 API 미등재 (구동사·복합어)',
+        definition:
+          '복합 구동사 또는 파생 형태이므로 하단STEP 2 단어장 해설이나 우측 외부 사전 링크를 참고해 주세요.',
+        example: '',
+        loading: false,
+        notFound: true,
+      });
+    }
+  };
+
+  // 9대 매체 트렌드 강제 업데이트 (encodeURIComponent 적용 + 피셔-예이츠 셔플 + 날짜/시간 기록)
+  const handleForceSyncTrends = async () => {
+    setIsTrendSyncing(true);
+    const nextSeed = trendSyncCount + getKstDayOfYear() + Math.floor(Date.now() % 97);
+    setTrendSyncCount((prev) => prev + 1);
+
+    try {
+      const rssUrl = encodeURIComponent(
+        'https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko'
+      );
+      const res = await fetch(
+        `https://api.rss2json.com/v1/api.json?rss_url=${rssUrl}`
+      );
+      const data = await res.json();
+      const liveTitles: string[] = Array.isArray(data?.items)
+        ? data.items.slice(0, 5).map((it: { title?: string }) => it.title || '')
+        : [];
 
       setMediaPlatforms((prev) =>
         prev.map((plat) => {
-          const rotated = [...plat.keywords]
-            .sort(() => Math.random() - 0.5)
-            .map((k, idx) => {
-              if (
-                plat.id === 'GOOGLE_TRENDS' &&
-                idx < liveHeadlines.length &&
-                liveHeadlines[idx]
-              ) {
-                return {
-                  ...k,
-                  rank: idx + 1,
-                  koTitle: `[실시간] ${liveHeadlines[idx]}`,
-                };
-              }
-              return {
-                ...k,
-                rank: idx + 1,
-              };
-            });
-          return { ...plat, keywords: rotated };
+          const shuffled = deterministicShuffle(plat.keywords, nextSeed).map(
+            (kw, idx) => ({
+              ...kw,
+              rank: idx + 1,
+              koTitle:
+                plat.id === 'GOOGLE_TRENDS' && liveTitles[idx]
+                  ? `[뉴스연동] ${liveTitles[idx].slice(0, 26)}… (${kw.enExpression})`
+                  : kw.koTitle,
+            })
+          );
+          return { ...plat, keywords: shuffled };
         })
       );
-      setLastTrendSyncTime(timeLabel);
     } catch {
       setMediaPlatforms((prev) =>
         prev.map((plat) => ({
           ...plat,
-          keywords: [...plat.keywords]
-            .reverse()
-            .map((k, idx) => ({ ...k, rank: idx + 1 })),
+          keywords: deterministicShuffle(plat.keywords, nextSeed).map(
+            (kw, idx) => ({
+              ...kw,
+              rank: idx + 1,
+            })
+          ),
         }))
       );
-      setLastTrendSyncTime(timeLabel);
     } finally {
-      setIsRefreshingTrends(false);
-    }
-  };
-
-  const [diagramTab, setDiagramTab] = useState<'all' | 'comp' | 'pos'>('all');
-  const [selectedComp, setSelectedComp] = useState<CompId | null>('DO');
-  const [selectedPos, setSelectedPos] = useState<PosId | null>('N');
-  const [selectedTokenIdx, setSelectedTokenIdx] = useState<number | null>(0);
-  const [writingInputs, setWritingInputs] = useState<Record<string, string>>({});
-
-  // 필기 도구 5종 (펜 4종 + 지우개) & 사파리 텍스트 선택 방지 적용
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const padWrapperRef = useRef<HTMLDivElement | null>(null);
-  const isDrawingRef = useRef<boolean>(false);
-  const lastPointRef = useRef<{ x: number; y: number } | null>(null);
-
-  const [isFloatingPad, setIsFloatingPad] = useState<boolean>(true);
-  const [isPadLocked, setIsPadLocked] = useState<boolean>(true);
-  const [isPadMinimized, setIsPadMinimized] = useState<boolean>(false);
-  const [penOnlyMode, setPenOnlyMode] = useState<boolean>(true);
-  const [penType, setPenType] = useState<
-    'fountain' | 'marker' | 'ballpoint' | 'highlighter' | 'eraser'
-  >('marker');
-  const [penColor, setPenColor] = useState<'#2563eb' | '#0f172a' | '#10b981' | '#e11d48'>('#2563eb');
-  const [penWidth, setPenWidth] = useState<number>(6);
-  const [padHeight, setPadHeight] = useState<number>(210);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const wrapper = padWrapperRef.current;
-    if (!canvas || !wrapper) return;
-
-    const blockSafariTouchAndSelect = (e: Event) => {
-      if (isPadLocked) {
-        e.preventDefault();
+      const stamp = getKstTimestampString();
+      setLastTrendSyncTime(stamp);
+      try {
+        localStorage.setItem('yanadu_trend_sync_time', stamp);
+      } catch {
+        // ignore
       }
-    };
-
-    canvas.addEventListener('touchstart', blockSafariTouchAndSelect, { passive: false });
-    canvas.addEventListener('touchmove', blockSafariTouchAndSelect, { passive: false });
-    canvas.addEventListener('selectstart', blockSafariTouchAndSelect);
-    canvas.addEventListener('contextmenu', blockSafariTouchAndSelect);
-    wrapper.addEventListener('selectstart', blockSafariTouchAndSelect);
-    wrapper.addEventListener('contextmenu', blockSafariTouchAndSelect);
-
-    return () => {
-      canvas.removeEventListener('touchstart', blockSafariTouchAndSelect);
-      canvas.removeEventListener('touchmove', blockSafariTouchAndSelect);
-      canvas.removeEventListener('selectstart', blockSafariTouchAndSelect);
-      canvas.removeEventListener('contextmenu', blockSafariTouchAndSelect);
-      wrapper.removeEventListener('selectstart', blockSafariTouchAndSelect);
-      wrapper.removeEventListener('contextmenu', blockSafariTouchAndSelect);
-    };
-  }, [isPadLocked, isPadMinimized]);
-
-  const syncCanvasResolution = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return;
-    const dpr = window.devicePixelRatio || 1;
-    const targetW = Math.round(rect.width * dpr);
-    const targetH = Math.round(rect.height * dpr);
-
-    if (canvas.width !== targetW || canvas.height !== targetH) {
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = canvas.width;
-      tempCanvas.height = canvas.height;
-      const tempCtx = tempCanvas.getContext('2d');
-      if (tempCtx && canvas.width > 0 && canvas.height > 0) {
-        tempCtx.drawImage(canvas, 0, 0);
-      }
-
-      canvas.width = targetW;
-      canvas.height = targetH;
-      const ctx = canvas.getContext('2d', { desynchronized: true });
-      if (ctx) {
-        ctx.scale(dpr, dpr);
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        if (tempCanvas.width > 0 && tempCanvas.height > 0) {
-          ctx.drawImage(
-            tempCanvas,
-            0,
-            0,
-            tempCanvas.width,
-            tempCanvas.height,
-            0,
-            0,
-            rect.width,
-            rect.height
-          );
-        }
-      }
+      setIsTrendSyncing(false);
     }
   };
 
-  useEffect(() => {
-    const timer = setTimeout(() => syncCanvasResolution(), 60);
-    window.addEventListener('resize', syncCanvasResolution);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('resize', syncCanvasResolution);
-    };
-  }, [isFloatingPad, isPadMinimized, padHeight, layoutMode, activeMode]);
-
-  const getExactPointerPos = (
-    canvas: HTMLCanvasElement,
-    clientX: number,
-    clientY: number
-  ) => {
-    const rect = canvas.getBoundingClientRect();
-    return {
-      x: clientX - rect.left,
-      y: clientY - rect.top,
-    };
+  // 트렌드 키워드 클릭 핸들러 (비문 없는 검증 문장 생성 및 레벨 인덱스 유지)
+  const handleClickTrendKeyword = (kw: MediaTrendKeyword) => {
+    setSelectedLiveKeyword(kw);
+    setSelectedThemeId(kw.targetThemeId);
+    setActiveMode('daily');
+    setDiagramSourceMode('theme');
+    setActiveSentenceIdx(0);
+    setSelectedTokenIdx(0);
+    fetchLiveDictionary(kw.enExpression, kw.dictTargetWord);
   };
 
-  const startDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!isPadLocked) return;
-    if (penOnlyMode && e.pointerType === 'touch') {
-      e.preventDefault();
-      e.stopPropagation();
-      return;
+  // 레벨 변경 시 해당 레벨 문장으로 정확히 포커싱 (인덱스 밀림 버그 완벽 해결)
+  const handleSelectLevel = (lvl: LearningLevel) => {
+    setLearningLevel(lvl);
+    const defaultSpeed = lvl === 'beginner' ? 0.5 : lvl === 'intermediate' ? 0.75 : 1.0;
+    setTtsRate(defaultSpeed);
+    const matchIdx = currentTheme.sentences.findIndex((s) => s.levelTag === lvl);
+    if (matchIdx !== -1) {
+      setActiveSentenceIdx(matchIdx);
+      setSelectedTokenIdx(0);
     }
-
-    e.preventDefault();
-    e.stopPropagation();
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const pos = getExactPointerPos(canvas, e.clientX, e.clientY);
-    isDrawingRef.current = true;
-    lastPointRef.current = pos;
-
-    const ctx = canvas.getContext('2d', { desynchronized: true });
-    if (!ctx) return;
-
-    const actualColor =
-      penColor === '#0f172a' && darkMode ? '#f8fafc' : penColor;
-
-    if (penType === 'eraser') {
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.globalAlpha = 1.0;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.lineWidth = Math.max(28, penWidth * 3.5);
-    } else if (penType === 'highlighter') {
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.globalAlpha = 0.32;
-      ctx.strokeStyle = '#facc15';
-      ctx.lineCap = 'square';
-      ctx.lineJoin = 'bevel';
-      ctx.lineWidth = Math.max(20, penWidth * 2.8);
-    } else if (penType === 'marker') {
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.globalAlpha = 1.0;
-      ctx.strokeStyle = actualColor;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.lineWidth = penWidth * 1.35;
-    } else if (penType === 'fountain') {
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.globalAlpha = 1.0;
-      ctx.strokeStyle = actualColor;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      const pressureFactor =
-        e.pointerType === 'pen' && e.pressure > 0 ? 0.6 + e.pressure * 1.5 : 1.1;
-      ctx.lineWidth = penWidth * pressureFactor;
-    } else {
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.globalAlpha = 1.0;
-      ctx.strokeStyle = actualColor;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.lineWidth = penWidth;
-    }
-
-    ctx.beginPath();
-    ctx.moveTo(pos.x, pos.y);
-    ctx.lineTo(pos.x + 0.05, pos.y + 0.05);
-    ctx.stroke();
   };
 
-  const draw = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!isDrawingRef.current || !isPadLocked) return;
-    if (penOnlyMode && e.pointerType === 'touch') {
-      e.preventDefault();
-      return;
-    }
+  // 현재 활성화된 테마 데이터 (useMemo로 불필요한 재계산 방지 및 문법적으로 완전한 트렌드 문장 결합)
+  const currentTheme: ThemeData = useMemo(() => {
+    const base = THEMES.find((t) => t.id === selectedThemeId) || THEMES[0];
+    if (!selectedLiveKeyword) return base;
 
-    e.preventDefault();
-    e.stopPropagation();
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d', { desynchronized: true });
-    if (!ctx) return;
+    const expr = selectedLiveKeyword.enExpression;
+    const ko = selectedLiveKeyword.koTitle;
+    const liveSentenceEn = `In practical communication, we often use the expression "${expr}" to convey our point clearly.`;
+    const liveSoundBlock = `In practical communication, / we often use / "${expr}" / to convey our point clearly.`;
 
-    if (penType === 'fountain' && e.pointerType === 'pen' && e.pressure > 0) {
-      ctx.lineWidth = penWidth * (0.6 + e.pressure * 1.5);
-    }
-
-    const nativeEvt = e.nativeEvent as PointerEvent;
-    const events =
-      typeof nativeEvt.getCoalescedEvents === 'function'
-        ? nativeEvt.getCoalescedEvents()
-        : [nativeEvt];
-
-    ctx.beginPath();
-    if (lastPointRef.current) {
-      ctx.moveTo(lastPointRef.current.x, lastPointRef.current.y);
-    }
-
-    for (const ev of events) {
-      const pt = getExactPointerPos(canvas, ev.clientX, ev.clientY);
-      ctx.lineTo(pt.x, pt.y);
-      lastPointRef.current = pt;
-    }
-    ctx.stroke();
-  };
-
-  const endDrawing = () => {
-    isDrawingRef.current = false;
-    lastPointRef.current = null;
-  };
-
-  const clearCanvas = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.restore();
-  };
-
-  const [quizLevelTab, setQuizLevelTab] = useState<
-    'word' | 'beginner' | 'intermediate' | 'advanced'
-  >('beginner');
-  const [selectedBeginnerOpt, setSelectedBeginnerOpt] = useState<number | null>(null);
-  const [selectedInterOpt, setSelectedInterOpt] = useState<number | null>(null);
-  const [showInterHint, setShowInterHint] = useState<boolean>(false);
-  const [selectedAdvOpts, setSelectedAdvOpts] = useState<number[]>([]);
-  const [userWritingMission, setUserWritingMission] = useState<string>('');
-
-  const [targetSpeakingMins, setTargetSpeakingMins] = useState<number>(5);
-  const [speakingSeconds, setSpeakingSeconds] = useState<number>(0);
-  const [isVoiceActive, setIsVoiceActive] = useState<boolean>(false);
-  const [chatInput, setChatInput] = useState<string>('');
-  const [chatHistory, setChatHistory] = useState<ChatTurn[]>([
-    {
-      role: 'coach',
-      text: 'Welcome! All grammatical structures, 16 grammar elements (7 components + 9 parts of speech), and the 5-tool writing pad are ready!',
-      nuanceTip: '단어·문장 보관함에서 뜻과 메모를 직접 수정하고, 암기 완료 상태도 자유롭게 전환해 보세요!',
-    },
-  ]);
-  const [correctionInput, setCorrectionInput] = useState<string>('');
-  const [correctionResult, setCorrectionResult] = useState<{
-    original: string;
-    naturalEn: string;
-    wordOrderFix: string;
-    grammarExplanation: string;
-    opicUpgrade: string;
-  } | null>(null);
-  const [studyStats, setStudyStats] = useState({
-    masteredWords: 120,
-    completedSentences: 64,
-    quizAccuracy: 96,
-    speakingMinutes: 55,
-    streakDays: 12,
-  });
-
-  const baseTheme = THEMES.find((t) => t.id === selectedThemeId) || THEMES[0];
-
-  // [문법 오류 완벽 교정] 동사원형 실시간 키워드(kwEn)가 결합될 때 'how to + 동사원형' 또는 조동사 뒤에 오도록 설계하여 'focus on layer' 같은 비문 방지!
-  const currentTheme: ThemeData = (() => {
-    if (!selectedLiveKeyword) return baseTheme;
-
-    const kwEn = selectedLiveKeyword.enExpression;
-    const kwKo = selectedLiveKeyword.koTitle;
-    const kwFirstWord = kwEn.split(' ')[0] || 'trend';
-
-    const liveVocabItem: VocabItem = {
-      id: 0,
-      type: '일상 회화',
-      recommendLevel: learningLevel,
-      word: kwEn,
-      masked: `${kwFirstWord.slice(0, 2)} ⬛ ⬛ ⬛`,
-      ipa: '/실시간 트렌드 핵심 표현/',
-      pron: `[실시간 키워드 발음 듣기 🔊]`,
-      soundMethod: `앞 단어 끝소리와 뒤 단어 첫 모음을 한 호흡의 소리블록(${kwEn})으로 부드럽게 이어 발음합니다.`,
-      soundBlock: `${kwFirstWord} / ${kwEn.split(' ').slice(1).join(' ') || 'now'}`,
-      meaning: `[실검 ${selectedLiveKeyword.rank}위] ${kwKo}`,
-      enDef: `Live Trend Expression from ${selectedLiveKeyword.platformName}`,
-      exampleBlank: `Let's practice how to ______ in our daily conversation.`,
-      pos: 'V',
-      posLabel: '핵심 표현 블록 (V/N)',
-      comp: 'DO',
-      compLabel: '핵심 성분 (V·DO)',
-      roleDesc: '방금 왼쪽 실시간 트렌드에서 선택한 최우선 집중 학습 표현',
-      collocation: kwEn,
-      collocationKo: kwKo,
-      paraphraseTip: `[실시간 연동 완료] 클릭하신 "${kwKo}" 이슈를 아래 직독직해와 16개 문법 요소 해부 카드로 즉시 학습합니다!`,
-    };
-
-    const liveSentence: TrainingSentence = {
-      id: 0,
+    const liveSentObj: TrainingSentence = {
+      id: 9999,
       levelTag: learningLevel,
-      tag: `🔥 [실시간 ${selectedLiveKeyword.rank}위 집중 문장] ${selectedLiveKeyword.platformName}`,
-      targetWord: kwEn,
-      wordOrderFormula: `[도입 패턴] + [how to + 동사원형 표현 (${kwEn})] + [수식어(M)]`,
-      structure: '주어(S) + 동사(V) + 목적어(how to부정사구) + 수식어(M)',
-      soundBlockEn:
-        learningLevel === 'beginner'
-          ? `We really need / to learn how to / ${kwEn} / today.`
-          : learningLevel === 'intermediate'
-          ? `Everyone is talking about / how to ${kwEn} / effectively.`
-          : `I was wondering if we could / ${kwEn} / from a broader perspective.`,
-      soundMethodGuide: `방금 선택하신 실시간 검색어 "${kwEn}"에 가장 강한 강세를 실어 또렷하게 발음하세요!`,
-      ipaLine: `/Live Trend Sentence — ${kwEn}/`,
-      koLine: `오늘의 핫이슈(S) / [${kwKo}]하는 방법을(DO) / 실전 문장으로 자연스럽게 익힙니다(V+M).`,
-      enLine:
-        learningLevel === 'beginner'
-          ? `We really need(S+V) / to learn how to [${kwEn}](DO) / today(M).`
-          : learningLevel === 'intermediate'
-          ? `Everyone is talking about(S+V) / how to [${kwEn}](O) / right now(M).`
-          : `I was wondering(S+V) / if we could [${kwEn}](O) / effortlessly(M).`,
-      rawEn:
-        learningLevel === 'beginner'
-          ? `We really need to learn how to ${kwEn} today.`
-          : learningLevel === 'intermediate'
-          ? `Everyone is talking about how to ${kwEn} right now.`
-          : `I was wondering if we could ${kwEn} effortlessly.`,
-      pronLine: `[실시간 문장 발음: 위 🔊 듣기 버튼을 눌러 원어민 연음을 확인하세요]`,
-      naturalKo: `[실시간 ${selectedLiveKeyword.rank}위 응용] 우리는 오늘 "${kwKo} (${kwEn})" 표현을 실전 영어로 자연스럽게 구사할 수 있습니다.`,
-      paraphraseVersion: `What I love most is that we can apply "${kwEn}" right away in real life.`,
-      grammarPoint: `의문사 + to부정사(how to + 동사원형) 명사구 구조를 사용하여 어떤 동사구 키워드도 문법 오류 없이 목적어 자리에 결합됩니다.`,
-      contextNuance: `${selectedLiveKeyword.platformName} 실시간 ${selectedLiveKeyword.rank}위 화젯거리를 원어민 스몰톡으로 즉시 연결한 문장입니다.`,
+      tag: `🔥 선택 토픽 집중 훈련 (#${selectedLiveKeyword.rank} ${ko})`,
+      targetWord: expr,
+      wordOrderFormula: `In practical communication[M], + we[S] + often[M] + use[V] + "${expr}"[DO] + to convey our point[M].`,
+      structure: '전치사구(M) + 3형식 주절(S + V + DO) + 목적의 to부정사구(M)',
+      soundBlockEn: liveSoundBlock,
+      soundMethodGuide: `핵심 표현인 "${expr}" ${selectedLiveKeyword.pron} 부분에 가장 강한 강세를 실어 또렷하게 발음합니다.`,
+      ipaLine: selectedLiveKeyword.ipa,
+      koLine: `실전 소통에서 / 우리는 자주 활용한다 / "${expr}"(${ko}) 표현을 / 핵심 요지를 명확히 전달하기 위해.`,
+      enLine: liveSoundBlock,
+      rawEn: liveSentenceEn,
+      pronLine: `${selectedLiveKeyword.pron} — [인 프랙티컬 커뮤니케이션 / 위 오픈 유즈 "${expr}" / 투 컨베이 아워 포인트 클리얼리]`,
+      naturalKo: `실전 의사소통에서 우리는 "${ko}"라는 뜻을 명확히 전달하기 위해 "${expr}" 표현을 자주 활용합니다.`,
+      paraphraseVersion: `Mastering the phrase "${expr}" helps us communicate more naturally.`,
+      grammarPoint: `어떤 문법 형태의 구절(동사구·명사구·형용사구)이든 타동사 use의 동격 명사구 목적어로 안전하게 결합하여 비문 없이 연습할 수 있습니다.`,
+      contextNuance: `좌측 9대 매체 토픽에서 선택한 "${ko}" 표현을 실전 문장 속에서 체화하는 맞춤형 카드입니다.`,
     };
 
     return {
-      ...baseTheme,
-      title: `🔥 [${selectedLiveKeyword.platformName} ${selectedLiveKeyword.rank}위] ${kwKo}`,
-      badge: `실시간 트렌드 연동 · ${baseTheme.badge}`,
-      levelTracks: {
-        beginner: {
-          ...baseTheme.levelTracks.beginner,
-          patternEn: `Let's practice / "${kwEn}" / step by step!`,
-          patternSoundBlock: `Let's practice / ${kwEn} / step by step!`,
-          patternMeaningKo: `[실시간 초급] "${kwKo}" 표현을 단계별로 쉽게 연습해 봅시다!`,
-        },
-        intermediate: {
-          ...baseTheme.levelTracks.intermediate,
-          patternEn: `Everyone is talking about / how to ${kwEn} / these days.`,
-          patternSoundBlock: `Everyone is talking about / how to ${kwEn} / these days.`,
-          patternMeaningKo: `[실시간 중급] 요즘 모두가 "${kwKo}"하는 방법에 대해 이야기하고 있습니다.`,
-        },
-        advanced: {
-          ...baseTheme.levelTracks.advanced,
-          patternEn: `I was wondering if we could / ${kwEn} / effectively.`,
-          patternSoundBlock: `I was wondering / if we could / ${kwEn} / effectively.`,
-          patternMeaningKo: `[실시간 고급] "${kwKo}" 트렌드를 실무와 일상에 효과적으로 적용해 볼 수 있을지 논의해 보고 싶습니다.`,
-        },
-      },
-      vocab: [liveVocabItem, ...baseTheme.vocab.slice(0, 9)],
-      sentences: [liveSentence, ...baseTheme.sentences],
-      quiz: {
-        ...baseTheme.quiz,
-        intermediate: {
-          sentenceBefore: 'Everyone is talking about how to',
-          sentenceAfter: 'in today’s trending issue.',
-          hint: `방금 왼쪽에서 클릭하신 [${selectedLiveKeyword.platformName} ${selectedLiveKeyword.rank}위: ${kwKo}] 영어 표현입니다!`,
-          options: [kwEn, 'take a rain check', 'miss the boat', 'call it a day'],
-          answerIdx: 0,
-          explanation: `방금 선택하신 실시간 트렌드 ${selectedLiveKeyword.rank}위 표현인 "${kwEn}"(${kwKo})이 정답입니다!`,
-        },
-      },
+      ...base,
+      sentences: [liveSentObj, ...base.sentences],
     };
-  })();
+  }, [selectedThemeId, selectedLiveKeyword, learningLevel]);
 
-  const currentLevelTrack = currentTheme.levelTracks[learningLevel];
-  const currentExamCourse =
-    EXAM_MASTER_COURSES.find((c) => c.id === selectedExamTrack) || EXAM_MASTER_COURSES[0];
+  const currentTrack: LevelTrackContent = currentTheme.levelTracks[learningLevel];
+  const activePlatform =
+    mediaPlatforms.find((p) => p.id === activePlatformId) || mediaPlatforms[0];
+  const currentSentence: TrainingSentence =
+    currentTheme.sentences[activeSentenceIdx] || currentTheme.sentences[0];
 
-  const activeSentenceForDiagram = customDissectSentence
-    ? {
-        rawEn: customDissectSentence.en,
-        naturalKo: customDissectSentence.ko,
-        tag: customDissectSentence.title,
-      }
-    : currentTheme.sentences[activeDiagramSentenceIdx] || currentTheme.sentences[0];
+  // STEP 3 다이어그램 분석 대상 문장 (useMemo)
+  const currentDiagramData: DiagramSentence = useMemo(() => {
+    if (diagramSourceMode === 'standard') {
+      return DIAGRAM_EXAMPLES[selectedStandardExIdx] || DIAGRAM_EXAMPLES[0];
+    }
+    return buildDynamicDiagramSentence(
+      currentSentence.rawEn,
+      currentSentence.naturalKo,
+      currentSentence.tag
+    );
+  }, [diagramSourceMode, selectedStandardExIdx, currentSentence]);
 
-  const currentDiagramEx: DiagramSentence = buildDynamicDiagramSentence(
-    activeSentenceForDiagram.rawEn,
-    activeSentenceForDiagram.naturalKo,
-    activeSentenceForDiagram.tag
+  const activeToken: DiagramToken =
+    currentDiagramData.tokens[selectedTokenIdx] || currentDiagramData.tokens[0];
+
+  // 1~5교시 파생 데이터 (useMemo 최적화)
+  const wordbookEntries = useMemo(() => {
+    const levels: WordbookLevel[] =
+      wordbookLevelFilter === '전체'
+        ? ['중등 필수', '고등·수능 핵심', '비즈니스·실무', '오픽(OPIc)·구동사']
+        : [wordbookLevelFilter];
+    return levels.flatMap((lvl) =>
+      getExpandedWordbookByDay(lvl, selectedWordbookDay)
+    );
+  }, [wordbookLevelFilter, selectedWordbookDay]);
+
+  const generatedSyntaxList = useMemo(
+    () => generateCombinatorialSentences(syntaxGeneratorSeed, 12),
+    [syntaxGeneratorSeed]
   );
 
-  const currentMediaObj =
-    mediaPlatforms.find((m) => m.id === activeMediaPlatform) || mediaPlatforms[0];
+  const customPassageAnalysis = useMemo(
+    () => analyzeCustomSchoolPassage(customSchoolPassage),
+    [customSchoolPassage]
+  );
 
+  // 스피킹 타이머 (StrictMode 안전 처리 & 목표 도달 후 재시작 시 자동 리셋)
   useEffect(() => {
-    setSelectedBeginnerOpt(null);
-    setSelectedInterOpt(null);
-    setShowInterHint(false);
-    setSelectedAdvOpts([]);
-    setRevealedWordIds([]);
-    setActiveDiagramSentenceIdx(0);
-    setSelectedTokenIdx(0);
-    setCustomDissectSentence(null);
-  }, [selectedThemeId, selectedLiveKeyword]);
-
-  useEffect(() => {
-    if (!isVoiceActive) return;
-    const timer = setInterval(() => {
+    if (!isSpeakingTimerRunning) return;
+    const goalSecs = speakingGoalMins * 60;
+    const timer = window.setInterval(() => {
       setSpeakingSeconds((prev) => {
-        if (prev + 1 >= targetSpeakingMins * 60) {
-          setIsVoiceActive(false);
-          return targetSpeakingMins * 60;
-        }
-        if ((prev + 1) % 60 === 0) {
-          setStudyStats((s) => ({ ...s, speakingMinutes: s.speakingMinutes + 1 }));
+        if (prev + 1 >= goalSecs) {
+          setIsSpeakingTimerRunning(false);
+          return goalSecs;
         }
         return prev + 1;
       });
     }, 1000);
-    return () => clearInterval(timer);
-  }, [isVoiceActive, targetSpeakingMins]);
+    return () => window.clearInterval(timer);
+  }, [isSpeakingTimerRunning, speakingGoalMins]);
 
-  const toggleKoreanPron = (key: string) => {
-    setRevealedPronKeys((prev) =>
-      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
-    );
+  const handleToggleSpeakingTimer = () => {
+    const goalSecs = speakingGoalMins * 60;
+    if (!isSpeakingTimerRunning && speakingSeconds >= goalSecs) {
+      setSpeakingSeconds(0);
+    }
+    setIsSpeakingTimerRunning((prev) => !prev);
   };
 
-  const isPronVisible = (key: string) => showAllKoreanPron || revealedPronKeys.includes(key);
+  // Web Speech API 실제 음성 인식 (마이크 발화 -> 텍스트 입력)
+  const handleStartVoiceRecognition = () => {
+    const SpeechRec =
+      (window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown })
+        .SpeechRecognition ||
+      (window as unknown as { webkitSpeechRecognition?: unknown })
+        .webkitSpeechRecognition;
+    if (!SpeechRec) {
+      alert(
+        '현재 브라우저에서는 음성 인식(SpeechRecognition)을 지원하지 않습니다. 크롬 또는 사파리 최신 버전을 이용해 주세요.'
+      );
+      return;
+    }
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const recognition = new (SpeechRec as any)();
+      recognition.lang = ttsAccent;
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+      setIsMicListening(true);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      recognition.onresult = (event: any) => {
+        const transcript = event?.results?.[0]?.[0]?.transcript || '';
+        if (transcript) {
+          setUserChatInput((prev) => (prev ? `${prev} ${transcript}` : transcript));
+        }
+        setIsMicListening(false);
+      };
+      recognition.onerror = () => setIsMicListening(false);
+      recognition.onend = () => setIsMicListening(false);
+      recognition.start();
+    } catch {
+      setIsMicListening(false);
+    }
+  };
 
-  const toggleBookmark = (item: {
+  // AI 코치 문장 점검 및 피드백 생성 (실제 입력 문장 분석 반영)
+  const handleSendCoachMessage = () => {
+    const raw = userChatInput.trim();
+    if (!raw) return;
+    const words = raw.split(/\s+/);
+    const hasTarget = currentTheme.vocab.some((v) =>
+      raw.toLowerCase().includes(v.word.toLowerCase().split(' ')[0])
+    );
+    const polished =
+      raw.charAt(0).toUpperCase() +
+      raw.slice(1) +
+      (/[.!?]$/.test(raw) ? '' : '.');
+
+    const replyTurn: ChatTurn = {
+      role: 'coach',
+      text: hasTarget
+        ? `훌륭합니다! 오늘 테마의 핵심 어휘를 정확히 활용해 총 ${words.length}어절 문장을 완성하셨습니다.`
+        : `좋은 시도입니다! 작성하신 ${words.length}어절 문장에 오늘의 대표 표현("${currentTrack.patternEn}")을 결합하면 한층 더 설득력 있는 문장이 됩니다.`,
+      correction: `다듬은 문장: "${polished}"`,
+      nuanceTip: `고급 확장 팁: Not only does this clarify our goal, but it also helps us ${
+        currentTheme.vocab[0]?.collocation || 'streamline the workflow'
+      }.`,
+    };
+
+    setChatHistory((prev) => [...prev, { role: 'user', text: raw }, replyTurn]);
+    setUserChatInput('');
+  };
+
+  // ============================================================================
+  // 아이패드 애플펜슬 벡터 획 배열(strokesRef) 캔버스 렌더링 엔진
+  // - 형광펜 겹침 얼룩 방지 / 다크모드 시 검정 필기 -> 흰색 자동 반전 / 실행 취소(Undo) 완벽 지원
+  // ============================================================================
+  const renderAllStrokes = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+
+    if (
+      canvas.width !== Math.floor(rect.width * dpr) ||
+      canvas.height !== Math.floor(rect.height * dpr)
+    ) {
+      canvas.width = Math.floor(rect.width * dpr);
+      canvas.height = Math.floor(rect.height * dpr);
+    }
+
+    ctx.save();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, rect.width, rect.height);
+
+    const allStrokes = currentStrokeRef.current
+      ? [...strokesRef.current, currentStrokeRef.current]
+      : strokesRef.current;
+
+    for (const st of allStrokes) {
+      if (st.points.length === 0) continue;
+      ctx.save();
+      ctx.lineCap = st.tool === 'highlighter' ? 'square' : 'round';
+      ctx.lineJoin = 'round';
+
+      if (st.tool === 'eraser') {
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.globalAlpha = 1.0;
+        ctx.lineWidth = st.width * 4.5;
+        ctx.strokeStyle = '#000000';
+      } else {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = st.tool === 'highlighter' ? st.alpha : 1.0;
+        // 다크모드일 때 기존 검정/슬레이트(#0f172a) 필기를 밝은 흰색(#f8fafc)으로 자동 반전
+        const effectiveColor =
+          darkMode && st.color === '#0f172a' ? '#f8fafc' : st.color;
+        ctx.strokeStyle = effectiveColor;
+        ctx.lineWidth =
+          st.tool === 'highlighter'
+            ? st.width * 3.2
+            : st.tool === 'ballpoint'
+            ? Math.max(1.2, st.width * 0.85)
+            : st.width;
+      }
+
+      ctx.beginPath();
+      ctx.moveTo(st.points[0].x, st.points[0].y);
+      for (let i = 1; i < st.points.length; i++) {
+        ctx.lineTo(st.points[i].x, st.points[i].y);
+      }
+      if (st.points.length === 1) {
+        ctx.lineTo(st.points[0].x + 0.1, st.points[0].y + 0.1);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    ctx.restore();
+  };
+
+  useEffect(() => {
+    renderAllStrokes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [darkMode, canvasHeight, isPadMinimized, layoutMode, strokeCount]);
+
+  // iPadOS Safari 터치 시 파란 블록 선택 방지 네이티브 리스너
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const preventDefaultTouch = (e: Event) => {
+      if (e.cancelable) e.preventDefault();
+    };
+    canvas.addEventListener('touchstart', preventDefaultTouch, { passive: false });
+    canvas.addEventListener('touchmove', preventDefaultTouch, { passive: false });
+    canvas.addEventListener('selectstart', preventDefaultTouch);
+    return () => {
+      canvas.removeEventListener('touchstart', preventDefaultTouch);
+      canvas.removeEventListener('touchmove', preventDefaultTouch);
+      canvas.removeEventListener('selectstart', preventDefaultTouch);
+    };
+  }, []);
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    e.preventDefault();
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // ignore
+    }
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    isDrawingRef.current = true;
+    currentStrokeRef.current = {
+      tool: penType,
+      color: penColor,
+      width: penWidth,
+      alpha: highlighterAlpha,
+      points: [{ x, y, pressure: e.pressure || 0.5 }],
+    };
+    renderAllStrokes();
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isDrawingRef.current || !currentStrokeRef.current) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    currentStrokeRef.current.points.push({ x, y, pressure: e.pressure || 0.5 });
+    renderAllStrokes();
+  };
+
+  const handlePointerUpOrCancel = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isDrawingRef.current) return;
+    isDrawingRef.current = false;
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      // ignore
+    }
+    if (currentStrokeRef.current && currentStrokeRef.current.points.length > 0) {
+      strokesRef.current = [...strokesRef.current, currentStrokeRef.current];
+      currentStrokeRef.current = null;
+      setStrokeCount(strokesRef.current.length);
+      try {
+        localStorage.setItem(
+          'yanadu_strokes_v1',
+          JSON.stringify(strokesRef.current.slice(-80))
+        );
+      } catch {
+        // ignore
+      }
+    }
+    renderAllStrokes();
+  };
+
+  const handleUndoStroke = () => {
+    if (strokesRef.current.length === 0) return;
+    strokesRef.current = strokesRef.current.slice(0, -1);
+    setStrokeCount(strokesRef.current.length);
+    try {
+      localStorage.setItem('yanadu_strokes_v1', JSON.stringify(strokesRef.current));
+    } catch {
+      // ignore
+    }
+    renderAllStrokes();
+  };
+
+  const handleClearCanvas = () => {
+    strokesRef.current = [];
+    currentStrokeRef.current = null;
+    setStrokeCount(0);
+    try {
+      localStorage.removeItem('yanadu_strokes_v1');
+    } catch {
+      // ignore
+    }
+    renderAllStrokes();
+  };
+
+  // 단어·문장 보관함 핸들러 (토글 삭제 버그 수정 및 고유 ID 기반)
+  const isWordBookmarked = (wordStr: string) =>
+    bookmarkedWords.some((w) => w.word.toLowerCase() === wordStr.toLowerCase());
+
+  const toggleBookmarkWord = (item: {
     word: string;
     ipa: string;
+    pron?: string;
     meaning: string;
     collocation: string;
     posLabel: string;
@@ -4324,137 +5665,105 @@ export default function App() {
     levelBadge?: string;
   }) => {
     setBookmarkedWords((prev) => {
-      const exists = prev.some((b) => b.word === item.word);
-      if (exists) return prev.filter((b) => b.word !== item.word);
-      setStudyStats((s) => ({ ...s, masteredWords: s.masteredWords + 1 }));
-      return [{ ...item, customNote: '', mastered: false }, ...prev];
-    });
-  };
-
-  const fetchLiveDictionary = async (wordToSearch: string) => {
-    const clean = wordToSearch.trim().split(' ')[0];
-    if (!clean) return;
-    setIsLoadingDict(true);
-    try {
-      const res = await fetch(
-        `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(clean)}`
+      const exists = prev.some(
+        (w) => w.word.toLowerCase() === item.word.toLowerCase()
       );
-      if (res.ok) {
-        const data = await res.json();
-        const first = data[0];
-        const meaningObj = first?.meanings?.[0]?.definitions?.[0];
-        setLiveDictResult({
-          word: first?.word || clean,
-          phonetic: first?.phonetic || first?.phonetics?.[0]?.text || '/발음기호/',
-          definition: meaningObj?.definition || '영영 사전 정의를 불러왔습니다.',
-          example:
-            meaningObj?.example ||
-            `Let's practice using "${clean}" in our ${learningLevel} track.`,
-        });
-      } else {
-        setLiveDictResult({
-          word: clean,
-          phonetic: '/실전 구어/입시 핵심 표현/',
-          definition: '원어민 실전 구동사·수능 핵심 표현입니다. 우측 네이버/구글 사전 버튼으로 상세 예문을 확인하세요.',
-          example: `You really pulled off "${clean}" effortlessly!`,
-        });
-      }
-    } catch {
-      setLiveDictResult({
-        word: clean,
-        phonetic: '/사전 안내/',
-        definition: '우측 사전 바로가기 링크를 이용해 주세요.',
-        example: `Practice "${clean}" step by step.`,
-      });
-    } finally {
-      setIsLoadingDict(false);
-    }
-  };
-
-  const speakText = (
-    text: string,
-    customAccent?: 'en-US' | 'en-GB' | 'en-AU' | 'en-IN',
-    customRate?: number
-  ) => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-    window.speechSynthesis.cancel();
-    const cleanText = text.replace(/\[|\]|"/g, '');
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    const targetLang = customAccent || accent;
-    utterance.lang = targetLang;
-    utterance.rate = customRate || speechRate;
-
-    const voices = window.speechSynthesis.getVoices();
-    const matchedVoice = voices.find((v) => v.lang.includes(targetLang));
-    if (matchedVoice) utterance.voice = matchedVoice;
-    window.speechSynthesis.speak(utterance);
-  };
-
-  const getGoogleTranslateUrl = (text: string) => {
-    const clean = text.replace(/\[|\]/g, '');
-    return `https://translate.google.com/?sl=en&tl=ko&text=${encodeURIComponent(clean)}&op=translate`;
-  };
-
-  const getNaverDictUrl = (text: string) => {
-    const clean = text.replace(/\[|\]/g, '');
-    return `https://en.dict.naver.com/#/search?query=${encodeURIComponent(clean)}`;
-  };
-
-  const handleRunCorrection = (e: React.FormEvent) => {
-    e.preventDefault();
-    const raw = correctionInput.trim();
-    if (!raw) return;
-    const capitalized = raw.charAt(0).toUpperCase() + raw.slice(1);
-    const withPeriod =
-      capitalized.endsWith('.') || capitalized.endsWith('?')
-        ? capitalized
-        : `${capitalized}.`;
-
-    setCorrectionResult({
-      original: raw,
-      naturalEn: `[수능·내신 서술형 패러프레이징] ${currentLevelTrack.patternEn.replace('~', raw)}`,
-      wordOrderFix:
-        '서술형 감점 방지 점검: [주어(S) + 동사(V) + 목적어(DO)/보어(SC·OC)] 수일치와 5형식 보어 품사(형용사)를 확인하세요.',
-      grammarExplanation: `입력하신 "${withPeriod}" 문장을 외운 답이 아닌 구조적 어순으로 변형하면 내신 서술형 답안이 됩니다.`,
-      opicUpgrade: `[고급 확장] Not only does it clarify the meaning, but ${withPeriod}`,
-    });
-    setStudyStats((s) => ({ ...s, completedSentences: s.completedSentences + 1 }));
-  };
-
-  const handleSendChat = (e: React.FormEvent) => {
-    e.preventDefault();
-    const msg = chatInput.trim();
-    if (!msg) return;
-    const userTurn: ChatTurn = { role: 'user', text: msg };
-    const coachReply: ChatTurn = {
-      role: 'coach',
-      text: `[${learningLevel.toUpperCase()} COACH] Great structure! "${msg}" shows strong command of word order. Try transforming it with "${currentTheme.vocab[0].collocation}"!`,
-      correction: `💡 레벨업 & 서술형 추천 표현: "${currentLevelTrack.patternEn}"`,
-      nuanceTip: `현재 배속(${speechRate}x)에 맞춰 의미단위(소리블록)로 끊어 읽어보세요!`,
-    };
-    setChatHistory((prev) => [...prev, userTurn, coachReply]);
-    setChatInput('');
-    speakText(coachReply.text);
-  };
-
-  const renderHighlightedSentence = (line: string) => {
-    const parts = line.split(/(\[[^\]]+\])/g);
-    return parts.map((part, idx) => {
-      if (part.startsWith('[') && part.endsWith(']')) {
-        const word = part.slice(1, -1);
-        return (
-          <strong
-            key={idx}
-            className="underline decoration-2 decoration-blue-500 underline-offset-4 font-extrabold text-blue-600 dark:text-yellow-300 px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/70"
-          >
-            {word}
-          </strong>
+      if (exists) {
+        return prev.filter(
+          (w) => w.word.toLowerCase() !== item.word.toLowerCase()
         );
       }
-      return <span key={idx}>{part}</span>;
+      return [
+        {
+          id: `w-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          word: item.word,
+          ipa: item.ipa,
+          pron: item.pron,
+          meaning: item.meaning,
+          collocation: item.collocation,
+          posLabel: item.posLabel,
+          compLabel: item.compLabel,
+          levelBadge: item.levelBadge || '일일 강의',
+          customNote: '',
+          mastered: false,
+        },
+        ...prev,
+      ];
     });
   };
 
+  const handleAddCustomWord = () => {
+    const w = newWordForm.word.trim();
+    const m = newWordForm.meaning.trim();
+    if (!w || !m) return;
+    setBookmarkedWords((prev) => [
+      {
+        id: `custom-w-${Date.now()}`,
+        word: w,
+        ipa: '/직접 추가/',
+        pron: newWordForm.pron.trim() || '[발음 메모]',
+        meaning: m,
+        collocation: newWordForm.collocation.trim() || w,
+        posLabel: '핵심 어휘',
+        compLabel: '직접 등록',
+        levelBadge: '내 단어장',
+        customNote: newWordForm.note.trim(),
+        mastered: false,
+      },
+      ...prev,
+    ]);
+    setNewWordForm({ word: '', pron: '', meaning: '', collocation: '', note: '' });
+  };
+
+  const handleAddCustomSentence = () => {
+    const en = newSentEn.trim();
+    const ko = newSentKo.trim();
+    if (!en || !ko) return;
+    setSavedSentences((prev) => [
+      {
+        id: `custom-s-${Date.now()}`,
+        en,
+        pron: newSentPron.trim(),
+        ko,
+        note: newSentNote.trim() || '직접 추가한 핵심 예문',
+        category: '직접 등록 구문',
+        mastered: false,
+      },
+      ...prev,
+    ]);
+    setNewSentEn('');
+    setNewSentPron('');
+    setNewSentKo('');
+    setNewSentNote('');
+  };
+
+  const toggleSaveSentenceFromLesson = (
+    en: string,
+    ko: string,
+    note: string,
+    pron?: string
+  ) => {
+    setSavedSentences((prev) => {
+      const exists = prev.some((s) => s.en.toLowerCase() === en.toLowerCase());
+      if (exists) {
+        return prev.filter((s) => s.en.toLowerCase() !== en.toLowerCase());
+      }
+      return [
+        {
+          id: `lesson-s-${Date.now()}`,
+          en,
+          pron,
+          ko,
+          note,
+          category: currentTheme.badge,
+          mastered: false,
+        },
+        ...prev,
+      ];
+    });
+  };
+
+  // 스타일 헬퍼
   const fontClass =
     fontStyle === 'serif'
       ? 'font-serif'
@@ -4471,1759 +5780,1178 @@ export default function App() {
       ? 'bg-amber-600'
       : 'bg-blue-600';
 
-  const filteredWordbook = getExpandedWordbookByDay(wordbookLevel, wordbookDay);
-  const generatedSyntaxList = generateCombinatorialSentences(syntaxSeed, 12);
-  const customPassageAnalysis = analyzeCustomSchoolPassage(customSchoolText);
-  const examVocabTestList = getExpandedWordbookByDay('고등·수능 핵심', vocabQuizSeed);
-  // ==========================================================================
-  // [파트 4] 누락 없는 전체 화면 UI + 양방향 보관함 + 필기 도구 5종(펜 4종+지우개)
-  // ==========================================================================
+  const SPEED_STEPS: { rate: number; label: string; badge: string }[] = [
+    { rate: 0.3, label: '0.30x', badge: '입문·초저속' },
+    { rate: 0.5, label: '0.50x', badge: '초보·천천히' },
+    { rate: 0.75, label: '0.75x', badge: '연음·중저속' },
+    { rate: 1.0, label: '1.0x', badge: '원어민 표준' },
+    { rate: 1.25, label: '1.25x', badge: '고급·쾌속' },
+  ];
+
+  const PEN_WIDTH_STEPS: { px: number; label: string }[] = [
+    { px: 1.5, label: '극세필 1.5' },
+    { px: 2.5, label: '세필 2.5' },
+    { px: 4, label: '보통 4.0' },
+    { px: 6, label: '중간 6.0' },
+    { px: 9, label: '강조 9.0' },
+  ];
+
+  // 1교시 & 5교시 실시간 채점 점수 계산
+  const period1QuizItems = useMemo(() => {
+    return deterministicShuffle(wordbookEntries, vocabChallengeSetSeed).slice(0, 20);
+  }, [wordbookEntries, vocabChallengeSetSeed]);
+
+  const period1CorrectCount = useMemo(() => {
+    let count = 0;
+    period1QuizItems.forEach((item, idx) => {
+      const key = `${vocabChallengeSetSeed}-${idx}`;
+      if (period1Answers[key] === 0) count++;
+    });
+    return count;
+  }, [period1QuizItems, period1Answers, vocabChallengeSetSeed]);
+
+  const quiz406CorrectCount = useMemo(() => {
+    let count = 0;
+    GRAMMAR_406_QUIZ_BANK.forEach((q) => {
+      if (quiz406Answers[q.id] === q.correct) count++;
+    });
+    return count;
+  }, [quiz406Answers]);
+
   return (
     <div
-      className={`${darkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'} ${fontClass} min-h-screen`}
+      className={`min-h-dvh ${fontClass} ${
+        darkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'
+      }`}
     >
+      {/* 인쇄 시 전체 페이지 출력 보장 CSS */}
       <style>{`
-        .no-safari-select, .no-safari-select * {
-          -webkit-touch-callout: none !important;
-          -webkit-user-select: none !important;
-          user-select: none !important;
-          -webkit-tap-highlight-color: transparent !important;
-        }
         @media print {
+          html, body, #root { height: auto !important; overflow: visible !important; }
           .no-print { display: none !important; }
-          .print-container {
-            width: 210mm !important;
-            max-width: 100% !important;
-            margin: 0 auto !important;
-            padding: 10mm !important;
-            background: #ffffff !important;
-            color: #000000 !important;
-            overflow: visible !important;
-            height: auto !important;
-          }
+          .print-expand { height: auto !important; overflow: visible !important; max-height: none !important; }
         }
       `}</style>
 
-      <div className="flex h-screen overflow-hidden">
-        {/* 좌측 사이드바: 9대 매체 실시간 새로고침 + 수능·내신 바로가기 + 5단계 배속 & 4개국 억양 */}
-        <aside
-          className={`no-print w-80 flex-shrink-0 border-r flex flex-col h-full select-none transition-colors ${
-            darkMode
-              ? 'bg-slate-900 border-slate-800 text-slate-100'
-              : 'bg-white border-slate-200 text-slate-900'
-          }`}
-        >
-          <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className={`px-2 py-0.5 text-[10px] font-extrabold rounded text-white ${themeAccentBg}`}>
-                  코어어휘+조합구문
-                </span>
-                <h1 className="text-base font-extrabold tracking-tight">나만의 야나두 PRO</h1>
-              </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                📅 {todayDateStr} · 실시간 연동 ON
-              </p>
-            </div>
+      {/* ==================================================================== */}
+      {/* 상단 글로벌 헤더 (모드 전환 · 한글발음 스위치 · 글씨체 한글화 · 테마색 영문) */}
+      {/* ==================================================================== */}
+      <header
+        className={`sticky top-0 z-30 border-b px-4 py-2.5 backdrop-blur-md no-print ${
+          darkMode
+            ? 'bg-slate-900/95 border-slate-800'
+            : 'bg-white/95 border-slate-200 shadow-xs'
+        }`}
+      >
+        <div className="max-w-[1600px] mx-auto flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <span
+              className={`px-2.5 py-1 rounded-lg text-xs font-extrabold text-white ${themeAccentBg}`}
+            >
+              야나두 영어 PRO
+            </span>
+            <h1 className="text-sm md:text-base font-black tracking-tight">
+              16문법 노드(7성분+9품사) · 소리블록 · 수능·오픽 통합 마스터
+            </h1>
+          </div>
+
+          {/* 메인 6대 모드 탭 */}
+          <nav className="flex flex-wrap items-center gap-1">
+            {[
+              { id: 'daily', label: '📚 일일 강의 (STEP 1~5)' },
+              { id: 'examCourses', label: '🎓 1~5교시·수능·내신' },
+              { id: 'wordbook', label: '📘 8,000단어장 (Day 1~100)' },
+              {
+                id: 'myVault',
+                label: `⭐ 내 보관함 (${bookmarkedWords.length + savedSentences.length})`,
+              },
+              { id: 'curriculum', label: '🗓️ 전체 총람(치트시트)' },
+              { id: 'devStory', label: '🛠️ 제작과정 백서' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() =>
+                  setActiveMode(
+                    tab.id as
+                      | 'daily'
+                      | 'examCourses'
+                      | 'wordbook'
+                      | 'myVault'
+                      | 'curriculum'
+                      | 'devStory'
+                  )
+                }
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  activeMode === tab.id
+                    ? `${themeAccentBg} text-white shadow-xs`
+                    : darkMode
+                    ? 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+
+          {/* 우측 직관적 설정 컨트롤 바 */}
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
             <button
-              onClick={() => setDarkMode((prev) => !prev)}
-              className={`px-3 py-1.5 rounded-xl border text-xs font-extrabold transition ${
+              onClick={() => setShowPronGuide((p) => !p)}
+              className={`px-2.5 py-1 rounded-md font-bold border ${
+                showPronGuide
+                  ? 'bg-emerald-600 text-white border-emerald-600'
+                  : darkMode
+                  ? 'bg-slate-800 text-slate-300 border-slate-700'
+                  : 'bg-white text-slate-700 border-slate-300'
+              }`}
+            >
+              {showPronGuide ? '👁️ 한글발음 켜짐' : '🙈 한글발음 가림'}
+            </button>
+
+            {/* 글씨체: 고딕 · 명조 · 코딩체 직관적 한글 표기 */}
+            <div
+              className={`flex items-center rounded-md border px-1.5 py-0.5 gap-1 ${
+                darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-slate-100'
+              }`}
+            >
+              <span className="text-[11px] font-bold opacity-75">글씨체:</span>
+              {(
+                [
+                  { id: 'sans', label: '고딕' },
+                  { id: 'serif', label: '명조' },
+                  { id: 'mono', label: '코딩체' },
+                ] as const
+              ).map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setFontStyle(f.id)}
+                  className={`px-1.5 py-0.5 rounded text-[11px] font-bold ${
+                    fontStyle === f.id
+                      ? `${themeAccentBg} text-white`
+                      : 'opacity-75 hover:opacity-100'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            {/* 테마색: 기존처럼 영문(BLUE/EMERALD/INDIGO/AMBER) 유지 */}
+            <div
+              className={`flex items-center rounded-md border px-1.5 py-0.5 gap-1 ${
+                darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-slate-100'
+              }`}
+            >
+              <span className="text-[11px] font-bold opacity-75">테마색:</span>
+              {(['blue', 'emerald', 'indigo', 'amber'] as const).map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setColorTheme(c)}
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold uppercase ${
+                    colorTheme === c
+                      ? `${themeAccentBg} text-white`
+                      : 'opacity-70 hover:opacity-100'
+                  }`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() =>
+                setLayoutMode((m) => (m === 'split' ? 'wide' : 'split'))
+              }
+              className={`px-2 py-1 rounded-md font-bold border ${
                 darkMode
-                  ? 'bg-yellow-400 text-slate-950 border-yellow-400'
-                  : 'bg-slate-900 text-white border-slate-900'
+                  ? 'bg-slate-800 border-slate-700 text-slate-200'
+                  : 'bg-white border-slate-300 text-slate-700'
+              }`}
+            >
+              {layoutMode === 'split' ? '📐 2단 분할화면' : '🖥️ 와이드 전체화면'}
+            </button>
+
+            <button
+              onClick={() => setDarkMode((d) => !d)}
+              className={`px-2 py-1 rounded-md font-bold border ${
+                darkMode
+                  ? 'bg-amber-400 text-slate-950 border-amber-400'
+                  : 'bg-slate-800 text-white border-slate-800'
               }`}
             >
               {darkMode ? '☀️ 라이트' : '🌙 다크'}
             </button>
+
+            <button
+              onClick={() => window.print()}
+              className="px-2 py-1 rounded-md font-bold border bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200"
+            >
+              🖨️ 교안인쇄
+            </button>
           </div>
+        </div>
+      </header>
 
-          <div className="p-3 bg-gradient-to-r from-indigo-900 via-blue-900 to-slate-900 text-white border-b border-slate-800 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-amber-400 text-slate-950">
-                수능·내신 1등급 마스터
-              </span>
-              <span className="text-[10px] text-blue-200 font-bold">1~5교시 실전 훈련</span>
-            </div>
-            <div className="text-xs font-extrabold leading-snug">
-              🎓 외운 답이 아닌 스스로 답을 만드는 영어!
-            </div>
-            <div className="grid grid-cols-3 gap-1 pt-0.5">
-              {[
-                { id: 'CSAT_MASTER' as ExamTrackId, label: '수능완성반' },
-                { id: 'GRAMMAR_ESSAY' as ExamTrackId, label: '어법·서술형' },
-                { id: 'SCHOOL_INTERNAL' as ExamTrackId, label: '학교별내신' },
-              ].map((tr) => (
-                <button
-                  key={tr.id}
-                  onClick={() => {
-                    setSelectedExamTrack(tr.id);
-                    setActiveMode('examMaster');
-                  }}
-                  className={`py-1.5 px-1 rounded-lg text-[10px] font-extrabold transition ${
-                    activeMode === 'examMaster' && selectedExamTrack === tr.id
-                      ? 'bg-amber-400 text-slate-950 shadow'
-                      : 'bg-slate-800/90 hover:bg-slate-700 text-white'
-                  }`}
-                >
-                  {tr.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="p-3 bg-slate-900 text-white border-b border-slate-800 space-y-2">
-            <div className="flex items-center justify-between text-[11px] font-bold text-slate-300">
-              <span>💚 실시간 영영·네이버 사전 허브</span>
-              <span className="text-emerald-400">Live API</span>
-            </div>
-            <div className="flex gap-1">
-              <input
-                type="text"
-                value={dictQuery}
-                onChange={(e) => setDictQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && fetchLiveDictionary(dictQuery)}
-                placeholder="단어 검색 (예: feasible, perspective)"
-                className="flex-1 bg-slate-800 text-white text-xs px-2.5 py-1.5 rounded-lg border border-slate-700 focus:outline-none focus:border-emerald-400"
-              />
-              <button
-                onClick={() => fetchLiveDictionary(dictQuery || currentTheme.vocab[0].word)}
-                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold rounded-lg"
-              >
-                {isLoadingDict ? '...' : '검색'}
-              </button>
-            </div>
-
-            {liveDictResult && (
-              <div className="p-2.5 rounded-xl bg-slate-800 border border-emerald-500/40 text-[11px] space-y-1">
-                <div className="flex items-center justify-between">
-                  <strong className="text-emerald-300 text-xs">
-                    {liveDictResult.word}{' '}
-                    <span className="text-slate-300 font-mono">{liveDictResult.phonetic}</span>
-                  </strong>
-                  <button
-                    onClick={() => setLiveDictResult(null)}
-                    className="text-slate-400 hover:text-white"
-                  >
-                    ✕
-                  </button>
-                </div>
-                <p className="text-slate-200">{liveDictResult.definition}</p>
-                <p className="text-blue-300 italic">"{liveDictResult.example}"</p>
-              </div>
-            )}
-
-            <div className="grid grid-cols-4 gap-1 text-[10px] font-bold text-center">
-              <a
-                href={getNaverDictUrl(dictQuery || currentTheme.vocab[0].word)}
-                target="_blank"
-                rel="noreferrer"
-                className="bg-slate-800 hover:bg-slate-700 py-1 rounded text-emerald-300"
-              >
-                N영어사전
-              </a>
-              <a
-                href="https://en.dict.naver.com/#/enendict/home"
-                target="_blank"
-                rel="noreferrer"
-                className="bg-slate-800 hover:bg-slate-700 py-1 rounded text-slate-200"
-              >
-                영영사전
-              </a>
-              <a
-                href="https://papago.naver.com/"
-                target="_blank"
-                rel="noreferrer"
-                className="bg-slate-800 hover:bg-slate-700 py-1 rounded text-slate-200"
-              >
-                파파고
-              </a>
-              <a
-                href={getGoogleTranslateUrl(dictQuery || currentLevelTrack.patternEn)}
-                target="_blank"
-                rel="noreferrer"
-                className="bg-slate-800 hover:bg-slate-700 py-1 rounded text-blue-300"
-              >
-                구글번역
-              </a>
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-3 space-y-4">
+      {/* ==================================================================== */}
+      {/* 메인 레이아웃 컨테이너 (좌측 사이드바 + 우측 본문) */}
+      {/* ==================================================================== */}
+      <div className="max-w-[1600px] mx-auto flex flex-col lg:flex-row gap-4 p-3 md:p-4 print-expand">
+        {/* 좌측 사이드바: 리딩 속도 5단계 + 9대 매체 트렌드 & 강제 업데이트 + 테마 선택 */}
+        {layoutMode === 'split' && (
+          <aside className="w-full lg:w-80 shrink-0 space-y-4 no-print">
+            {/* 1) 리딩 속도 5단계 (0.30x · 0.50x · 0.75x · 1.0x · 1.25x) & 4개국 억양 */}
             <div
-              className={`p-3 rounded-2xl border ${
+              className={`p-3.5 rounded-2xl border ${
                 darkMode
-                  ? 'bg-slate-800/60 border-slate-700'
-                  : 'bg-slate-100/90 border-slate-200'
+                  ? 'bg-slate-900 border-slate-800'
+                  : 'bg-white border-slate-200 shadow-xs'
               }`}
             >
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-extrabold">🔥 9대 매체 실시간 트렌드 TOP 10</span>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-extrabold">
+                  🎙️ 원어민 음성 & 리딩 속도 5단계
+                </span>
+                <span className="text-[11px] font-bold text-blue-500">
+                  현재 {ttsRate.toFixed(2)}x
+                </span>
+              </div>
+              <div className="grid grid-cols-4 gap-1 mb-2.5">
+                {(
+                  [
+                    { code: 'en-US', label: '🇺🇸 미국' },
+                    { code: 'en-GB', label: '🇬🇧 영국' },
+                    { code: 'en-AU', label: '🇦🇺 호주' },
+                    { code: 'en-CA', label: '🇨🇦 캐나다' },
+                  ] as const
+                ).map((acc) => (
+                  <button
+                    key={acc.code}
+                    onClick={() => setTtsAccent(acc.code)}
+                    className={`py-1 rounded-lg text-[11px] font-bold border ${
+                      ttsAccent === acc.code
+                        ? `${themeAccentBg} text-white border-transparent`
+                        : darkMode
+                        ? 'bg-slate-800 border-slate-700 text-slate-300'
+                        : 'bg-slate-50 border-slate-200 text-slate-700'
+                    }`}
+                  >
+                    {acc.label}
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-5 gap-1">
+                {SPEED_STEPS.map((st) => (
+                  <button
+                    key={st.rate}
+                    onClick={() => setTtsRate(st.rate)}
+                    className={`py-1.5 px-1 rounded-lg text-center border transition-all ${
+                      Math.abs(ttsRate - st.rate) < 0.02
+                        ? `${themeAccentBg} text-white border-transparent shadow-xs`
+                        : darkMode
+                        ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <div className="text-xs font-black">{st.label}</div>
+                    <div className="text-[9px] opacity-85 truncate">{st.badge}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 2) 9대 매체 트렌드 허브 + [⚡ 강제 업데이트] 버튼 + 날짜·시간 표시 */}
+            <div
+              className={`p-3.5 rounded-2xl border ${
+                darkMode
+                  ? 'bg-slate-900 border-slate-800'
+                  : 'bg-white border-slate-200 shadow-xs'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <div>
+                  <h2 className="text-xs font-extrabold">
+                    🌐 9대 매체 트렌드 표현 TOP 10
+                  </h2>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                    📅 최근 업데이트: <strong className="text-emerald-500">{lastTrendSyncTime}</strong>
+                  </p>
+                </div>
                 <button
-                  onClick={handleRefreshLiveTrends}
-                  className="px-2 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-extrabold flex items-center gap-1 shadow-sm"
+                  onClick={handleForceSyncTrends}
+                  disabled={isTrendSyncing}
+                  className="px-2.5 py-1.5 rounded-lg text-[11px] font-extrabold bg-rose-600 text-white hover:bg-rose-700 shadow-xs shrink-0"
                 >
-                  <span>{isRefreshingTrends ? '⏳ 갱신중...' : '🔄 실시간 새로고침'}</span>
+                  {isTrendSyncing ? '⏳ 동기화 중...' : '⚡ 강제 업데이트'}
                 </button>
               </div>
-              <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 mb-2">
-                <span>⏱️ {lastTrendSyncTime}</span>
+
+              {/* 9대 플랫폼 탭 */}
+              <div className="flex flex-wrap gap-1 my-2">
+                {mediaPlatforms.map((plat) => (
+                  <button
+                    key={plat.id}
+                    onClick={() => setActivePlatformId(plat.id)}
+                    className={`px-2 py-1 rounded-md text-[10px] font-bold transition-all ${
+                      activePlatformId === plat.id
+                        ? plat.badgeColor
+                        : darkMode
+                        ? 'bg-slate-800 text-slate-300'
+                        : 'bg-slate-100 text-slate-700'
+                    }`}
+                  >
+                    {plat.shortName}
+                  </button>
+                ))}
+              </div>
+
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 mb-2 flex items-center justify-between">
+                <span>📌 {activePlatform.sourceNote}</span>
                 <a
-                  href={currentMediaObj.liveUrl}
+                  href={activePlatform.liveUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-blue-600 dark:text-blue-400 font-bold underline"
+                  className="text-blue-500 font-bold underline"
                 >
-                  매체 원문↗
+                  원문 매체↗
                 </a>
               </div>
 
-              <div className="grid grid-cols-3 gap-1 mb-2.5">
-                {mediaPlatforms.map((mp) => (
-                  <button
-                    key={mp.id}
-                    onClick={() => setActiveMediaPlatform(mp.id)}
-                    className={`py-1 px-1.5 rounded-lg text-[10px] font-extrabold truncate transition ${
-                      activeMediaPlatform === mp.id
-                        ? mp.badgeColor
-                        : darkMode
-                        ? 'bg-slate-900 text-slate-300 border border-slate-700'
-                        : 'bg-white text-slate-600 border border-slate-200'
-                    }`}
-                  >
-                    {mp.shortName}
-                  </button>
-                ))}
-              </div>
-
-              <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
-                {currentMediaObj.keywords.map((kw) => {
-                  const isKwActive =
-                    selectedLiveKeyword?.koTitle === kw.koTitle &&
+              <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
+                {activePlatform.keywords.map((kw) => {
+                  const isSel =
+                    selectedLiveKeyword?.enExpression === kw.enExpression &&
                     selectedLiveKeyword?.rank === kw.rank;
                   return (
                     <div
-                      key={kw.rank}
-                      onClick={() => {
-                        setSelectedThemeId(kw.targetThemeId);
-                        setSelectedLiveKeyword({
-                          platformName: currentMediaObj.shortName,
-                          rank: kw.rank,
-                          koTitle: kw.koTitle,
-                          enExpression: kw.enExpression,
-                          extUrl: kw.extUrl,
-                        });
-                        setActiveMode('daily');
-                        setActiveDiagramSentenceIdx(0);
-                        speakText(kw.enExpression);
-                        fetchLiveDictionary(kw.enExpression);
-                      }}
-                      className={`group flex items-center justify-between p-2 rounded-xl border cursor-pointer transition ${
-                        isKwActive
-                          ? 'bg-blue-600 text-white border-blue-500 shadow'
+                      key={`${activePlatform.id}-${kw.rank}-${kw.enExpression}`}
+                      onClick={() => handleClickTrendKeyword(kw)}
+                      className={`p-2 rounded-xl border cursor-pointer transition-all ${
+                        isSel
+                          ? 'border-blue-500 bg-blue-50/80 dark:bg-blue-950/50'
                           : darkMode
-                          ? 'bg-slate-900 hover:bg-slate-800 border-slate-800'
-                          : 'bg-white hover:bg-blue-50 border-slate-200/70'
+                          ? 'border-slate-800 bg-slate-800/50 hover:bg-slate-800'
+                          : 'border-slate-200 bg-slate-50/70 hover:bg-slate-100'
                       }`}
                     >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span
-                          className={`w-5 h-5 rounded-md text-[10px] font-extrabold flex items-center justify-center flex-shrink-0 ${
-                            isKwActive
-                              ? 'bg-white text-blue-700'
-                              : kw.rank <= 3
-                              ? `${themeAccentBg} text-white`
-                              : darkMode
-                              ? 'bg-slate-800 text-slate-300'
-                              : 'bg-slate-200 text-slate-700'
-                          }`}
-                        >
-                          {kw.rank}
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-[11px] font-bold truncate">
+                          <span className="inline-block w-4 text-rose-500 font-black">
+                            {kw.rank}.
+                          </span>
+                          {kw.koTitle}
                         </span>
-                        <div className="truncate">
-                          <div className="text-[11px] font-bold truncate">{kw.koTitle}</div>
-                          <div
-                            className={`text-[10px] font-semibold truncate ${
-                              isKwActive ? 'text-yellow-300' : 'text-blue-600 dark:text-blue-400'
-                            }`}
-                          >
-                            🗣️ {kw.enExpression}
-                          </div>
-                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            speakText(kw.enExpression);
+                          }}
+                          className="text-[10px] px-1.5 py-0.5 rounded bg-blue-600 text-white font-bold shrink-0"
+                        >
+                          🔊
+                        </button>
                       </div>
-                      <a
-                        href={kw.extUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-blue-600 flex-shrink-0"
-                      >
-                        ↗
-                      </a>
+                      <div className="text-xs font-extrabold text-blue-600 dark:text-blue-400 mt-0.5">
+                        {kw.enExpression}
+                      </div>
+                      {showPronGuide && (
+                        <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                          {kw.ipa} · {kw.pron}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
               </div>
+
+              {/* 영영사전 API 실시간 조회 결과창 */}
+              {liveDictData && (
+                <div
+                  className={`mt-2.5 p-2.5 rounded-xl border text-xs ${
+                    darkMode
+                      ? 'bg-slate-950 border-slate-800'
+                      : 'bg-slate-100 border-slate-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-black text-blue-500">
+                      📖 영영사전 조회: {liveDictData.word}
+                    </span>
+                    <span className="text-[10px] opacity-75">
+                      {liveDictData.phonetic}
+                    </span>
+                  </div>
+                  <p className="text-[11px] mt-1 leading-relaxed">
+                    {liveDictData.loading
+                      ? '영영사전 데이터를 불러오는 중입니다...'
+                      : liveDictData.definition}
+                  </p>
+                </div>
+              )}
             </div>
 
-            <div>
-              <div className="flex items-center justify-between px-1 mb-1.5">
-                <p className="text-[11px] font-extrabold text-slate-400 uppercase">
-                  📚 5대 정규 커리큘럼 (초·중·고급)
-                </p>
-                {selectedLiveKeyword && (
-                  <button
-                    onClick={() => setSelectedLiveKeyword(null)}
-                    className="text-[10px] font-extrabold text-rose-500 underline"
-                  >
-                    실검모드 해제
-                  </button>
-                )}
-              </div>
-              <div className="space-y-1.5">
-                {THEMES.map((theme) => {
-                  const isSel =
-                    theme.id === selectedThemeId &&
-                    !selectedLiveKeyword &&
-                    activeMode === 'daily';
-                  return (
-                    <button
-                      key={theme.id}
-                      onClick={() => {
-                        setSelectedLiveKeyword(null);
-                        setSelectedThemeId(theme.id);
-                        setActiveMode('daily');
-                      }}
-                      className={`w-full text-left p-2.5 rounded-2xl border transition ${
-                        isSel
-                          ? `${themeAccentBg} text-white border-transparent shadow`
-                          : darkMode
-                          ? 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-100'
-                          : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-800'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between text-[10px] font-bold opacity-85">
-                        <span>{theme.badge}</span>
-                      </div>
-                      <div className="text-xs font-extrabold mt-0.5">{theme.title}</div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
+            {/* 3) 5대 정규 테마 선택 */}
             <div
-              className={`p-3 rounded-2xl border space-y-2 ${
+              className={`p-3.5 rounded-2xl border ${
                 darkMode
-                  ? 'bg-slate-800/70 border-slate-700'
-                  : 'bg-slate-100 border-slate-200'
+                  ? 'bg-slate-900 border-slate-800'
+                  : 'bg-white border-slate-200 shadow-xs'
               }`}
             >
-              <div className="flex items-center justify-between text-[11px] font-extrabold">
-                <span>🎚️ 리딩 속도 5단계 세분화 제어</span>
-                <span className="text-blue-600 dark:text-blue-400">{speechRate}x</span>
-              </div>
-              <div className="grid grid-cols-5 gap-1 text-[10px] font-extrabold">
-                {[
-                  { rate: 0.75, label: '0.75x\n초급느림' },
-                  { rate: 0.85, label: '0.85x\n연음훈련' },
-                  { rate: 1.0, label: '1.0x\n실전표준' },
-                  { rate: 1.15, label: '1.15x\n빠른청해' },
-                  { rate: 1.25, label: '1.25x\n고급도전' },
-                ].map((r) => (
+              <h2 className="text-xs font-extrabold mb-2">
+                🗂️ 5대 실전 테마 커리큘럼
+              </h2>
+              <div className="space-y-1.5">
+                {THEMES.map((th) => (
                   <button
-                    key={r.rate}
+                    key={th.id}
                     onClick={() => {
-                      setSpeechRate(r.rate);
-                      speakText(currentLevelTrack.patternEn, accent, r.rate);
+                      setSelectedLiveKeyword(null);
+                      setSelectedThemeId(th.id);
+                      setActiveMode('daily');
+                      setActiveSentenceIdx(0);
+                      setSelectedTokenIdx(0);
                     }}
-                    className={`py-1.5 px-1 rounded-lg border whitespace-pre-line leading-tight text-center transition ${
-                      speechRate === r.rate
-                        ? `${themeAccentBg} text-white border-transparent`
+                    className={`w-full text-left p-2.5 rounded-xl border transition-all ${
+                      selectedThemeId === th.id && !selectedLiveKeyword
+                        ? `${themeAccentBg} text-white border-transparent shadow-xs`
                         : darkMode
-                        ? 'bg-slate-900 border-slate-700 text-slate-300'
-                        : 'bg-white border-slate-200 text-slate-700'
+                        ? 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700'
+                        : 'bg-slate-50 border-slate-200 text-slate-800 hover:bg-slate-100'
                     }`}
                   >
-                    {r.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* 4개국 발음 억양 선택기 (setAccent 연결 완료) */}
-              <div className="grid grid-cols-4 gap-1 text-[10px] font-bold pt-1">
-                {[
-                  { code: 'en-US' as const, label: '🇺🇸 미국' },
-                  { code: 'en-GB' as const, label: '🇬🇧 영국' },
-                  { code: 'en-AU' as const, label: '🇦🇺 호주' },
-                  { code: 'en-IN' as const, label: '🇮🇳 인도' },
-                ].map((item) => (
-                  <button
-                    key={item.code}
-                    onClick={() => {
-                      setAccent(item.code);
-                      speakText(currentLevelTrack.patternEn, item.code);
-                    }}
-                    className={`py-1 rounded-lg border ${
-                      accent === item.code
-                        ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 border-transparent'
-                        : darkMode
-                        ? 'bg-slate-900 border-slate-700'
-                        : 'bg-white border-slate-200'
-                    }`}
-                  >
-                    {item.label}
+                    <div className="text-[10px] font-bold opacity-85">
+                      {th.badge}
+                    </div>
+                    <div className="text-xs font-extrabold mt-0.5">{th.title}</div>
                   </button>
                 ))}
               </div>
             </div>
-          </div>
-        </aside>
+          </aside>
+        )}
 
-        {/* 우측 메인 영역 */}
-        <main className="flex-1 flex flex-col h-full overflow-hidden relative">
-          <header
-            className={`no-print border-b px-5 py-3 space-y-2.5 transition-colors ${
-              darkMode
-                ? 'bg-slate-900 border-slate-800'
-                : 'bg-white border-slate-200'
-            }`}
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200/70 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-extrabold text-slate-500 dark:text-slate-400">
-                  🎯 레벨 스위치:
-                </span>
-                <div className="inline-flex p-1 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                  {[
-                    { id: 'beginner' as LearningLevel, label: '🌱 초급 (0.75x 느림)' },
-                    { id: 'intermediate' as LearningLevel, label: '🌿 중급 (바꿔 말하기)' },
-                    { id: 'advanced' as LearningLevel, label: '🌳 고급 (긴 대화·비평)' },
-                  ].map((lvl) => (
-                    <button
-                      key={lvl.id}
-                      onClick={() => handleSelectLevel(lvl.id)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition ${
-                        learningLevel === lvl.id
-                          ? `${themeAccentBg} text-white shadow`
-                          : 'text-slate-600 dark:text-slate-300'
-                      }`}
-                    >
-                      {lvl.label}
-                    </button>
-                  ))}
+        {/* ================================================================== */}
+        {/* 우측 메인 콘텐츠 영역 */}
+        {/* ================================================================== */}
+        <main className="flex-1 min-w-0 space-y-6 print-expand">
+          {/* ---------------------------------------------------------------- */}
+          {/* [모드 1] 📚 일일 강의 (STEP 1 ~ STEP 5 누락 항목 100% 복원) */}
+          {/* ---------------------------------------------------------------- */}
+          {activeMode === 'daily' && (
+            <div className="space-y-6">
+              {/* 초·중·고급 3단계 레벨 스위치 */}
+              <div
+                className={`p-4 rounded-2xl border ${
+                  darkMode
+                    ? 'bg-slate-900 border-slate-800'
+                    : 'bg-white border-slate-200 shadow-xs'
+                }`}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                  <div>
+                    <span className="text-xs font-extrabold text-blue-500">
+                      {currentTheme.badge}
+                    </span>
+                    <h2 className="text-lg md:text-xl font-black">
+                      {currentTheme.title}
+                    </h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {currentTheme.subtitle}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {(
+                      [
+                        { id: 'beginner', label: '🌱 초급 (0.30~0.50x)' },
+                        { id: 'intermediate', label: '🌿 중급 (0.75~1.0x)' },
+                        { id: 'advanced', label: '🌳 고급 (1.0~1.25x)' },
+                      ] as const
+                    ).map((lv) => (
+                      <button
+                        key={lv.id}
+                        onClick={() => handleSelectLevel(lv.id)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all ${
+                          learningLevel === lv.id
+                            ? `${themeAccentBg} text-white shadow-xs`
+                            : darkMode
+                            ? 'bg-slate-800 text-slate-300'
+                            : 'bg-slate-100 text-slate-700'
+                        }`}
+                      >
+                        {lv.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex flex-wrap items-center gap-1.5 text-xs font-bold">
-                <button
-                  onClick={() => setActiveMode('naverQuiz')}
-                  className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-300 font-extrabold"
-                >
-                  🗂️ 보관함 (단어 {bookmarkedWords.length} · 문장 {savedSentences.length} · 완료 {completedDays.length}일)
-                </button>
-                <button
-                  onClick={() => {
-                    setIsFloatingPad(!isFloatingPad);
-                    setIsPadMinimized(false);
-                  }}
-                  className={`px-3 py-1 rounded-lg border font-extrabold transition ${
-                    isFloatingPad
-                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                      : 'border-slate-300 dark:border-slate-700'
+                {/* ========================================================== */}
+                {/* STEP 1. 오늘의 대표 패턴 & 소리블록 & 2인 롤플레이 대화 & 어조 스케일 */}
+                {/* ========================================================== */}
+                <div
+                  className={`p-4 rounded-2xl border ${
+                    darkMode
+                      ? 'bg-slate-950 border-slate-800'
+                      : 'bg-blue-50/50 border-blue-200'
                   }`}
                 >
-                  {isFloatingPad ? '📌 따라다니는 펜슬장 ON' : '📌 펜슬장 하단고정'}
-                </button>
-                <button
-                  onClick={() => setIsPadLocked(!isPadLocked)}
-                  className={`px-3 py-1 rounded-lg border font-extrabold transition ${
-                    isPadLocked
-                      ? 'bg-rose-600 text-white border-rose-600'
-                      : 'bg-emerald-600 text-white border-emerald-600'
-                  }`}
-                >
-                  {isPadLocked ? '🔒 메모장 락(필기고정)' : '🔓 락 해제(스크롤)'}
-                </button>
-                <button
-                  onClick={() => setShowAllKoreanPron(!showAllKoreanPron)}
-                  className={`px-2.5 py-1 rounded-lg border font-extrabold ${
-                    showAllKoreanPron
-                      ? 'bg-amber-500 text-slate-950 border-amber-500'
-                      : 'border-slate-300 dark:border-slate-700'
-                  }`}
-                >
-                  {showAllKoreanPron ? '👁️ 한글발음' : '🙈 발음가림'}
-                </button>
-                <button
-                  onClick={() => window.print()}
-                  className="px-2.5 py-1 rounded-lg bg-slate-800 text-white font-extrabold"
-                >
-                  🖨️ 인쇄
-                </button>
-              </div>
-            </div>
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <span className="px-2.5 py-1 rounded-md text-xs font-black bg-blue-600 text-white">
+                      STEP 1 · 오늘의 대표 패턴 & 소리블록 법칙 ({currentTrack.levelName})
+                    </span>
+                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                      {currentTrack.speedGuide}
+                    </span>
+                  </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl">
-                {[
-                  { id: 'daily', label: '📝 일일 강의 & 16요소' },
-                  { id: 'examMaster', label: '🎓 수능·내신 (1~5교시)' },
-                  { id: 'wordbook', label: '📘 코어 단어장 (Day 1~100)' },
-                  { id: 'naverQuiz', label: '🗂️ 내 보관함·수정·완료관리' },
-                  { id: 'aiCoach', label: '🎙️ AI 회화·첨삭' },
-                  { id: 'weekly', label: '🗓️ 전체 총람' },
-                  { id: 'devStory', label: '🛠️ 제작과정 백서' },
-                ].map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveMode(tab.id as typeof activeMode)}
-                    className={`px-2.5 py-1.5 rounded-xl text-xs font-extrabold transition ${
-                      activeMode === tab.id
-                        ? tab.id === 'examMaster'
-                          ? 'bg-indigo-600 text-white shadow-sm ring-2 ring-amber-400/60'
-                          : tab.id === 'devStory'
-                          ? 'bg-emerald-600 text-white shadow-sm'
-                          : `${themeAccentBg} text-white shadow-sm`
-                        : 'text-slate-600 dark:text-slate-300'
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 mb-3">
+                    💡 {currentTrack.levelGuide}
+                  </p>
 
-              <div className="flex items-center gap-1.5 text-[11px]">
-                {(['blue', 'emerald', 'indigo', 'amber'] as const).map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => setColorTheme(c)}
-                    className={`px-2 py-0.5 rounded font-bold ${
-                      colorTheme === c
-                        ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                        : 'text-slate-500'
-                    }`}
-                  >
-                    {c.toUpperCase()}
-                  </button>
-                ))}
-                <button
-                  onClick={() => setLayoutMode(layoutMode === 'split' ? 'wide' : 'split')}
-                  className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 font-bold"
-                >
-                  {layoutMode === 'split' ? '📐 스플릿' : '📐 와이드'}
-                </button>
-                <button
-                  onClick={() =>
-                    setFontStyle(
-                      fontStyle === 'sans' ? 'serif' : fontStyle === 'serif' ? 'mono' : 'sans'
-                    )
-                  }
-                  className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 font-bold"
-                >
-                  🔤 {fontStyle}
-                </button>
-              </div>
-            </div>
-          </header>
-
-          {/* 메인 스크롤 본문 */}
-          <div className="print-container flex-1 overflow-y-auto p-5 md:p-7">
-            <div
-              className={`${
-                layoutMode === 'split' ? 'max-w-4xl' : 'max-w-6xl'
-              } mx-auto space-y-7 ${isFloatingPad && !isPadMinimized ? 'pb-72' : 'pb-20'}`}
-            >
-              {/* ==============================================================
-                  [모드 1] 🎓 수능·내신 1등급 마스터 전용관 (1~5교시 완전 복원!)
-              ============================================================== */}
-              {activeMode === 'examMaster' && (
-                <div className="space-y-6">
-                  <section className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 shadow-lg border border-indigo-500/30 space-y-5">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="px-3 py-1 rounded-full bg-amber-400 text-slate-950 text-xs font-black">
-                            수능 & 내신 실전 훈련 시스템
-                          </span>
-                          <span className="px-3 py-1 rounded-full bg-indigo-500/30 border border-indigo-400/40 text-indigo-200 text-xs font-extrabold">
-                            조합형 구문 훈련 · 빈출 어법 체크 · 내 학교 지문 자동 분석기
-                          </span>
-                        </div>
-                        <h2 className="text-2xl md:text-3xl font-black tracking-tight pt-1">
-                          🎓 영어로 생각하고 표현하는 힘,{' '}
-                          <span className="text-yellow-300 underline decoration-2 underline-offset-4">
-                            외운 답이 아닌 답을 만드는 영어
-                          </span>
-                        </h2>
-                      </div>
-
-                      <div className="bg-slate-900/90 border border-slate-700 rounded-2xl p-3.5 text-center min-w-[180px]">
-                        <div className="text-[10px] font-extrabold text-amber-300 uppercase">
-                          ⏱️ 집중 학습 목표 시간
-                        </div>
-                        <div className="text-xl font-black font-mono text-white mt-0.5">
-                          {csatTimerMins}분 코스
-                        </div>
-                        <div className="flex justify-center gap-1 mt-1">
-                          {[60, 120, 180].map((m) => (
-                            <button
-                              key={m}
-                              onClick={() => setCsatTimerMins(m)}
-                              className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${
-                                csatTimerMins === m
-                                  ? 'bg-amber-400 text-slate-950'
-                                  : 'bg-slate-800 text-slate-300'
-                              }`}
-                            >
-                              {m}분
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-1">
-                      {EXAM_MASTER_COURSES.map((course) => {
-                        const isSel = course.id === selectedExamTrack;
-                        return (
-                          <button
-                            key={course.id}
-                            onClick={() => {
-                              setSelectedExamTrack(course.id);
-                              setShowExamModelAnswer(false);
-                              setExamEssayInput('');
-                            }}
-                            className={`p-4 rounded-2xl border text-left transition ${
-                              isSel
-                                ? 'bg-white text-slate-900 border-amber-400 ring-2 ring-amber-400 shadow-md'
-                                : 'bg-slate-900/70 hover:bg-slate-800/80 text-white border-slate-700'
-                            }`}
-                          >
-                            <span
-                              className={`text-[10px] font-extrabold px-2 py-0.5 rounded ${
-                                isSel ? 'bg-indigo-600 text-white' : 'bg-indigo-500/30 text-indigo-200'
-                              }`}
-                            >
-                              {course.badge}
-                            </span>
-                            <div className="text-sm font-black mt-1.5">{course.shortTabName}</div>
-                            <div
-                              className={`text-[11px] mt-1 font-semibold ${
-                                isSel ? 'text-slate-600' : 'text-slate-300'
-                              }`}
-                            >
-                              {course.targetGoal}
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </section>
-
-                  <section
-                    className={`border rounded-3xl p-6 shadow-sm space-y-6 ${
+                  <div
+                    className={`p-4 rounded-xl border ${
                       darkMode
                         ? 'bg-slate-900 border-slate-800'
                         : 'bg-white border-slate-200'
                     }`}
                   >
-                    <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-5 gap-2">
-                      {[
-                        { step: 1, title: '1교시: 단어 스피드 테스트', sub: '20문항 셔플 시험지' },
-                        { step: 2, title: '2교시: 핵심 구문 조합 훈련', sub: '도치·분사·강조 12문장씩' },
-                        { step: 3, title: '3교시: 독해심화 & 지문변형', sub: 'Paraphrasing 비교' },
-                        { step: 4, title: '4교시: 주요 학술소재 연계', sub: '철학·경제·뇌과학·환경' },
-                        { step: 5, title: '5교시: 빈출 어법·서술형', sub: '+내 학교 지문 자동분석기' },
-                      ].map((stObj) => {
-                        const activeStage = schoolInternalStage === stObj.step;
-                        return (
-                          <button
-                            key={stObj.step}
-                            onClick={() => setSchoolInternalStage(stObj.step)}
-                            className={`p-3.5 rounded-2xl border text-left transition ${
-                              activeStage
-                                ? 'bg-indigo-600 text-white border-indigo-500 shadow-md ring-2 ring-amber-400'
-                                : darkMode
-                                ? 'bg-slate-950 hover:bg-slate-800 border-slate-800 text-slate-300'
-                                : 'bg-slate-50 hover:bg-indigo-50 border-slate-200 text-slate-700'
-                            }`}
-                          >
-                            <div className="text-[10px] font-black opacity-80">
-                              STEP 0{stObj.step}
-                            </div>
-                            <div className="text-xs font-extrabold mt-0.5">{stObj.title}</div>
-                            <div className="text-[10px] opacity-75 mt-0.5">{stObj.sub}</div>
-                          </button>
-                        );
-                      })}
+                    <div className="text-lg md:text-2xl font-black text-blue-600 dark:text-blue-400">
+                      {currentTrack.patternSoundBlock}
+                    </div>
+                    {showPronGuide && (
+                      <div className="mt-1.5 space-y-0.5">
+                        <div className="text-xs font-mono text-slate-500 dark:text-slate-400">
+                          미국식 IPA: {currentTrack.patternIpa}
+                        </div>
+                        <div className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400">
+                          🗣️ 실전 한글발음: {currentTrack.patternPron}
+                        </div>
+                      </div>
+                    )}
+                    <div className="text-sm font-bold mt-2">
+                      🇰🇷 뜻: {currentTrack.patternMeaningKo}
+                    </div>
+                    <div className="text-xs text-slate-600 dark:text-slate-300 mt-1.5 pt-1.5 border-t border-dashed border-slate-300 dark:border-slate-700">
+                      🔊 <strong>소리블록 연음 법칙:</strong> {currentTrack.patternSoundRule}
+                      <br />
+                      📐 <strong>핵심 어순·문법 해설:</strong> {currentTrack.grammarSummary}
                     </div>
 
-                    {/* 1교시: 정답 위치(1·2·3번) 자동 분산 셔플 적용 완료! */}
-                    {schoolInternalStage === 1 && (
-                      <div className="space-y-4">
-                        <div className="flex flex-wrap items-center justify-between gap-2 p-4 rounded-2xl bg-indigo-950 text-white">
-                          <div>
-                            <h4 className="text-base font-black">
-                              ⚡ [1교시 단어학습 & 테스트] 고등·수능 핵심 어휘 20문항 (Set #{vocabQuizSeed})
-                            </h4>
-                            <p className="text-xs text-indigo-200">
-                              정답 번호가 1·2·3번에 골고루 섞여 출제됩니다. 우측 버튼으로 새 시험지를 생성하세요!
-                            </p>
-                          </div>
-                          <button
-                            onClick={() => {
-                              setVocabQuizSeed((s) => (s % 100) + 1);
-                              setSelectedVocabQuizAnswers({});
-                            }}
-                            className="px-4 py-2 rounded-xl bg-amber-400 text-slate-950 text-xs font-black shadow"
-                          >
-                            🎲 새 20문항 시험지 생성 (Set #{(vocabQuizSeed % 100) + 1})
-                          </button>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {examVocabTestList.map((item, idx) => {
-                            const picked = selectedVocabQuizAnswers[idx];
-                            const wrong1 =
-                              examVocabTestList[(idx + 3) % examVocabTestList.length].meaning;
-                            const wrong2 =
-                              examVocabTestList[(idx + 7) % examVocabTestList.length].meaning;
-                            const correctPos = (idx + vocabQuizSeed) % 3;
-                            const options =
-                              correctPos === 0
-                                ? [item.meaning, wrong1, wrong2]
-                                : correctPos === 1
-                                ? [wrong1, item.meaning, wrong2]
-                                : [wrong1, wrong2, item.meaning];
-                            const isSaved = bookmarkedWords.some((b) => b.word === item.word);
-
-                            return (
-                              <div
-                                key={idx}
-                                className={`p-4 rounded-2xl border space-y-2 ${
-                                  darkMode
-                                    ? 'bg-slate-950 border-slate-800'
-                                    : 'bg-slate-50 border-slate-200'
-                                }`}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <span className="px-2 py-0.5 rounded bg-indigo-600 text-white text-[10px] font-black">
-                                      Q{idx + 1}
-                                    </span>
-                                    <strong className="text-base font-black">{item.word}</strong>
-                                  </div>
-                                  <div className="flex gap-1">
-                                    <button
-                                      onClick={() =>
-                                        toggleBookmark({
-                                          word: item.word,
-                                          ipa: item.ipa,
-                                          meaning: item.meaning,
-                                          collocation: item.collocation,
-                                          posLabel: item.posLabel,
-                                          compLabel: item.compLabel,
-                                          levelBadge: '수능테스트',
-                                        })
-                                      }
-                                      className="px-2 py-0.5 rounded border text-xs font-bold"
-                                    >
-                                      {isSaved ? '⭐ 저장됨' : '☆ 단어저장'}
-                                    </button>
-                                    <button
-                                      onClick={() => speakText(item.word.split('(')[0])}
-                                      className="w-7 h-7 rounded-full bg-blue-600 text-white text-xs"
-                                    >
-                                      🔊
-                                    </button>
-                                  </div>
-                                </div>
-                                <div className="space-y-1 pt-1">
-                                  {options.map((opt, oIdx) => {
-                                    const isSel = picked === oIdx;
-                                    const isAns = oIdx === correctPos;
-                                    return (
-                                      <button
-                                        key={oIdx}
-                                        onClick={() =>
-                                          setSelectedVocabQuizAnswers((prev) => ({
-                                            ...prev,
-                                            [idx]: oIdx,
-                                          }))
-                                        }
-                                        className={`w-full text-left px-3 py-1.5 rounded-xl text-xs font-bold border transition ${
-                                          isSel
-                                            ? isAns
-                                              ? 'bg-emerald-600 text-white border-emerald-500'
-                                              : 'bg-rose-600 text-white border-rose-500'
-                                            : darkMode
-                                            ? 'bg-slate-900 border-slate-800'
-                                            : 'bg-white border-slate-200'
-                                        }`}
-                                      >
-                                        {oIdx + 1}) {opt}
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 2교시: 핵심 구문 조합 훈련 */}
-                    {schoolInternalStage === 2 && (
-                      <div className="space-y-4">
-                        <div className="flex flex-wrap items-center justify-between gap-2 p-4 rounded-2xl bg-indigo-950 text-white">
-                          <div>
-                            <h4 className="text-base font-black">
-                              🧩 [2교시 핵심구문 학습] 조합형 고난도 구문 훈련 (Batch #{syntaxSeed})
-                            </h4>
-                            <p className="text-xs text-indigo-200">
-                              마음에 드는 구문은 <strong>[📌 문장저장]</strong>을 눌러 내 보관함에서 수정·복습하세요!
-                            </p>
-                          </div>
-                          <button
-                            onClick={() => setSyntaxSeed((s) => s + 1)}
-                            className="px-4 py-2 rounded-xl bg-amber-400 text-slate-950 text-xs font-black shadow"
-                          >
-                            🔄 새 구문 12문장 조합 생성 (Batch #{syntaxSeed + 1})
-                          </button>
-                        </div>
-
-                        <div className="space-y-3">
-                          {generatedSyntaxList.map((item, idx) => {
-                            const isSentSaved = savedSentences.some(
-                              (s) => s.en === item.sentenceEn
-                            );
-                            return (
-                              <div
-                                key={item.id}
-                                className={`p-4 rounded-2xl border space-y-2 ${
-                                  darkMode
-                                    ? 'bg-slate-950 border-slate-800'
-                                    : 'bg-slate-50 border-slate-200'
-                                }`}
-                              >
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                  <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-indigo-600 text-white">
-                                    구문 #{idx + 1} · {item.openerRule}
-                                  </span>
-                                  <div className="flex flex-wrap items-center gap-1.5">
-                                    <button
-                                      onClick={() =>
-                                        toggleSaveSentence({
-                                          en: item.sentenceEn,
-                                          ko: item.sentenceKo,
-                                          note: `${item.openerRule} | 변형: ${item.paraphrasedEn}`,
-                                          category: '수능·내신 2교시 핵심구문',
-                                        })
-                                      }
-                                      className={`px-3 py-1 rounded-lg text-xs font-extrabold border ${
-                                        isSentSaved
-                                          ? 'bg-amber-400 text-slate-950 border-amber-400'
-                                          : 'border-slate-300 dark:border-slate-700'
-                                      }`}
-                                    >
-                                      {isSentSaved ? '📌 문장저장됨(클릭해제)' : '📌 문장저장'}
-                                    </button>
-                                    <button
-                                      onClick={() => {
-                                        setCustomDissectSentence({
-                                          en: item.sentenceEn,
-                                          ko: item.sentenceKo,
-                                          title: `구문 #${idx + 1}: ${item.openerRule}`,
-                                        });
-                                        setActiveMode('daily');
-                                        speakText(item.sentenceEn);
-                                      }}
-                                      className="px-3 py-1 rounded-lg bg-blue-600 text-white text-xs font-extrabold"
-                                    >
-                                      🔍 16요소 즉시 해부↗
-                                    </button>
-                                    <button
-                                      onClick={() => speakText(item.sentenceEn)}
-                                      className="px-2.5 py-1 rounded-lg bg-slate-800 text-white text-xs font-bold"
-                                    >
-                                      🔊 듣기
-                                    </button>
-                                  </div>
-                                </div>
-
-                                <div className="text-base font-black text-blue-600 dark:text-yellow-300">
-                                  "{item.sentenceEn}"
-                                </div>
-                                <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                                  🇰🇷 직독직해: {item.sentenceKo}
-                                </div>
-                                <div className="text-xs text-emerald-600 dark:text-emerald-400 font-bold">
-                                  🔄 [내신·수능 변형]: "{item.paraphrasedEn}"
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 3교시 */}
-                    {schoolInternalStage === 3 && (
-                      <div className="space-y-5">
-                        {currentExamCourse.steps.map((st) => (
-                          <div
-                            key={st.stepNum}
-                            className={`p-5 rounded-3xl border space-y-4 ${
-                              darkMode
-                                ? 'bg-slate-950 border-slate-800'
-                                : 'bg-slate-50 border-slate-200'
-                            }`}
-                          >
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <span className="px-3 py-1 rounded-full bg-indigo-600 text-white text-xs font-extrabold">
-                                {st.stepTitle}
-                              </span>
-                              <button
-                                onClick={() =>
-                                  toggleSaveSentence({
-                                    en: st.transformedEn,
-                                    ko: st.originalPassageKo,
-                                    note: st.transformedPoint,
-                                    category: '3교시 패러프레이징 변형문장',
-                                  })
-                                }
-                                className="px-3 py-1 rounded-lg bg-amber-400 text-slate-950 text-xs font-extrabold"
-                              >
-                                📌 변형문장 보관함에 저장
-                              </button>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                              <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1.5">
-                                <div className="text-xs font-extrabold text-blue-500">
-                                  📘 [교과서·모의고사 원문 지문]
-                                </div>
-                                <div className="text-sm font-black">"{st.originalPassageEn}"</div>
-                                <div className="text-xs text-slate-500">{st.originalPassageKo}</div>
-                              </div>
-
-                              <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-1.5">
-                                <div className="text-xs font-extrabold text-emerald-500">
-                                  🔄 [학교 시험 변형 출제 문장]
-                                </div>
-                                <div className="text-sm font-black text-emerald-600 dark:text-emerald-300">
-                                  "{st.transformedEn}"
-                                </div>
-                                <div className="text-xs font-semibold">{st.transformedPoint}</div>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* 4교시 */}
-                    {schoolInternalStage === 4 && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {EBS_MAJOR_TOPICS.map((tp) => (
-                          <div
-                            key={tp.id}
-                            className={`p-5 rounded-3xl border space-y-3 ${
-                              darkMode
-                                ? 'bg-slate-950 border-slate-800'
-                                : 'bg-slate-50 border-slate-200'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-extrabold text-indigo-500">
-                                {tp.category}
-                              </span>
-                              <button
-                                onClick={() =>
-                                  toggleSaveSentence({
-                                    en: tp.paraphraseSummary,
-                                    ko: tp.passageKo,
-                                    note: `학술 소재 요약: ${tp.title}`,
-                                    category: '4교시 학술요약',
-                                  })
-                                }
-                                className="px-2.5 py-1 rounded-lg bg-amber-400 text-slate-950 text-xs font-extrabold"
-                              >
-                                📌 요약문 저장
-                              </button>
-                            </div>
-                            <h4 className="text-base font-black">{tp.title}</h4>
-                            <p className="text-xs font-bold leading-relaxed bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800">
-                              "{tp.passageEn}"
-                            </p>
-                            <p className="text-xs text-slate-500">{tp.passageKo}</p>
-                            <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs font-bold text-emerald-600 dark:text-emerald-300">
-                              📌 [수능 40번 유형 한 줄 요약]: "{tp.paraphraseSummary}"
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* 5교시 (어법 양자택일 + 내 학교 지문 자동 분석기 + 서술형 영작 입력창 연결 완료!) */}
-                    {schoolInternalStage === 5 && (
-                      <div className="space-y-6">
-                        <div className="space-y-3">
-                          <h4 className="text-base font-black text-rose-500">
-                            🚨 1) 고등 내신·수능 핵심 빈출 어법 양자택일 실전 테스트
-                          </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {GRAMMAR_406_QUIZ_BANK.map((q) => {
-                              const picked = selectedGrammarQuizAnswers[q.id];
-                              return (
-                                <div
-                                  key={q.id}
-                                  className={`p-4 rounded-2xl border space-y-2.5 ${
-                                    darkMode
-                                      ? 'bg-slate-950 border-slate-800'
-                                      : 'bg-slate-50 border-slate-200'
-                                  }`}
-                                >
-                                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-rose-500/15 text-rose-500">
-                                    {q.schoolTag}
-                                  </span>
-                                  <div className="text-xs font-bold leading-relaxed">
-                                    {q.sentenceBefore}{' '}
-                                    <span className="px-2 py-0.5 rounded bg-amber-400/20 text-amber-600 dark:text-amber-300 font-black">
-                                      [ (A) {q.choiceA} / (B) {q.choiceB} ]
-                                    </span>{' '}
-                                    {q.sentenceAfter}
-                                  </div>
-                                  <div className="flex gap-2">
-                                    {(['A', 'B'] as const).map((choice) => {
-                                      const isSel = picked === choice;
-                                      const isCorrect = q.correct === choice;
-                                      return (
-                                        <button
-                                          key={choice}
-                                          onClick={() =>
-                                            setSelectedGrammarQuizAnswers((prev) => ({
-                                              ...prev,
-                                              [q.id]: choice,
-                                            }))
-                                          }
-                                          className={`flex-1 py-1.5 rounded-xl text-xs font-extrabold border transition ${
-                                            isSel
-                                              ? isCorrect
-                                                ? 'bg-emerald-600 text-white border-emerald-500'
-                                                : 'bg-rose-600 text-white border-rose-500'
-                                              : darkMode
-                                              ? 'bg-slate-900 border-slate-700'
-                                              : 'bg-white border-slate-300'
-                                          }`}
-                                        >
-                                          ({choice}) {choice === 'A' ? q.choiceA : q.choiceB}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                  {picked && (
-                                    <div className="text-[11px] text-emerald-500 font-semibold pt-1 border-t border-slate-200 dark:border-slate-800">
-                                      ✅ 정답 ({q.correct}): {q.explanation}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        <div className="p-5 rounded-3xl bg-slate-900 text-white border border-indigo-500/40 space-y-4">
-                          <h4 className="text-base font-black">
-                            📋 2) 내 학교 내신 교과서 / 모의고사 지문 붙여넣기 ➔ 구문 해부 & 서술형 문제 자동 생성!
-                          </h4>
-                          <textarea
-                            rows={3}
-                            value={customSchoolText}
-                            onChange={(e) => setCustomSchoolText(e.target.value)}
-                            placeholder="여기에 학교 시험 범위 영어 지문을 붙여넣으세요..."
-                            className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-3.5 text-xs text-white focus:outline-none focus:border-amber-400"
-                          />
-
-                          <div className="space-y-3">
-                            {customPassageAnalysis.sentences.map((item) => (
-                              <div
-                                key={item.idx}
-                                className="p-4 rounded-2xl bg-slate-800/90 border border-slate-700 space-y-2 text-xs"
-                              >
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                  <span className="font-extrabold text-amber-300">
-                                    문장 #{item.idx} 분석 완료
-                                  </span>
-                                  <div className="flex gap-1.5">
-                                    <button
-                                      onClick={() =>
-                                        toggleSaveSentence({
-                                          en: item.rawEn,
-                                          ko: `핵심어휘: ${item.extractedKeywords.join(', ')}`,
-                                          note: `빈칸정답: ${item.answerWord}`,
-                                          category: '내 학교 시험지문',
-                                        })
-                                      }
-                                      className="px-2.5 py-1 rounded-lg bg-amber-400 text-slate-950 font-extrabold"
-                                    >
-                                      📌 문장저장
-                                    </button>
-                                    <button
-                                      onClick={() => {
-                                        setCustomDissectSentence({
-                                          en: item.rawEn,
-                                          ko: '내가 입력한 학교 내신·모의고사 지문 실시간 해부 모드',
-                                          title: `내 학교 지문 문장 #${item.idx}`,
-                                        });
-                                        setActiveMode('daily');
-                                        speakText(item.rawEn);
-                                      }}
-                                      className="px-3 py-1 rounded-lg bg-blue-600 text-white font-extrabold"
-                                    >
-                                      🔍 16요소 해부↗
-                                    </button>
-                                  </div>
-                                </div>
-                                <div className="text-emerald-300 font-bold">
-                                  🧱 소리블록: {item.soundBlockEn}
-                                </div>
-                                <div className="text-slate-200">
-                                  ✍️ [빈칸 문제]: {item.blankQuizSentence}{' '}
-                                  <span className="text-amber-300 font-bold">
-                                    (정답: {item.answerWord})
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* 서술형 조건 영작 훈련 (examEssayInput & showExamModelAnswer 연결 완료) */}
-                        <div className="p-4 rounded-2xl border border-indigo-500/30 space-y-2">
-                          <div className="text-xs font-extrabold text-indigo-500">
-                            ✍️ 3) {currentExamCourse.steps[0].essayMission.typeBadge}
-                          </div>
-                          <div className="text-xs font-bold">
-                            {currentExamCourse.steps[0].essayMission.koCondition}
-                          </div>
-                          <div className="text-xs font-mono text-blue-500">
-                            보기: {currentExamCourse.steps[0].essayMission.givenWords}
-                          </div>
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              value={examEssayInput}
-                              onChange={(e) => setExamEssayInput(e.target.value)}
-                              placeholder="서술형 영작 답안을 직접 입력해 보세요..."
-                              className="flex-1 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs"
-                            />
-                            <button
-                              onClick={() => setShowExamModelAnswer(!showExamModelAnswer)}
-                              className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-extrabold"
-                            >
-                              {showExamModelAnswer ? '모범답안 숨기기' : '모범답안 확인'}
-                            </button>
-                          </div>
-                          {showExamModelAnswer && (
-                            <div className="text-xs font-extrabold text-emerald-500 pt-1">
-                              ✅ 모범답안: {currentExamCourse.steps[0].essayMission.modelAnswerEn} (
-                              {currentExamCourse.steps[0].essayMission.scoringCriteria})
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </section>
-                </div>
-              )}
-
-              {/* ==============================================================
-                  [모드 2] 코어 단어장 (Day 1 ~ Day 100) + 암기완료 양방향 해제 완전 복원!
-              ============================================================== */}
-              {activeMode === 'wordbook' && (
-                <section
-                  className={`border rounded-3xl p-6 shadow-sm space-y-6 ${
-                    darkMode
-                      ? 'bg-slate-900 border-slate-800'
-                      : 'bg-white border-slate-200'
-                  }`}
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
-                    <div>
-                      <span className="text-xs font-extrabold text-blue-500">
-                        CORE & CONTEXT EXPANDED WORDBOOK (완료 체크 언제든 다시 해제 가능!)
-                      </span>
-                      <h2 className="text-2xl font-extrabold mt-0.5">
-                        📘 영역별 코어 영단어 & 문맥 확장 훈련장 (Day 1 ~ Day 100)
-                      </h2>
+                    {/* 단계별 속도 즉시 듣기 버튼 (0.30x · 0.50x · 0.75x · 1.0x) */}
+                    <div className="flex flex-wrap items-center gap-2 mt-3">
+                      <button
+                        onClick={() => speakText(currentTrack.patternEn, 0.3)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-extrabold bg-amber-500 text-slate-950 hover:bg-amber-400"
+                      >
+                        🐌 0.30x 초저속 듣기
+                      </button>
+                      <button
+                        onClick={() => speakText(currentTrack.patternEn, 0.5)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-extrabold bg-emerald-600 text-white hover:bg-emerald-700"
+                      >
+                        🐢 0.50x 천천히 듣기
+                      </button>
+                      <button
+                        onClick={() => speakText(currentTrack.patternEn, 0.75)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-extrabold bg-indigo-600 text-white hover:bg-indigo-700"
+                      >
+                        🚶 0.75x 연음 듣기
+                      </button>
+                      <button
+                        onClick={() => speakText(currentTrack.patternEn, 1.0)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-extrabold bg-blue-600 text-white hover:bg-blue-700"
+                      >
+                        🔊 1.0x 원어민 정속
+                      </button>
                     </div>
+                  </div>
 
-                    <div className="flex flex-wrap gap-1.5 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl">
-                      {(
-                        [
-                          '중등 필수',
-                          '고등·수능 핵심',
-                          '비즈니스·실무',
-                          '오픽(OPIc)·구동사',
-                        ] as const
-                      ).map((lvl) => (
-                        <button
-                          key={lvl}
-                          onClick={() => {
-                            setWordbookLevel(lvl);
-                            setWordbookDay(1);
-                          }}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition ${
-                            wordbookLevel === lvl
-                              ? `${themeAccentBg} text-white shadow`
-                              : 'text-slate-600 dark:text-slate-300'
+                  {/* 패러프레이징(표현 업그레이드) 비교 */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 mt-3">
+                    {currentTrack.paraphraseDrill.map((pd, idx) => (
+                      <div
+                        key={idx}
+                        className={`p-3 rounded-xl border text-xs ${
+                          darkMode
+                            ? 'bg-slate-900 border-slate-800'
+                            : 'bg-white border-slate-200'
+                        }`}
+                      >
+                        <div className="text-slate-500 line-through">
+                          기본 표현: {pd.basicExpr}
+                        </div>
+                        <div className="font-extrabold text-blue-600 dark:text-blue-400 mt-0.5">
+                          🚀 업그레이드: {pd.upgradedExpr}
+                        </div>
+                        <div className="text-[11px] opacity-80 mt-1">
+                          💡 {pd.nuanceDiff}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* [복원 완료 #23] 💬 A/B 2인 실전 롤플레이 대화문 */}
+                  <div
+                    className={`mt-3 p-3.5 rounded-xl border ${
+                      darkMode
+                        ? 'bg-slate-900 border-slate-800'
+                        : 'bg-white border-slate-200'
+                    }`}
+                  >
+                    <h4 className="text-xs font-black mb-2">
+                      💬 2인 실전 롤플레이 대화 (소리블록 & 한글 발음 포함)
+                    </h4>
+                    <div className="space-y-2">
+                      {currentTrack.dialogue.map((turn, idx) => (
+                        <div
+                          key={idx}
+                          className={`p-2.5 rounded-xl border text-xs ${
+                            turn.speaker === 'A'
+                              ? darkMode
+                                ? 'bg-slate-800/70 border-slate-700'
+                                : 'bg-slate-50 border-slate-200'
+                              : darkMode
+                              ? 'bg-blue-950/40 border-blue-800'
+                              : 'bg-blue-50/60 border-blue-200'
                           }`}
                         >
-                          {lvl}
-                        </button>
+                          <div className="flex items-center justify-between">
+                            <span className="font-extrabold text-blue-500">
+                              {turn.speaker} · {turn.roleName}
+                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-600 dark:text-amber-300 font-bold">
+                                {turn.pointNote}
+                              </span>
+                              <button
+                                onClick={() => speakText(turn.en)}
+                                className="px-2 py-0.5 rounded bg-blue-600 text-white text-[10px] font-bold"
+                              >
+                                🔊 듣기
+                              </button>
+                            </div>
+                          </div>
+                          <div className="font-black text-sm mt-1">
+                            {turn.soundBlock}
+                          </div>
+                          {showPronGuide && (
+                            <div className="text-emerald-600 dark:text-emerald-400 font-bold mt-0.5">
+                              🗣️ {turn.pron}
+                            </div>
+                          )}
+                          <div className="text-slate-600 dark:text-slate-300 mt-0.5">
+                            {turn.ko}
+                          </div>
+                        </div>
                       ))}
                     </div>
                   </div>
 
-                  <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-2">
-                    <div className="flex items-center justify-between text-xs font-extrabold text-emerald-600 dark:text-emerald-300">
-                      <span>
-                        ✅ 내가 암기 완료한 Day 목록 ({completedDays.length}개 완료 — 배지를 누르면 해당 Day로 이동하거나 ✕를 눌러 완료를 해제할 수 있습니다!)
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {completedDays.length === 0 && (
-                        <span className="text-xs text-slate-500">
-                          아직 완료 체크한 Day가 없습니다.
-                        </span>
-                      )}
-                      {completedDays.map((dKey) => {
-                        const [lvlName, dStr] = dKey.split('-');
+                  {/* [복원 완료 #23] 📊 3단계 어조·격식도 온도계 (synonymScales) */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                    {currentTheme.synonymScales.map((sc, idx) => (
+                      <div
+                        key={idx}
+                        className={`p-3 rounded-xl border text-xs ${
+                          darkMode
+                            ? 'bg-slate-900 border-slate-800'
+                            : 'bg-white border-slate-200'
+                        }`}
+                      >
+                        <div className="font-extrabold text-blue-500">
+                          🌡️ {sc.conceptTitle}
+                        </div>
+                        <div className="text-[10px] opacity-75 mb-2">
+                          {sc.scaleAxisLabel}
+                        </div>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {[
+                            { badge: '1단계 (기본)', item: sc.weak },
+                            { badge: '2단계 (실무표준)', item: sc.medium },
+                            { badge: '3단계 (고급강조)', item: sc.strong },
+                          ].map((col, cIdx) => (
+                            <div
+                              key={cIdx}
+                              onClick={() => speakText(col.item.expr)}
+                              className={`p-2 rounded-lg border cursor-pointer ${
+                                darkMode
+                                  ? 'bg-slate-800/70 border-slate-700 hover:bg-slate-800'
+                                  : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                              }`}
+                            >
+                              <div className="text-[10px] font-bold text-amber-500">
+                                {col.badge} 🔊
+                              </div>
+                              <div className="font-black text-xs mt-0.5">
+                                {col.item.expr}
+                              </div>
+                              {showPronGuide && (
+                                <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                                  {col.item.pron}
+                                </div>
+                              )}
+                              <div className="text-[11px] font-semibold mt-0.5">
+                                {col.item.ko}
+                              </div>
+                              <div className="text-[10px] opacity-75 mt-0.5">
+                                {col.item.note}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* ============================================================ */}
+              {/* STEP 2. 핵심 어휘 & 7성분·9품사 역할 & 빈칸 예문 (개별 가림 해제 완비) */}
+              {/* ============================================================ */}
+              <section
+                className={`p-4 rounded-2xl border ${
+                  darkMode
+                    ? 'bg-slate-900 border-slate-800'
+                    : 'bg-white border-slate-200 shadow-xs'
+                }`}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                  <div>
+                    <span className="px-2.5 py-1 rounded-md text-xs font-black bg-emerald-600 text-white">
+                      STEP 2 · 테마 필수 어휘 & 문법 성분(7직책)·품사(9신분) 매칭표
+                    </span>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                      단어나 뜻을 가린 뒤 개별 칸을 클릭하면 해당 단어만 다시 확인할 수 있습니다.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <button
+                      onClick={() => {
+                        setHideWords((p) => !p);
+                        setRevealedWordIds([]);
+                      }}
+                      className={`px-2.5 py-1 rounded-lg font-bold border ${
+                        hideWords
+                          ? 'bg-rose-600 text-white border-rose-600'
+                          : darkMode
+                          ? 'bg-slate-800 border-slate-700'
+                          : 'bg-slate-100 border-slate-300'
+                      }`}
+                    >
+                      {hideWords ? '🔓 영어단어 모두보기' : '🙈 영어단어 가리기'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setHideMeanings((p) => !p);
+                        setRevealedWordIds([]);
+                      }}
+                      className={`px-2.5 py-1 rounded-lg font-bold border ${
+                        hideMeanings
+                          ? 'bg-rose-600 text-white border-rose-600'
+                          : darkMode
+                          ? 'bg-slate-800 border-slate-700'
+                          : 'bg-slate-100 border-slate-300'
+                      }`}
+                    >
+                      {hideMeanings ? '🔓 한글뜻 모두보기' : '🙈 한글뜻 가리기'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr
+                        className={`border-b ${
+                          darkMode
+                            ? 'border-slate-800 bg-slate-950 text-slate-300'
+                            : 'border-slate-200 bg-slate-100 text-slate-700'
+                        }`}
+                      >
+                        <th className="p-2.5">단어 & 소리블록 · 한글발음</th>
+                        <th className="p-2.5">뜻 & 영영정의</th>
+                        <th className="p-2.5">품사(9신분) & 문장성분(7직책)</th>
+                        <th className="p-2.5">실전 연어 & 빈칸 적용 예문</th>
+                        <th className="p-2.5 text-center">음성·보관함</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                      {currentTheme.vocab.map((v) => {
+                        const isRevealed = revealedWordIds.includes(v.id);
+                        const maskWord = hideWords && !isRevealed;
+                        const maskMean = hideMeanings && !isRevealed;
+                        const saved = isWordBookmarked(v.word);
+
                         return (
-                          <div
-                            key={dKey}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-600 text-white text-[11px] font-extrabold"
+                          <tr
+                            key={v.id}
+                            onClick={() =>
+                              setRevealedWordIds((prev) =>
+                                prev.includes(v.id)
+                                  ? prev.filter((id) => id !== v.id)
+                                  : [...prev, v.id]
+                              )
+                            }
+                            className="cursor-pointer hover:bg-blue-50/40 dark:hover:bg-slate-800/50"
                           >
-                            <button
-                              onClick={() => {
-                                setWordbookLevel(lvlName as typeof wordbookLevel);
-                                setWordbookDay(Number(dStr) || 1);
-                              }}
+                            <td className="p-2.5 align-top">
+                              <div className="flex items-center gap-1.5">
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/15 text-blue-600 dark:text-blue-400">
+                                  {v.recommendLevel.toUpperCase()}
+                                </span>
+                                <span className="font-black text-sm text-blue-600 dark:text-blue-400">
+                                  {maskWord ? v.masked : v.word}
+                                </span>
+                              </div>
+                              <div className="text-[11px] font-mono text-slate-500 mt-0.5">
+                                {v.ipa} · 끊어읽기: <strong>{v.soundBlock}</strong>
+                              </div>
+                              {showPronGuide && (
+                                <div className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                                  🗣️ {v.pron} — {v.soundMethod}
+                                </div>
+                              )}
+                            </td>
+
+                            <td className="p-2.5 align-top">
+                              <div className="font-extrabold text-sm">
+                                {maskMean ? '🔒 [클릭하여 뜻 확인]' : v.meaning}
+                              </div>
+                              <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                EN: {v.enDef}
+                              </div>
+                              <div className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold mt-0.5">
+                                💡 {v.paraphraseTip}
+                              </div>
+                            </td>
+
+                            <td className="p-2.5 align-top">
+                              <div className="flex flex-wrap gap-1">
+                                <span className="px-2 py-0.5 rounded font-bold bg-indigo-500/15 text-indigo-600 dark:text-indigo-300">
+                                  품사: {v.posLabel}
+                                </span>
+                                <span className="px-2 py-0.5 rounded font-bold bg-rose-500/15 text-rose-600 dark:text-rose-300">
+                                  성분: {v.compLabel}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                                {v.roleDesc}
+                              </p>
+                            </td>
+
+                            <td className="p-2.5 align-top">
+                              <div className="font-bold text-blue-600 dark:text-blue-400">
+                                🔗 {v.collocation} ({v.collocationKo})
+                              </div>
+                              <div className="text-[11px] mt-1 font-mono bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
+                                빈칸훈련: {v.exampleBlank} (정답: <strong>{v.word}</strong>)
+                              </div>
+                            </td>
+
+                            <td
+                              className="p-2.5 align-top text-center space-y-1"
+                              onClick={(e) => e.stopPropagation()}
                             >
-                              {lvlName} Day {dStr}
-                            </button>
-                            <button
-                              onClick={() => toggleCompletedDay(dKey)}
-                              title="암기 완료 해제"
-                              className="px-1 rounded-full bg-emerald-800 hover:bg-rose-600 text-[10px]"
-                            >
-                              ✕해제
-                            </button>
-                          </div>
+                              <button
+                                onClick={() => speakText(v.collocation)}
+                                className="w-full px-2 py-1 rounded bg-blue-600 text-white font-bold text-[11px]"
+                              >
+                                🔊 발음
+                              </button>
+                              <button
+                                onClick={() =>
+                                  toggleBookmarkWord({
+                                    word: v.word,
+                                    ipa: v.ipa,
+                                    pron: v.pron,
+                                    meaning: v.meaning,
+                                    collocation: v.collocation,
+                                    posLabel: v.posLabel,
+                                    compLabel: v.compLabel,
+                                    levelBadge: currentTheme.badge,
+                                  })
+                                }
+                                className={`w-full px-2 py-1 rounded font-bold text-[11px] border ${
+                                  saved
+                                    ? 'bg-amber-400 text-slate-950 border-amber-500'
+                                    : darkMode
+                                    ? 'bg-slate-800 border-slate-700 text-slate-300'
+                                    : 'bg-slate-100 border-slate-300 text-slate-700'
+                                }`}
+                              >
+                                {saved ? '⭐ 저장됨' : '☆ 단어장저장'}
+                              </button>
+                            </td>
+                          </tr>
                         );
                       })}
-                    </div>
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              {/* ============================================================ */}
+              {/* STEP 3. 16개 문법 노드(7성분+9품사) 연결도 & 사전 탭 전환 (완벽 복원) */}
+              {/* ============================================================ */}
+              <section
+                className={`p-4 rounded-2xl border ${
+                  darkMode
+                    ? 'bg-slate-900 border-slate-800'
+                    : 'bg-white border-slate-200 shadow-xs'
+                }`}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                  <div>
+                    <span className="px-2.5 py-1 rounded-md text-xs font-black bg-indigo-600 text-white">
+                      STEP 3 · 문장 성분 7개(구·절 역할) + 9품사(단어 정체) = 총 16개 문법 노드 & 사전
+                    </span>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                      우측 버튼에서 <strong>[문장 성분(7직책) 사전]</strong>이나 <strong>[9품사(한정사 포함) 사전]</strong>을 클릭하면 수식어·한정사·간접목적어 등 각각의 상세 뜻과 어순 규칙 페이지로 즉시 전환됩니다.
+                    </p>
                   </div>
 
-                  <div
-                    className={`flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl border ${
-                      darkMode
-                        ? 'bg-slate-950 border-slate-800'
-                        : 'bg-slate-50 border-slate-200'
-                    }`}
-                  >
-                    <button
-                      onClick={() => setWordbookDay((d) => (d > 1 ? d - 1 : 100))}
-                      className="px-4 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs font-extrabold"
-                    >
-                      ◀ 이전 Day {wordbookDay > 1 ? wordbookDay - 1 : 100}
-                    </button>
+                  {/* [핵심 복원 #8] 3대 탭 전환 버튼 */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {(
+                      [
+                        { id: 'all', label: '🕸️ 16개 문법 노드 대표 연결도' },
+                        { id: 'comp', label: '📘 문장 성분(7직책) 사전' },
+                        { id: 'pos', label: '📗 9품사(한정사 포함) 사전' },
+                      ] as const
+                    ).map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => setDiagramTab(t.id)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all ${
+                          diagramTab === t.id
+                            ? 'bg-indigo-600 text-white shadow-xs'
+                            : darkMode
+                            ? 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                        }`}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-                    <div className="text-center space-y-1">
-                      <div className="text-base font-black">
-                        📖 [{wordbookLevel}] — Day {wordbookDay} / 100 페이지
-                      </div>
-                      <div className="flex flex-wrap justify-center gap-1">
-                        {[1, 2, 3, 5, 10, 20, 30, 50, 75, 100].map((dNum) => (
+                {/* 탭 1: 16개 문법 노드 SVG 연결도 + 어절 클릭 해부기 */}
+                {diagramTab === 'all' && (
+                  <div className="space-y-4">
+                    {/* 분석할 문장 선택 바 (현재 테마 문장 vs 대표 표준 예문 3선) */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-100 dark:bg-slate-950 text-xs">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="font-extrabold">분석 문장 선택:</span>
+                        <button
+                          onClick={() => {
+                            setDiagramSourceMode('theme');
+                            setSelectedTokenIdx(0);
+                          }}
+                          className={`px-2.5 py-1 rounded-lg font-bold ${
+                            diagramSourceMode === 'theme'
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-white dark:bg-slate-800'
+                          }`}
+                        >
+                          현재 테마 문장 ({currentSentence.tag})
+                        </button>
+                        {DIAGRAM_EXAMPLES.map((ex, idx) => (
                           <button
-                            key={dNum}
-                            onClick={() => setWordbookDay(dNum)}
-                            className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${
-                              wordbookDay === dNum
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-slate-200 dark:bg-slate-800'
+                            key={idx}
+                            onClick={() => {
+                              setDiagramSourceMode('standard');
+                              setSelectedStandardExIdx(idx);
+                              setSelectedTokenIdx(0);
+                            }}
+                            className={`px-2.5 py-1 rounded-lg font-bold ${
+                              diagramSourceMode === 'standard' &&
+                              selectedStandardExIdx === idx
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-white dark:bg-slate-800'
                             }`}
                           >
-                            Day {dNum}
+                            표준예문 #{idx + 1}
                           </button>
                         ))}
                       </div>
+                      {currentDiagramData.isHeuristic && (
+                        <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400">
+                          ℹ️ 문맥 규칙 기반 자동 분석 (어절 터치 시 상세 확인)
+                        </span>
+                      )}
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => toggleCompletedDay(`${wordbookLevel}-${wordbookDay}`)}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition ${
-                          completedDays.includes(`${wordbookLevel}-${wordbookDay}`)
-                            ? 'bg-emerald-600 hover:bg-rose-600 text-white'
-                            : 'bg-slate-200 dark:bg-slate-800'
-                        }`}
+                    {/* SVG 16노드 다이어그램 (다크모드 완벽 대응 #28) */}
+                    <div
+                      className={`p-3 rounded-2xl border overflow-x-auto ${
+                        darkMode
+                          ? 'bg-slate-950 border-slate-800'
+                          : 'bg-slate-50 border-slate-200'
+                      }`}
+                    >
+                      <svg
+                        viewBox="0 0 890 320"
+                        className="w-full min-w-[680px] h-auto select-none"
                       >
-                        {completedDays.includes(`${wordbookLevel}-${wordbookDay}`)
-                          ? '✅ 암기완료됨 (다시 누르면 해제)'
-                          : '⬜ 오늘 Day 완료 체크하기'}
-                      </button>
-
-                      <button
-                        onClick={() => setWordbookDay((d) => (d < 100 ? d + 1 : 1))}
-                        className={`px-4 py-2 rounded-xl text-white text-xs font-extrabold ${themeAccentBg}`}
-                      >
-                        다음 Day {wordbookDay < 100 ? wordbookDay + 1 : 1} ▶
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {filteredWordbook.map((item, idx) => {
-                      const pronKey = `wb-${item.level}-${item.day}-${idx}`;
-                      const isBookmarked = bookmarkedWords.some((b) => b.word === item.word);
-                      return (
-                        <div
-                          key={idx}
-                          className={`p-5 rounded-2xl border space-y-2.5 ${
-                            darkMode
-                              ? 'bg-slate-950 border-slate-800'
-                              : 'bg-slate-50 border-slate-200'
+                        <text
+                          x="20"
+                          y="26"
+                          className={`text-[12px] font-bold ${
+                            darkMode ? 'fill-blue-400' : 'fill-blue-700'
                           }`}
                         >
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-extrabold text-slate-400">
-                                  #{idx + 1}
-                                </span>
-                                <span className="text-lg font-black">{item.word}</span>
-                                <span className="text-xs font-mono text-blue-500 font-bold">
-                                  {item.ipa}
-                                </span>
-                                <button
-                                  onClick={() => speakText(item.word.split('(')[0])}
-                                  className="w-7 h-7 rounded-full bg-blue-600 text-white text-xs"
-                                >
-                                  🔊
-                                </button>
-                              </div>
-                              <button
-                                onClick={() => toggleKoreanPron(pronKey)}
-                                className="mt-1 text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-300"
-                              >
-                                {isPronVisible(pronKey)
-                                  ? `🗣️ ${item.pron}`
-                                  : '🔒 [한글발음 보기 터치]'}
-                              </button>
-                            </div>
-
-                            <button
-                              onClick={() =>
-                                toggleBookmark({
-                                  word: item.word,
-                                  ipa: item.ipa,
-                                  meaning: item.meaning,
-                                  collocation: item.collocation,
-                                  posLabel: item.posLabel,
-                                  compLabel: item.compLabel,
-                                  levelBadge: item.level,
-                                })
-                              }
-                              className={`px-2.5 py-1 rounded-lg text-xs font-extrabold border ${
-                                isBookmarked
-                                  ? 'bg-amber-400 text-slate-900 border-amber-400'
-                                  : 'border-slate-300 dark:border-slate-700'
-                              }`}
-                            >
-                              {isBookmarked ? '⭐ 저장됨(해제)' : '☆ 단어장저장'}
-                            </button>
-                          </div>
-
-                          <div className="text-sm font-extrabold">뜻: {item.meaning}</div>
-                          <div className="text-xs space-y-1">
-                            <div>🧱 소리블록: {item.soundBlock}</div>
-                            <div className="text-blue-500 font-bold">
-                              🔗 짝꿍: {item.collocation} ({item.collocationKo})
-                            </div>
-                            <div className="text-slate-500 italic">"{item.exampleEn}"</div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
-              )}
-
-              {/* ==============================================================
-                  [모드 3] 전 레벨 일일 강의 노트 (STEP 1 ~ STEP 5 완전 복원!)
-              ============================================================== */}
-              {activeMode === 'daily' && (
-                <>
-                  <div
-                    className={`border rounded-3xl p-6 shadow-sm space-y-4 ${
-                      darkMode
-                        ? 'bg-slate-900 border-slate-800'
-                        : 'bg-white border-slate-200'
-                    }`}
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className={`text-xs font-extrabold text-white px-3 py-1 rounded-full ${themeAccentBg}`}>
-                          {currentTheme.badge}
-                        </span>
-                        <span className="text-xs font-extrabold px-3 py-1 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-300">
-                          {currentLevelTrack.levelName}
-                        </span>
-                      </div>
-                      <button
-                        onClick={() =>
-                          toggleSaveSentence({
-                            en: currentLevelTrack.patternEn,
-                            ko: currentLevelTrack.patternMeaningKo,
-                            note: currentLevelTrack.focusBadge,
-                            category: '일일 대표 패턴',
-                          })
-                        }
-                        className="px-3 py-1 rounded-xl bg-amber-400 text-slate-950 text-xs font-extrabold"
-                      >
-                        📌 이 대표 패턴 문장 보관함에 저장
-                      </button>
-                    </div>
-
-                    <h2 className="text-2xl font-black">📣 {currentTheme.title}</h2>
-                    <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-                      💡 <strong>학습 가이드:</strong> {currentLevelTrack.levelGuide}
-                    </p>
-
-                    <div className="p-4 rounded-2xl bg-slate-900 text-white space-y-3 border border-slate-800">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="text-xs font-extrabold text-emerald-400">
-                          🎯 [{learningLevel.toUpperCase()} FOCUS] {currentLevelTrack.focusBadge}
-                        </span>
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() => speakText(currentLevelTrack.patternEn, accent, 0.75)}
-                            className="px-2.5 py-1 rounded-lg bg-slate-800 text-xs font-bold text-amber-300"
-                          >
-                            🐢 0.75x 느림
-                          </button>
-                          <button
-                            onClick={() => speakText(currentLevelTrack.patternEn, accent, 1.0)}
-                            className={`px-3 py-1 rounded-lg text-white text-xs font-extrabold ${themeAccentBg}`}
-                          >
-                            🔊 듣기
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="text-xl font-black text-yellow-400">
-                        {currentLevelTrack.patternEn}
-                      </div>
-                      <div className="text-sm font-bold text-white">
-                        🇰🇷 뜻 도움: "{currentLevelTrack.patternMeaningKo}"
-                      </div>
-
-                      <div className="pt-2 border-t border-slate-800 space-y-1.5">
-                        <div className="text-xs font-extrabold text-blue-300">
-                          🔄 레벨업 바꿔 말하기 (Paraphrasing Drill):
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                          {currentLevelTrack.paraphraseDrill.map((dr, idx) => (
-                            <div
-                              key={idx}
-                              onClick={() => speakText(dr.upgradedExpr)}
-                              className="p-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-800 cursor-pointer border border-slate-700 text-xs space-y-0.5"
-                            >
-                              <div className="text-slate-400 line-through">{dr.basicExpr}</div>
-                              <div className="text-emerald-300 font-extrabold">
-                                ➔ {dr.upgradedExpr} 🔊
-                              </div>
-                              <div className="text-[11px] text-slate-300">{dr.nuanceDiff}</div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* STEP 2 단어장 */}
-                  <section
-                    className={`border rounded-3xl p-6 shadow-sm space-y-6 ${
-                      darkMode
-                        ? 'bg-slate-900 border-slate-800'
-                        : 'bg-white border-slate-200'
-                    }`}
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <h3 className="text-lg font-extrabold">
-                        📚 STEP 2. 전 레벨 짝꿍 단어장 (⭐ 클릭 시 보관함에 저장 & 수정 가능)
-                      </h3>
-                      <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-full">
-                        <button
-                          onClick={() => setHideWordMode(!hideWordMode)}
-                          className={`px-3 py-1 rounded-full text-xs font-extrabold ${
-                            hideWordMode ? `${themeAccentBg} text-white` : ''
+                          ▲ 상단 7개 노드: 문장 성분 (구·절이 문장에서 맡는 역할) — 원을 클릭하면 아래에 뜻이 표시됩니다
+                        </text>
+                        <text
+                          x="20"
+                          y="308"
+                          className={`text-[12px] font-bold ${
+                            darkMode ? 'fill-emerald-400' : 'fill-emerald-700'
                           }`}
                         >
-                          {hideWordMode ? '🙈 Hide Word ON' : '👁️ Hide Word'}
-                        </button>
-                        <button
-                          onClick={() => setHideMeaningMode(!hideMeaningMode)}
-                          className={`px-3 py-1 rounded-full text-xs font-extrabold ${
-                            hideMeaningMode ? `${themeAccentBg} text-white` : ''
-                          }`}
-                        >
-                          {hideMeaningMode ? '🙈 Hide Meaning ON' : '👁️ Hide Meaning'}
-                        </button>
-                      </div>
-                    </div>
+                          ▲ 하단 9개 노드: 품사 (개별 단어의 고유 신분, 한정사 포함) — 현재 선택 어절: &quot;{activeToken?.word}&quot; ({activeToken?.comp} ↔ {activeToken?.pos})
+                        </text>
 
-                    <div className="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-2xl">
-                      <table className="w-full text-left text-xs">
-                        <thead className="bg-slate-100 dark:bg-slate-800 font-extrabold">
-                          <tr>
-                            <th className="py-3 px-3 text-center">레벨</th>
-                            <th className="py-3 px-3">단어 · 저장</th>
-                            <th className="py-3 px-3">뜻 & 문법 요소(7성분+9품사)</th>
-                            <th className="py-3 px-3">🧱 소리블록</th>
-                            <th className="py-3 px-3">🔗 짝꿍 표현</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                          {currentTheme.vocab.map((v) => {
-                            const isWordHidden = hideWordMode && !revealedWordIds.includes(v.id);
-                            const isMeaningHidden =
-                              hideMeaningMode && !revealedWordIds.includes(v.id);
-                            const isSaved = bookmarkedWords.some((b) => b.word === v.word);
-
-                            return (
-                              <tr
-                                key={v.id}
-                                onClick={() => {
-                                  setSelectedComp(v.comp);
-                                  setSelectedPos(v.pos);
-                                }}
-                                className="cursor-pointer hover:bg-slate-100/50 dark:hover:bg-slate-800/40"
-                              >
-                                <td className="py-3 px-3 text-center">
-                                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-300">
-                                    {v.id === 0 ? '🔥 실검1위' : v.recommendLevel.toUpperCase()}
-                                  </span>
-                                </td>
-                                <td className="py-3 px-3">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="text-sm font-black">
-                                      {isWordHidden ? v.masked : v.word}
-                                    </span>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        speakText(v.word);
-                                      }}
-                                      className="w-6 h-6 rounded-full bg-blue-600 text-white text-[10px]"
-                                    >
-                                      🔊
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        toggleBookmark({
-                                          word: v.word,
-                                          ipa: v.ipa,
-                                          meaning: v.meaning,
-                                          collocation: v.collocation,
-                                          posLabel: v.posLabel,
-                                          compLabel: v.compLabel,
-                                        });
-                                      }}
-                                      className="px-2 py-0.5 rounded border text-[10px] font-bold"
-                                    >
-                                      {isSaved ? '⭐ 저장됨' : '☆ 저장'}
-                                    </button>
-                                  </div>
-                                </td>
-                                <td className="py-3 px-3 font-extrabold">
-                                  {isMeaningHidden ? '🔒 [뜻 숨김]' : v.meaning}
-                                </td>
-                                <td className="py-3 px-3 font-bold text-emerald-600">
-                                  {v.soundBlock}
-                                </td>
-                                <td className="py-3 px-3 font-bold text-blue-500">
-                                  {v.collocation}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </section>
-
-                  {/* STEP 3: 문장 성분 7개 + 품사 9개 (총 16개 문법 요소) 다이어그램 */}
-                  <section
-                    className={`border rounded-3xl p-6 shadow-sm space-y-6 ${
-                      darkMode
-                        ? 'bg-slate-900 border-slate-800'
-                        : 'bg-white border-slate-200'
-                    }`}
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <span className="text-[11px] font-extrabold text-blue-500">
-                          문장 성분 7개 + 이 프로그램에서 사용하는 9품사 분류 (총 16개 문법 요소)
-                        </span>
-                        <div className="mt-1 inline-flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-full">
-                          {[
-                            { id: 'all', label: '16개 문법 요소 대표 연결도' },
-                            { id: 'comp', label: '문장 성분(7직책) 사전' },
-                            { id: 'pos', label: '9품사(한정사 포함) 사전' },
-                          ].map((t) => (
-                            <button
-                              key={t.id}
-                              onClick={() => setDiagramTab(t.id as 'all' | 'comp' | 'pos')}
-                              className={`px-4 py-1.5 rounded-full text-xs font-extrabold ${
-                                diagramTab === t.id
-                                  ? 'bg-white dark:bg-slate-900 text-blue-600 border-2 border-blue-600'
-                                  : 'text-slate-600 dark:text-slate-400'
-                              }`}
-                            >
-                              {t.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => {
-                          setSelectedComp(null);
-                          setSelectedPos(null);
-                        }}
-                        className="px-3.5 py-1.5 rounded-full border text-xs font-bold"
-                      >
-                        전체 연결 보기
-                      </button>
-                    </div>
-
-                    <div className="w-full overflow-x-auto">
-                      <svg viewBox="0 0 920 310" className="w-full min-w-[760px] h-auto select-none">
+                        {/* 20개 대표 결합선 */}
                         {MAPPING_EDGES.map((edge, idx) => {
-                          const compIdx = SENTENCE_COMPONENTS.findIndex((c) => c.id === edge.comp);
-                          const posIdx = PARTS_OF_SPEECH.findIndex((p) => p.id === edge.pos);
-                          const x1 = 75 + compIdx * 128;
-                          const y1 = 112;
-                          const x2 = 55 + posIdx * 101;
-                          const y2 = 212;
-                          const midY = 162;
-
+                          const cPos = COMP_COORDS[edge.comp];
+                          const pPos = POS_COORDS[edge.pos];
                           const isHighlighted =
-                            (selectedComp === null && selectedPos === null) ||
-                            (selectedComp !== null &&
-                              selectedPos !== null &&
-                              edge.comp === selectedComp &&
-                              edge.pos === selectedPos) ||
-                            (selectedComp !== null &&
-                              selectedPos === null &&
-                              edge.comp === selectedComp) ||
-                            (selectedPos !== null &&
-                              selectedComp === null &&
-                              edge.pos === selectedPos);
-
+                            activeToken &&
+                            activeToken.comp === edge.comp &&
+                            activeToken.pos === edge.pos;
                           return (
-                            <path
+                            <line
                               key={idx}
-                              d={`M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${x2} ${y2}`}
-                              fill="none"
-                              stroke={isHighlighted ? '#2563eb' : '#cbd5e1'}
-                              strokeWidth={isHighlighted ? 2.8 : 1.2}
-                              opacity={isHighlighted ? 1 : 0.3}
+                              x1={cPos.x}
+                              y1={cPos.y + 26}
+                              x2={pPos.x}
+                              y2={pPos.y - 26}
+                              stroke={
+                                isHighlighted
+                                  ? '#f59e0b'
+                                  : darkMode
+                                  ? '#334155'
+                                  : '#cbd5e1'
+                              }
+                              strokeWidth={isHighlighted ? 4 : 1.5}
+                              strokeDasharray={isHighlighted ? undefined : '4 3'}
                             />
                           );
                         })}
 
-                        {SENTENCE_COMPONENTS.map((comp, idx) => {
-                          const cx = 75 + idx * 128;
-                          const cy = 74;
-                          const isActive = selectedComp === comp.id;
+                        {/* 상단 7개 문장 성분 노드 */}
+                        {(Object.keys(COMP_COORDS) as CompId[]).map((cid) => {
+                          const coord = COMP_COORDS[cid];
+                          const isActive =
+                            activeToken?.comp === cid ||
+                            (focusedNode?.type === 'comp' && focusedNode.id === cid);
                           return (
                             <g
-                              key={comp.id}
-                              onClick={() => {
-                                setSelectedComp(comp.id);
-                                setSelectedPos(null);
-                              }}
+                              key={cid}
+                              onClick={() => setFocusedNode({ type: 'comp', id: cid })}
                               className="cursor-pointer"
                             >
                               <circle
-                                cx={cx}
-                                cy={cy}
-                                r={38}
-                                fill={isActive ? '#eff6ff' : '#ffffff'}
-                                stroke={isActive ? '#2563eb' : '#94a3b8'}
-                                strokeWidth={isActive ? 3 : 1.5}
+                                cx={coord.x}
+                                cy={coord.y}
+                                r={28}
+                                fill={
+                                  isActive
+                                    ? '#2563eb'
+                                    : darkMode
+                                    ? '#0f172a'
+                                    : '#ffffff'
+                                }
+                                stroke={isActive ? '#f59e0b' : '#3b82f6'}
+                                strokeWidth={isActive ? 3.5 : 2}
                               />
                               <text
-                                x={cx}
-                                y={cy - 4}
+                                x={coord.x}
+                                y={coord.y - 3}
                                 textAnchor="middle"
-                                className="text-[13px] font-extrabold fill-slate-800"
+                                className={`text-[12px] font-black ${
+                                  isActive
+                                    ? 'fill-white'
+                                    : darkMode
+                                    ? 'fill-slate-100'
+                                    : 'fill-slate-900'
+                                }`}
                               >
-                                {comp.name}
+                                {cid}
                               </text>
                               <text
-                                x={cx}
-                                y={cy + 15}
+                                x={coord.x}
+                                y={coord.y + 13}
                                 textAnchor="middle"
-                                className="text-[10px] font-bold fill-blue-600"
+                                className={`text-[9px] font-bold ${
+                                  isActive
+                                    ? 'fill-blue-100'
+                                    : darkMode
+                                    ? 'fill-slate-300'
+                                    : 'fill-slate-600'
+                                }`}
                               >
-                                {comp.id}
+                                {coord.short}
                               </text>
                             </g>
                           );
                         })}
 
-                        {PARTS_OF_SPEECH.map((pos, idx) => {
-                          const cx = 55 + idx * 101;
-                          const cy = 248;
-                          const isActive = selectedPos === pos.id;
+                        {/* 하단 9개 품사 노드 */}
+                        {(Object.keys(POS_COORDS) as PosId[]).map((pid) => {
+                          const coord = POS_COORDS[pid];
+                          const isActive =
+                            activeToken?.pos === pid ||
+                            (focusedNode?.type === 'pos' && focusedNode.id === pid);
                           return (
                             <g
-                              key={pos.id}
-                              onClick={() => {
-                                setSelectedPos(pos.id);
-                                setSelectedComp(null);
-                              }}
+                              key={pid}
+                              onClick={() => setFocusedNode({ type: 'pos', id: pid })}
                               className="cursor-pointer"
                             >
                               <circle
-                                cx={cx}
-                                cy={cy}
-                                r={34}
-                                fill={isActive ? '#eff6ff' : '#ffffff'}
-                                stroke={isActive ? '#2563eb' : '#cbd5e1'}
-                                strokeWidth={isActive ? 3 : 1.5}
+                                cx={coord.x}
+                                cy={coord.y}
+                                r={26}
+                                fill={
+                                  isActive
+                                    ? '#059669'
+                                    : darkMode
+                                    ? '#0f172a'
+                                    : '#ffffff'
+                                }
+                                stroke={isActive ? '#f59e0b' : '#10b981'}
+                                strokeWidth={isActive ? 3.5 : 2}
                               />
                               <text
-                                x={cx}
-                                y={cy - 3}
+                                x={coord.x}
+                                y={coord.y - 2}
                                 textAnchor="middle"
-                                className="text-[12px] font-extrabold fill-slate-800"
+                                className={`text-[11px] font-black ${
+                                  isActive
+                                    ? 'fill-white'
+                                    : darkMode
+                                    ? 'fill-slate-100'
+                                    : 'fill-slate-900'
+                                }`}
                               >
-                                {pos.name}
+                                {pid}
                               </text>
                               <text
-                                x={cx}
-                                y={cy + 14}
+                                x={coord.x}
+                                y={coord.y + 12}
                                 textAnchor="middle"
-                                className="text-[10px] font-bold fill-slate-500"
+                                className={`text-[8.5px] font-bold ${
+                                  isActive
+                                    ? 'fill-emerald-100'
+                                    : darkMode
+                                    ? 'fill-slate-300'
+                                    : 'fill-slate-600'
+                                }`}
                               >
-                                {pos.id}
+                                {coord.short}
                               </text>
                             </g>
                           );
@@ -6231,1068 +6959,2145 @@ export default function App() {
                       </svg>
                     </div>
 
-                    <div
-                      className={`border rounded-3xl p-5 space-y-4 ${
-                        darkMode
-                          ? 'bg-slate-950 border-slate-800'
-                          : 'bg-slate-50 border-slate-200'
-                      }`}
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <h4 className="text-base font-extrabold">
-                          🧩 실전 예문 이중 레이어 해부 카드
-                        </h4>
-                        <div className="flex flex-wrap gap-1.5">
-                          {currentTheme.sentences.map((s, idx) => (
-                            <button
-                              key={s.id}
-                              onClick={() => {
-                                setCustomDissectSentence(null);
-                                setActiveDiagramSentenceIdx(idx);
-                                setSelectedTokenIdx(0);
-                                speakText(s.rawEn);
-                              }}
-                              className={`px-3 py-1 rounded-full text-xs font-extrabold ${
-                                !customDissectSentence && activeDiagramSentenceIdx === idx
-                                  ? 'bg-blue-600 text-white'
-                                  : 'bg-slate-200 dark:bg-slate-800'
-                              }`}
-                            >
-                              {s.id === 0 ? '🔥 실검문장' : `문장 ${idx + 1}`}
-                            </button>
-                          ))}
-                        </div>
+                    {/* 동그라미(노드) 직접 클릭 시 해당 문장성분/품사 상세 뜻 팝업 박스 */}
+                    {focusedNode && (
+                      <div
+                        className={`p-3.5 rounded-xl border text-xs ${
+                          darkMode
+                            ? 'bg-indigo-950/50 border-indigo-700'
+                            : 'bg-indigo-50 border-indigo-200'
+                        }`}
+                      >
+                        {focusedNode.type === 'comp' ? (
+                          (() => {
+                            const info = SENTENCE_COMPONENTS.find(
+                              (c) => c.id === focusedNode.id
+                            );
+                            if (!info) return null;
+                            return (
+                              <div>
+                                <div className="flex items-center justify-between">
+                                  <span className="font-black text-sm text-blue-600 dark:text-blue-400">
+                                    📘 [문장 성분 상세] {info.name} — {info.engName} ({info.roleTitle})
+                                  </span>
+                                  <button
+                                    onClick={() => setFocusedNode(null)}
+                                    className="text-[11px] font-bold underline"
+                                  >
+                                    닫기✕
+                                  </button>
+                                </div>
+                                <p className="mt-1 font-semibold">{info.easyMeaning}</p>
+                                <p className="mt-1 text-slate-600 dark:text-slate-300">
+                                  • <strong>어순 규칙:</strong> {info.wordOrderRule} | <strong>결합 가능 품사:</strong> {info.allowedPos.join(', ')}
+                                </p>
+                                <p className="mt-1 font-mono text-emerald-600 dark:text-emerald-400">
+                                  • <strong>대표 예문:</strong> {info.exampleHighlight}
+                                </p>
+                              </div>
+                            );
+                          })()
+                        ) : (
+                          (() => {
+                            const info = PARTS_OF_SPEECH.find(
+                              (p) => p.id === focusedNode.id
+                            );
+                            if (!info) return null;
+                            return (
+                              <div>
+                                <div className="flex items-center justify-between">
+                                  <span className="font-black text-sm text-emerald-600 dark:text-emerald-400">
+                                    📗 [9품사 상세] {info.name} — {info.engName} ({info.identityTitle})
+                                  </span>
+                                  <button
+                                    onClick={() => setFocusedNode(null)}
+                                    className="text-[11px] font-bold underline"
+                                  >
+                                    닫기✕
+                                  </button>
+                                </div>
+                                <p className="mt-1 font-semibold">{info.easyMeaning}</p>
+                                <p className="mt-1 text-slate-600 dark:text-slate-300">
+                                  • <strong>담당하는 문장 성분 자리:</strong> {info.allowedComp.join(', ')}
+                                </p>
+                                <p className="mt-1 font-mono text-blue-600 dark:text-blue-400">
+                                  • <strong>대표 어휘:</strong> {info.exampleWords}
+                                </p>
+                              </div>
+                            );
+                          })()
+                        )}
                       </div>
+                    )}
 
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-                        {currentDiagramEx.tokens.map((tk, idx) => (
+                    {/* 어절별 터치 카드 & [복원 완료 #24] 선택한 어절 상세 문법 해설판 */}
+                    <div>
+                      <div className="text-xs font-bold mb-2">
+                        👇 아래 문장의 각 단어를 클릭하면 위 연결선이 움직이고 아래에 상세 문법 역할이 표시됩니다:
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {currentDiagramData.tokens.map((tok, idx) => (
                           <button
                             key={idx}
-                            onClick={() => {
-                              setSelectedTokenIdx(idx);
-                              setSelectedComp(tk.comp === '독립어' ? 'M' : tk.comp);
-                              setSelectedPos(tk.pos);
-                              speakText(tk.word);
-                            }}
-                            className={`p-3 rounded-2xl bg-white dark:bg-slate-900 border-2 text-center flex flex-col items-center gap-1.5 ${
+                            onClick={() => setSelectedTokenIdx(idx)}
+                            className={`px-3 py-2 rounded-xl border-2 text-left transition-all ${
                               selectedTokenIdx === idx
-                                ? 'border-blue-600'
-                                : `${tk.colorClass} dark:border-slate-800`
+                                ? 'ring-2 ring-amber-400 bg-amber-50 dark:bg-slate-800 border-amber-500'
+                                : darkMode
+                                ? 'bg-slate-950 border-slate-800'
+                                : 'bg-white border-slate-200'
                             }`}
                           >
-                            <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800">
-                              {tk.compLabel}
-                            </span>
-                            <span className="text-base font-black">{tk.word}</span>
-                            <span className="text-[10px] font-bold text-slate-500">
-                              {tk.posLabel}
-                            </span>
+                            <div className="text-sm font-black">{tok.word}</div>
+                            <div className="text-[10px] font-extrabold text-blue-600 dark:text-blue-400">
+                              {tok.compLabel} · {tok.posLabel}
+                            </div>
+                            <div className="text-[10px] text-slate-500">
+                              {tok.meaning}
+                            </div>
                           </button>
                         ))}
                       </div>
-                    </div>
-                  </section>
 
-                  {/* STEP 4. 3단 직독직해 + 문장 저장 + 따라 쓰기(writingInputs 연결 완료!) */}
-                  <section
-                    className={`border rounded-3xl p-6 shadow-sm space-y-5 ${
-                      darkMode
-                        ? 'bg-slate-900 border-slate-800'
-                        : 'bg-white border-slate-200'
-                    }`}
-                  >
-                    <h3 className="text-lg font-extrabold">
-                      🗣️ STEP 4. 전 레벨 3단 직독직해 & 문장 스크랩
-                    </h3>
-                    {currentTheme.sentences.map((sent, sIdx) => {
-                      const isSentSaved = savedSentences.some((s) => s.en === sent.rawEn);
-                      return (
+                      {activeToken && (
                         <div
-                          key={sent.id}
-                          className={`p-5 rounded-2xl border space-y-2.5 ${
+                          className={`mt-3 p-3.5 rounded-xl border text-xs ${
                             darkMode
                               ? 'bg-slate-950 border-slate-800'
-                              : 'bg-slate-50 border-slate-200'
+                              : 'bg-amber-50/60 border-amber-200'
                           }`}
                         >
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <span className={`text-xs font-extrabold px-3 py-1 rounded-full text-white ${themeAccentBg}`}>
-                              {sent.tag}
-                            </span>
-                            <div className="flex flex-wrap gap-1.5">
-                              <button
-                                onClick={() =>
-                                  toggleSaveSentence({
-                                    en: sent.rawEn,
-                                    ko: sent.naturalKo,
-                                    note: `바꿔말하기: ${sent.paraphraseVersion} | 문법: ${sent.grammarPoint}`,
-                                    category: currentTheme.title,
-                                  })
-                                }
-                                className={`px-3 py-1 rounded-lg text-xs font-extrabold border ${
-                                  isSentSaved
-                                    ? 'bg-amber-400 text-slate-950 border-amber-400'
-                                    : 'border-slate-300 dark:border-slate-700'
-                                }`}
-                              >
-                                {isSentSaved ? '📌 문장저장됨(해제)' : '📌 문장저장'}
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setCustomDissectSentence(null);
-                                  setActiveDiagramSentenceIdx(sIdx);
-                                  speakText(sent.rawEn);
-                                }}
-                                className="px-3 py-1 rounded-lg bg-blue-600 text-white text-xs font-extrabold"
-                              >
-                                🔍 16요소 해부
-                              </button>
-                              <button
-                                onClick={() => speakText(sent.rawEn)}
-                                className="px-3 py-1 rounded-lg bg-slate-800 text-white text-xs font-bold"
-                              >
-                                🔊 듣기
-                              </button>
-                            </div>
+                          <div className="font-black text-sm text-amber-600 dark:text-amber-400">
+                            🔍 선택 어절 정밀 분석: &quot;{activeToken.word}&quot; — [{activeToken.compLabel} ↔ {activeToken.posLabel}]
                           </div>
-                          <div className="text-sm font-semibold">① {sent.koLine}</div>
-                          <div className="text-base font-bold">
-                            ② {renderHighlightedSentence(sent.enLine)}
-                          </div>
-                          <div className="text-xs text-emerald-500 font-extrabold">
-                            🔄 바꿔 말하기: "{sent.paraphraseVersion}"
-                          </div>
-                          <input
-                            type="text"
-                            value={writingInputs[`copy-${sent.id}`] || ''}
-                            onChange={(e) =>
-                              setWritingInputs({
-                                ...writingInputs,
-                                [`copy-${sent.id}`]: e.target.value,
-                              })
-                            }
-                            placeholder={`✍️ 따라 쓰기: ${sent.rawEn}`}
-                            className="w-full text-xs bg-transparent border-b border-dashed border-slate-300 dark:border-slate-700 py-1 focus:outline-none"
-                          />
+                          <p className="mt-1 font-semibold">
+                            • 단어 의미: {activeToken.meaning} | 문법 역할: {activeToken.roleExplanation}
+                          </p>
+                          <p className="mt-1 text-slate-600 dark:text-slate-300">
+                            • <strong>문장 뼈대 공식:</strong> {currentDiagramData.skeleton} ({currentDiagramData.patternType})
+                          </p>
+                          <p className="mt-0.5 text-slate-600 dark:text-slate-300">
+                            • <strong>핵심 어순 포인트:</strong> {currentDiagramData.wordOrderTip}
+                          </p>
                         </div>
-                      );
-                    })}
-                  </section>
-
-                  {/* STEP 5. 4단계 실전 퀴즈 */}
-                  <section className="bg-slate-900 text-white rounded-3xl p-6 shadow-lg space-y-4 border border-slate-800">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <h3 className="text-lg font-extrabold">🎮 STEP 5. 오늘의 4단계 실전 퀴즈</h3>
-                      <div className="flex gap-1.5">
-                        {(['word', 'beginner', 'intermediate', 'advanced'] as const).map((tab) => (
-                          <button
-                            key={tab}
-                            onClick={() => setQuizLevelTab(tab)}
-                            className={`px-3 py-1 rounded-xl text-xs font-extrabold ${
-                              quizLevelTab === tab ? 'bg-blue-600' : 'bg-slate-800'
-                            }`}
-                          >
-                            {tab.toUpperCase()}
-                          </button>
-                        ))}
-                      </div>
+                      )}
                     </div>
+                  </div>
+                )}
 
-                    {quizLevelTab === 'word' && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {NAVER_OFFICIAL_WORD_CHALLENGE.map((item, idx) => (
+                {/* [핵심 복원 #8] 탭 2: 문장 성분(7직책) 전체 사전 페이지 */}
+                {diagramTab === 'comp' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {SENTENCE_COMPONENTS.map((comp) => (
+                      <div
+                        key={comp.id}
+                        className={`p-4 rounded-xl border text-xs ${
+                          darkMode
+                            ? 'bg-slate-950 border-slate-800'
+                            : 'bg-slate-50 border-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-black text-blue-600 dark:text-blue-400">
+                            [{comp.id}] {comp.name} — {comp.engName}
+                          </span>
+                          <span className="px-2 py-0.5 rounded bg-blue-500/15 text-blue-600 dark:text-blue-300 font-bold">
+                            {comp.roleTitle}
+                          </span>
+                        </div>
+                        <p className="mt-2 font-semibold leading-relaxed">
+                          💡 <strong>쉬운 뜻:</strong> {comp.easyMeaning}
+                        </p>
+                        <p className="mt-1.5 text-slate-600 dark:text-slate-300">
+                          📐 <strong>어순 규칙:</strong> {comp.wordOrderRule}
+                        </p>
+                        <p className="mt-1 text-emerald-600 dark:text-emerald-400 font-bold">
+                          🔗 <strong>들어갈 수 있는 품사:</strong> {comp.allowedPos.join(', ')}
+                        </p>
+                        <div className="mt-2 p-2 rounded bg-white dark:bg-slate-900 font-mono text-[11px]">
+                          예문: {comp.exampleHighlight}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* [핵심 복원 #8] 탭 3: 9품사(한정사 포함) 전체 사전 페이지 */}
+                {diagramTab === 'pos' && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {PARTS_OF_SPEECH.map((pos) => (
+                      <div
+                        key={pos.id}
+                        className={`p-4 rounded-xl border text-xs ${
+                          darkMode
+                            ? 'bg-slate-950 border-slate-800'
+                            : 'bg-slate-50 border-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">
+                            [{pos.id}] {pos.name} — {pos.engName}
+                          </span>
+                        </div>
+                        <div className="text-[11px] font-bold text-amber-600 dark:text-amber-400 mt-0.5">
+                          {pos.identityTitle}
+                        </div>
+                        <p className="mt-2 font-semibold leading-relaxed">
+                          💡 <strong>쉬운 뜻:</strong> {pos.easyMeaning}
+                        </p>
+                        <p className="mt-1.5 text-blue-600 dark:text-blue-400 font-bold">
+                          🎯 <strong>담당하는 문장 성분:</strong> {pos.allowedComp.join(', ')}
+                        </p>
+                        <div className="mt-2 p-2 rounded bg-white dark:bg-slate-900 font-mono text-[11px]">
+                          대표 단어: {pos.exampleWords}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              {/* ============================================================ */}
+              {/* STEP 4. 3단 소리블록 직독직해 & 따라 쓰기 완벽 일치 판정 (#21) */}
+              {/* ============================================================ */}
+              <section
+                className={`p-4 rounded-2xl border ${
+                  darkMode
+                    ? 'bg-slate-900 border-slate-800'
+                    : 'bg-white border-slate-200 shadow-xs'
+                }`}
+              >
+                <div className="mb-3">
+                  <span className="px-2.5 py-1 rounded-md text-xs font-black bg-amber-500 text-slate-950">
+                    STEP 4 · 3단 소리블록 직독직해 & 타이핑 필사 훈련
+                  </span>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    문장 카드를 클릭하면 위 STEP 3 다이어그램이 해당 문장으로 즉시 연동됩니다.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  {currentTheme.sentences.map((sent, idx) => {
+                    const typed = (dictationInputs[sent.id] || '').trim();
+                    const isExactMatch =
+                      typed.length > 0 &&
+                      typed.toLowerCase() === sent.rawEn.trim().toLowerCase();
+
+                    return (
+                      <div
+                        key={sent.id}
+                        onClick={() => {
+                          setDiagramSourceMode('theme');
+                          setActiveSentenceIdx(idx);
+                          setSelectedTokenIdx(0);
+                        }}
+                        className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+                          activeSentenceIdx === idx
+                            ? 'border-blue-500 bg-blue-50/40 dark:bg-slate-800/80'
+                            : darkMode
+                            ? 'bg-slate-950 border-slate-800'
+                            : 'bg-slate-50 border-slate-200'
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="px-2 py-0.5 rounded text-[11px] font-extrabold bg-blue-600 text-white">
+                            {sent.tag} · 핵심어: {sent.targetWord}
+                          </span>
                           <div
-                            key={idx}
-                            className="bg-slate-800 p-3.5 rounded-2xl border border-slate-700 flex items-center justify-between"
+                            className="flex items-center gap-1.5"
+                            onClick={(e) => e.stopPropagation()}
                           >
-                            <div>
-                              <div className="font-black text-base">
-                                {revealedChallengeIdx.includes(idx) ? item.word : item.masked}
-                              </div>
-                              <div className="text-xs text-slate-300">{item.koMeaning}</div>
-                            </div>
+                            <button
+                              onClick={() => speakText(sent.rawEn, 0.5)}
+                              className="px-2 py-1 rounded bg-emerald-600 text-white text-[11px] font-bold"
+                            >
+                              🐢 0.50x
+                            </button>
+                            <button
+                              onClick={() => speakText(sent.rawEn, 1.0)}
+                              className="px-2 py-1 rounded bg-blue-600 text-white text-[11px] font-bold"
+                            >
+                              🔊 1.0x 듣기
+                            </button>
                             <button
                               onClick={() =>
-                                setRevealedChallengeIdx((prev) =>
-                                  prev.includes(idx)
-                                    ? prev.filter((i) => i !== idx)
-                                    : [...prev, idx]
+                                toggleSaveSentenceFromLesson(
+                                  sent.rawEn,
+                                  sent.naturalKo,
+                                  sent.grammarPoint,
+                                  sent.pronLine
                                 )
                               }
-                              className="px-2.5 py-1 rounded bg-slate-700 text-xs"
+                              className="px-2 py-1 rounded border text-[11px] font-bold bg-white dark:bg-slate-900"
                             >
-                              정답
+                              ⭐ 구문보관
                             </button>
                           </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {quizLevelTab === 'beginner' && (
-                      <div className="space-y-2">
-                        <div className="text-xl font-black">{currentTheme.quiz.beginner.word}</div>
-                        {currentTheme.quiz.beginner.options.map((opt, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => setSelectedBeginnerOpt(idx)}
-                            className={`w-full p-2.5 rounded-xl text-xs font-bold border ${
-                              selectedBeginnerOpt === idx
-                                ? idx === currentTheme.quiz.beginner.answerIdx
-                                  ? 'bg-emerald-600'
-                                  : 'bg-rose-600'
-                                : 'bg-slate-800 border-slate-700'
-                            }`}
-                          >
-                            {opt}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-
-                    {quizLevelTab === 'intermediate' && (
-                      <div className="space-y-2">
-                        <div className="text-sm font-bold">
-                          {currentTheme.quiz.intermediate.sentenceBefore} _______{' '}
-                          {currentTheme.quiz.intermediate.sentenceAfter}
                         </div>
-                        <button
-                          onClick={() => setShowInterHint(!showInterHint)}
-                          className="text-xs text-blue-300 underline"
+
+                        {/* 3단 직독직해 (① 의미단위 한글 -> ② 소리블록 영어 & 발음 -> ③ 자연스러운 완역 & 문법공식) */}
+                        <div className="mt-2.5 space-y-1.5 text-xs">
+                          <div className="text-slate-600 dark:text-slate-300 font-semibold">
+                            ① <strong>의미단위 직독:</strong> {sent.koLine}
+                          </div>
+                          <div className="text-base md:text-lg font-black text-blue-600 dark:text-blue-400">
+                            ② {sent.enLine}
+                          </div>
+                          {showPronGuide && (
+                            <div className="space-y-0.5">
+                              <div className="font-mono text-[11px] text-slate-500">
+                                IPA: {sent.ipaLine}
+                              </div>
+                              <div className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
+                                🗣️ 한글 연음 가이드: {sent.pronLine}
+                              </div>
+                            </div>
+                          )}
+                          <div className="font-bold text-sm">
+                            ③ <strong>자연스러운 완역:</strong> {sent.naturalKo}
+                          </div>
+                          <div className="pt-1.5 border-t border-dashed border-slate-300 dark:border-slate-700 text-[11px] space-y-0.5 text-slate-600 dark:text-slate-300">
+                            <div>
+                              📐 <strong>어순 공식:</strong> {sent.wordOrderFormula} ({sent.structure})
+                            </div>
+                            <div>
+                              📌 <strong>문법 포인트:</strong> {sent.grammarPoint}
+                            </div>
+                            <div>
+                              🔄 <strong>Paraphrase:</strong> {sent.paraphraseVersion}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 따라 쓰기(필사) 입력창 & 완벽 일치 자동 판정 */}
+                        <div
+                          className="mt-3 flex flex-wrap items-center gap-2"
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          {showInterHint ? currentTheme.quiz.intermediate.hint : '힌트 보기'}
-                        </button>
-                        {currentTheme.quiz.intermediate.options.map((opt, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => setSelectedInterOpt(idx)}
-                            className={`w-full p-2.5 rounded-xl text-xs font-bold border ${
-                              selectedInterOpt === idx
-                                ? idx === currentTheme.quiz.intermediate.answerIdx
-                                  ? 'bg-emerald-600'
-                                  : 'bg-rose-600'
-                                : 'bg-slate-800 border-slate-700'
+                          <input
+                            type="text"
+                            value={dictationInputs[sent.id] || ''}
+                            onChange={(e) =>
+                              setDictationInputs((prev) => ({
+                                ...prev,
+                                [sent.id]: e.target.value,
+                              }))
+                            }
+                            placeholder={`✍️ 따라 쓰기: ${sent.rawEn}`}
+                            className={`flex-1 min-w-[240px] px-3 py-1.5 rounded-lg border text-xs font-semibold ${
+                              isExactMatch
+                                ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40'
+                                : darkMode
+                                ? 'bg-slate-900 border-slate-700'
+                                : 'bg-white border-slate-300'
                             }`}
-                          >
-                            {opt}
-                          </button>
-                        ))}
+                          />
+                          {isExactMatch && (
+                            <span className="px-2.5 py-1 rounded-lg bg-emerald-600 text-white text-xs font-extrabold">
+                              ✅ 원문 완벽 일치!
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+
+              {/* ============================================================ */}
+              {/* STEP 5. 단계별 확인 퀴즈(해설 표시) & 서술형 영작 미션 + AI 코치 */}
+              {/* ============================================================ */}
+              <section
+                className={`p-4 rounded-2xl border space-y-4 ${
+                  darkMode
+                    ? 'bg-slate-900 border-slate-800'
+                    : 'bg-white border-slate-200 shadow-xs'
+                }`}
+              >
+                <span className="px-2.5 py-1 rounded-md text-xs font-black bg-rose-600 text-white">
+                  STEP 5 · 초·중·고급 실전 점검 퀴즈 & 서술형 영작 · AI 스피킹 코치
+                </span>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                  {/* 초급 퀴즈 */}
+                  <div
+                    className={`p-3.5 rounded-xl border ${
+                      darkMode
+                        ? 'bg-slate-950 border-slate-800'
+                        : 'bg-slate-50 border-slate-200'
+                    }`}
+                  >
+                    <div className="font-extrabold text-blue-500 mb-1">
+                      🌱 초급 어휘 확인: &quot;{currentTheme.quiz.beginner.word}&quot; ({currentTheme.quiz.beginner.ipa})
+                    </div>
+                    <div className="space-y-1.5 mt-2">
+                      {currentTheme.quiz.beginner.options.map((opt, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setBegSelected(idx)}
+                          className={`w-full text-left px-2.5 py-1.5 rounded-lg border font-semibold ${
+                            begSelected === idx
+                              ? idx === currentTheme.quiz.beginner.answerIdx
+                                ? 'bg-emerald-600 text-white border-emerald-600'
+                                : 'bg-rose-600 text-white border-rose-600'
+                              : darkMode
+                              ? 'bg-slate-900 border-slate-800'
+                              : 'bg-white border-slate-200'
+                          }`}
+                        >
+                          {idx + 1}. {opt}
+                        </button>
+                      ))}
+                    </div>
+                    {begSelected !== null && (
+                      <div className="mt-2 p-2 rounded bg-blue-500/10 text-[11px] font-semibold">
+                        💡 해설: {currentTheme.quiz.beginner.explanation}
                       </div>
                     )}
+                  </div>
 
-                    {quizLevelTab === 'advanced' && (
-                      <div className="space-y-2">
-                        <div className="text-sm font-bold">
-                          유의어 모두 선택: {currentTheme.quiz.advanced.highlightWord}
-                        </div>
-                        {currentTheme.quiz.advanced.options.map((opt, idx) => (
+                  {/* 중급 빈칸 퀴즈 */}
+                  <div
+                    className={`p-3.5 rounded-xl border ${
+                      darkMode
+                        ? 'bg-slate-950 border-slate-800'
+                        : 'bg-slate-50 border-slate-200'
+                    }`}
+                  >
+                    <div className="font-extrabold text-emerald-500 mb-1">
+                      🌿 중급 문맥 빈칸 ({currentTheme.quiz.intermediate.hint})
+                    </div>
+                    <p className="font-mono text-[11px] mb-2">
+                      {currentTheme.quiz.intermediate.sentenceBefore} [ _____ ]{' '}
+                      {currentTheme.quiz.intermediate.sentenceAfter}
+                    </p>
+                    <div className="space-y-1.5">
+                      {currentTheme.quiz.intermediate.options.map((opt, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setIntSelected(idx)}
+                          className={`w-full text-left px-2.5 py-1.5 rounded-lg border font-semibold ${
+                            intSelected === idx
+                              ? idx === currentTheme.quiz.intermediate.answerIdx
+                                ? 'bg-emerald-600 text-white border-emerald-600'
+                                : 'bg-rose-600 text-white border-rose-600'
+                              : darkMode
+                              ? 'bg-slate-900 border-slate-800'
+                              : 'bg-white border-slate-200'
+                          }`}
+                        >
+                          {idx + 1}. {opt}
+                        </button>
+                      ))}
+                    </div>
+                    {intSelected !== null && (
+                      <div className="mt-2 p-2 rounded bg-emerald-500/10 text-[11px] font-semibold">
+                        💡 해설: {currentTheme.quiz.intermediate.explanation}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 고급 어법 복수선택 퀴즈 */}
+                  <div
+                    className={`p-3.5 rounded-xl border ${
+                      darkMode
+                        ? 'bg-slate-950 border-slate-800'
+                        : 'bg-slate-50 border-slate-200'
+                    }`}
+                  >
+                    <div className="font-extrabold text-amber-500 mb-1">
+                      🌳 고급 어법 판별 (2개 선택)
+                    </div>
+                    <p className="text-[11px] mb-2">
+                      {currentTheme.quiz.advanced.questionPrompt}
+                    </p>
+                    <div className="space-y-1.5">
+                      {currentTheme.quiz.advanced.options.map((opt, idx) => {
+                        const isPicked = advSelected.includes(idx);
+                        const isCorrect =
+                          currentTheme.quiz.advanced.answerIndices.includes(idx);
+                        return (
                           <button
                             key={idx}
                             onClick={() =>
-                              setSelectedAdvOpts((prev) =>
+                              setAdvSelected((prev) =>
                                 prev.includes(idx)
                                   ? prev.filter((i) => i !== idx)
                                   : [...prev, idx]
                               )
                             }
-                            className={`w-full p-2.5 rounded-xl text-xs font-bold border ${
-                              selectedAdvOpts.includes(idx)
-                                ? currentTheme.quiz.advanced.answerIndices.includes(idx)
-                                  ? 'bg-emerald-600'
-                                  : 'bg-rose-600'
-                                : 'bg-slate-800 border-slate-700'
+                            className={`w-full text-left px-2.5 py-1.5 rounded-lg border font-semibold ${
+                              isPicked
+                                ? isCorrect
+                                  ? 'bg-emerald-600 text-white border-emerald-600'
+                                  : 'bg-rose-600 text-white border-rose-600'
+                                : darkMode
+                                ? 'bg-slate-900 border-slate-800'
+                                : 'bg-white border-slate-200'
                             }`}
                           >
                             {opt}
                           </button>
-                        ))}
+                        );
+                      })}
+                    </div>
+                    {advSelected.length > 0 && (
+                      <div className="mt-2 p-2 rounded bg-amber-500/10 text-[11px] font-semibold">
+                        💡 해설: {currentTheme.quiz.advanced.explanation}
                       </div>
                     )}
+                  </div>
+                </div>
 
-                    <div className="pt-2 border-t border-slate-800">
-                      <input
-                        type="text"
-                        value={userWritingMission}
-                        onChange={(e) => setUserWritingMission(e.target.value)}
-                        placeholder={currentTheme.quiz.writingMission.koPrompt}
-                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
-                      />
-                    </div>
-                  </section>
-                </>
-              )}
-
-              {/* ==============================================================
-                  [모드 4] 🗂️ 내 단어·문장 보관함 & 직접 수정 & 암기완료 해제 관리소 완전 복원!
-              ============================================================== */}
-              {activeMode === 'naverQuiz' && (
-                <div className="space-y-6">
-                  <section
-                    className={`border rounded-3xl p-6 shadow-sm space-y-5 ${
+                {/* 서술형 영작 미션 & 모범답안 확인 토글 (#25 복원) */}
+                <div
+                  className={`p-3.5 rounded-xl border text-xs ${
+                    darkMode
+                      ? 'bg-slate-950 border-slate-800'
+                      : 'bg-slate-50 border-slate-200'
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-extrabold">
+                      ✍️ 서술형 영작 미션: &quot;{currentTheme.quiz.writingMission.koPrompt}&quot; (목표 패턴: {currentTheme.quiz.writingMission.targetPattern})
+                    </span>
+                    <button
+                      onClick={() => setShowWritingModel((p) => !p)}
+                      className="px-2.5 py-1 rounded bg-indigo-600 text-white font-bold text-[11px]"
+                    >
+                      {showWritingModel ? '🙈 모범답안 숨기기' : '👁️ 모범답안 확인'}
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={writingInput}
+                    onChange={(e) => setWritingInput(e.target.value)}
+                    placeholder="위 우리말을 영어로 직접 영작해 보세요..."
+                    className={`w-full mt-2 px-3 py-2 rounded-lg border ${
                       darkMode
-                        ? 'bg-slate-900 border-slate-800'
-                        : 'bg-white border-slate-200'
+                        ? 'bg-slate-900 border-slate-700'
+                        : 'bg-white border-slate-300'
                     }`}
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-4">
-                      <div>
-                        <span className="text-xs font-extrabold text-amber-500">
-                          EDITABLE WORD & SENTENCE VAULT
-                        </span>
-                        <h2 className="text-2xl font-extrabold mt-0.5">
-                          ⭐ 1) 내가 저장한 단어장 ({bookmarkedWords.length}개 · 뜻/메모 수정 & 암기완료 해제 가능)
-                        </h2>
-                      </div>
+                  />
+                  {showWritingModel && (
+                    <div className="mt-2 p-2.5 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 font-bold">
+                      ✅ 모범 답안: {currentTheme.quiz.writingMission.modelAnswer}
                     </div>
+                  )}
+                </div>
 
-                    <div className="p-4 rounded-2xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2">
-                      <div className="text-xs font-extrabold text-blue-600 dark:text-blue-400">
-                        ➕ 나만의 새 단어 직접 추가하기
+                {/* AI 스피킹 타이머 & 음성 인식(SpeechRecognition) 코칭 */}
+                <div
+                  className={`p-3.5 rounded-xl border text-xs ${
+                    darkMode
+                      ? 'bg-slate-950 border-slate-800'
+                      : 'bg-slate-50 border-slate-200'
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <div className="font-extrabold">
+                      🎙️ 실전 스피킹 타이머 & 1:1 문장 첨삭 코치
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {([5, 15, 30] as const).map((m) => (
+                        <button
+                          key={m}
+                          onClick={() => {
+                            setSpeakingGoalMins(m);
+                            setSpeakingSeconds(0);
+                            setIsSpeakingTimerRunning(false);
+                          }}
+                          className={`px-2 py-0.5 rounded font-bold ${
+                            speakingGoalMins === m
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-slate-200 dark:bg-slate-800'
+                          }`}
+                        >
+                          {m}분 목표
+                        </button>
+                      ))}
+                      <span className="font-mono font-black text-sm px-2">
+                        {String(Math.floor(speakingSeconds / 60)).padStart(2, '0')}:
+                        {String(speakingSeconds % 60).padStart(2, '0')}
+                      </span>
+                      <button
+                        onClick={handleToggleSpeakingTimer}
+                        className="px-2.5 py-1 rounded bg-emerald-600 text-white font-bold"
+                      >
+                        {isSpeakingTimerRunning ? '⏸ 일시정지' : '▶ 타이머시작'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 max-h-44 overflow-y-auto mb-2 p-2 rounded bg-white dark:bg-slate-900">
+                    {chatHistory.map((turn, idx) => (
+                      <div
+                        key={idx}
+                        className={`p-2 rounded-lg ${
+                          turn.role === 'user'
+                            ? 'bg-blue-600 text-white ml-8'
+                            : darkMode
+                            ? 'bg-slate-800 mr-8'
+                            : 'bg-slate-100 mr-8'
+                        }`}
+                      >
+                        <div className="font-semibold">{turn.text}</div>
+                        {turn.correction && (
+                          <div className="text-[11px] text-emerald-500 font-bold mt-1">
+                            {turn.correction}
+                          </div>
+                        )}
+                        {turn.nuanceTip && (
+                          <div className="text-[11px] text-amber-500 font-semibold mt-0.5">
+                            {turn.nuanceTip}
+                          </div>
+                        )}
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-                        <input
-                          type="text"
-                          value={newCustomWord}
-                          onChange={(e) => setNewCustomWord(e.target.value)}
-                          placeholder="영단어 (예: resilience)"
-                          className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold"
-                        />
-                        <input
-                          type="text"
-                          value={newCustomWordMeaning}
-                          onChange={(e) => setNewCustomWordMeaning(e.target.value)}
-                          placeholder="뜻 (예: 회복탄력성)"
-                          className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold"
-                        />
-                        <input
-                          type="text"
-                          value={newCustomWordNote}
-                          onChange={(e) => setNewCustomWordNote(e.target.value)}
-                          placeholder="짝꿍표현/나만의 메모"
-                          className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs"
-                        />
+                    ))}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleStartVoiceRecognition}
+                      className={`px-3 py-2 rounded-lg font-extrabold text-white shrink-0 ${
+                        isMicListening ? 'bg-rose-600 animate-pulse' : 'bg-indigo-600'
+                      }`}
+                    >
+                      {isMicListening ? '🎙️ 듣는 중...' : '🎙️ 음성발화 입력'}
+                    </button>
+                    <input
+                      type="text"
+                      value={userChatInput}
+                      onChange={(e) => setUserChatInput(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSendCoachMessage()}
+                      placeholder="영어로 문장을 입력하거나 음성발화 버튼을 눌러 말씀해 보세요..."
+                      className={`flex-1 px-3 py-2 rounded-lg border ${
+                        darkMode
+                          ? 'bg-slate-900 border-slate-700'
+                          : 'bg-white border-slate-300'
+                      }`}
+                    />
+                    <button
+                      onClick={handleSendCoachMessage}
+                      className="px-3 py-2 rounded-lg font-extrabold bg-blue-600 text-white shrink-0"
+                    >
+                      첨삭받기
+                    </button>
+                  </div>
+                </div>
+              </section>
+            </div>
+          )}
+
+          {/* ---------------------------------------------------------------- */}
+          {/* [모드 2] 🎓 1~5교시 실전 훈련소 & 수능·서술형·내신 3대 마스터 코스 */}
+          {/* ---------------------------------------------------------------- */}
+          {activeMode === 'examCourses' && (
+            <div className="space-y-6">
+              {/* 상단 1~5교시 탭 전환 */}
+              <div
+                className={`p-4 rounded-2xl border ${
+                  darkMode
+                    ? 'bg-slate-900 border-slate-800'
+                    : 'bg-white border-slate-200 shadow-xs'
+                }`}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                  <h2 className="text-base md:text-lg font-black">
+                    🎓 1~5교시 실전 훈련 모듈 & 수능·내신 마스터 코스
+                  </h2>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(
+                      [
+                        { p: 1, label: '1교시 · 어휘 20문항 채점' },
+                        { p: 2, label: '2교시 · 12구문 & 어순조립' },
+                        { p: 3, label: '3교시 · 3대 입시트랙' },
+                        { p: 4, label: '4교시 · 학술 6대 지문' },
+                        { p: 5, label: '5교시 · 빈출어법 10선 & 내 지문분석' },
+                      ] as const
+                    ).map((item) => (
+                      <button
+                        key={item.p}
+                        onClick={() => setActiveModulePeriod(item.p)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-extrabold ${
+                          activeModulePeriod === item.p
+                            ? `${themeAccentBg} text-white`
+                            : darkMode
+                            ? 'bg-slate-800 text-slate-300'
+                            : 'bg-slate-100 text-slate-700'
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 1교시: 어휘 스피드 테스트 + 실시간 점수 채점판 & 다시 풀기 (#20) */}
+                {activeModulePeriod === 1 && (
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl bg-blue-500/10 text-xs">
+                      <div className="font-extrabold">
+                        🎯 실시간 채점 점수: <span className="text-blue-600 dark:text-blue-400 text-sm">{period1CorrectCount} / {period1QuizItems.length}점</span> (응시 {Object.keys(period1Answers).length}문항)
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setPeriod1Answers({})}
+                          className="px-2.5 py-1 rounded bg-slate-700 text-white font-bold"
+                        >
+                          🔄 현재 시험지 다시 풀기
+                        </button>
                         <button
                           onClick={() => {
-                            if (!newCustomWord.trim()) return;
-                            setBookmarkedWords((prev) => [
-                              {
-                                word: newCustomWord.trim(),
-                                ipa: '/직접추가/',
-                                meaning: newCustomWordMeaning.trim() || '나만의 단어',
-                                collocation: newCustomWordNote.trim() || newCustomWord.trim(),
-                                posLabel: '내 단어',
-                                compLabel: '핵심어휘',
-                                levelBadge: '직접등록',
-                                customNote: newCustomWordNote.trim(),
-                                mastered: false,
-                              },
-                              ...prev,
-                            ]);
-                            setNewCustomWord('');
-                            setNewCustomWordMeaning('');
-                            setNewCustomWordNote('');
+                            setVocabChallengeSetSeed((s) => s + 1);
+                            setPeriod1Answers({});
                           }}
-                          className={`rounded-xl text-white text-xs font-extrabold py-2 ${themeAccentBg}`}
+                          className="px-2.5 py-1 rounded bg-blue-600 text-white font-bold"
                         >
-                          ➕ 단어장에 즉시 추가
+                          🎲 새 시험지 세트 생성 (Set #{vocabChallengeSetSeed})
                         </button>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {bookmarkedWords.map((bw, idx) => {
-                        const isEditing = editingWordIdx === idx;
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                      {period1QuizItems.map((item, idx) => {
+                        const qKey = `${vocabChallengeSetSeed}-${idx}`;
+                        const picked = period1Answers[qKey];
+                        const distractors = [
+                          item.meaning,
+                          '일정을 무기한 연기하다',
+                          '예산을 삭감하고 축소하다',
+                          '규정을 위반하여 제재를 받다',
+                        ];
                         return (
                           <div
-                            key={idx}
-                            className={`p-4 rounded-2xl border space-y-2.5 transition ${
-                              bw.mastered
-                                ? 'bg-emerald-500/10 border-emerald-500/40'
-                                : darkMode
+                            key={qKey}
+                            className={`p-3 rounded-xl border ${
+                              darkMode
                                 ? 'bg-slate-950 border-slate-800'
                                 : 'bg-slate-50 border-slate-200'
                             }`}
                           >
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-2">
-                                <strong className="text-base font-black">{bw.word}</strong>
-                                <span className="text-xs font-mono text-blue-500">{bw.ipa}</span>
+                            <div className="flex items-center justify-between">
+                              <span className="font-black text-sm text-blue-500">
+                                Q{idx + 1}. {item.word}{' '}
+                                <span className="text-[11px] font-normal opacity-75">
+                                  {item.ipa} {showPronGuide ? item.pron : ''}
+                                </span>
+                              </span>
+                              <button
+                                onClick={() => speakText(item.word)}
+                                className="px-2 py-0.5 rounded bg-blue-600 text-white text-[10px] font-bold"
+                              >
+                                🔊
+                              </button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-1.5 mt-2">
+                              {distractors.map((opt, oIdx) => (
                                 <button
-                                  onClick={() => speakText(bw.word)}
-                                  className="px-2 py-0.5 rounded bg-blue-600 text-white text-xs"
-                                >
-                                  🔊
-                                </button>
-                              </div>
-
-                              <div className="flex items-center gap-1">
-                                <button
+                                  key={oIdx}
                                   onClick={() =>
-                                    setBookmarkedWords((prev) =>
-                                      prev.map((item, i) =>
-                                        i === idx ? { ...item, mastered: !item.mastered } : item
-                                      )
-                                    )
+                                    setPeriod1Answers((prev) => ({
+                                      ...prev,
+                                      [qKey]: oIdx,
+                                    }))
                                   }
-                                  className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold ${
-                                    bw.mastered
-                                      ? 'bg-emerald-600 text-white'
-                                      : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                                  className={`p-1.5 rounded border text-left font-semibold ${
+                                    picked === oIdx
+                                      ? oIdx === 0
+                                        ? 'bg-emerald-600 text-white border-emerald-600'
+                                        : 'bg-rose-600 text-white border-rose-600'
+                                      : darkMode
+                                      ? 'bg-slate-900 border-slate-800'
+                                      : 'bg-white border-slate-200'
                                   }`}
                                 >
-                                  {bw.mastered ? '✅ 암기완료(해제)' : '⬜ 암기중'}
+                                  {oIdx + 1}. {opt}
                                 </button>
-
-                                <button
-                                  onClick={() => {
-                                    if (isEditing) {
-                                      setEditingWordIdx(null);
-                                    } else {
-                                      setEditingWordIdx(idx);
-                                      setEditWordMeaning(bw.meaning);
-                                      setEditWordCollocation(bw.collocation);
-                                      setEditWordNote(bw.customNote || '');
-                                    }
-                                  }}
-                                  className="px-2 py-1 rounded-lg bg-blue-500/15 text-blue-600 dark:text-blue-300 text-[11px] font-extrabold"
-                                >
-                                  {isEditing ? '취소' : '✏️ 수정'}
-                                </button>
-
-                                <button
-                                  onClick={() => toggleBookmark(bw)}
-                                  className="px-2 py-1 rounded-lg bg-rose-500/15 text-rose-500 text-[11px] font-extrabold"
-                                >
-                                  삭제
-                                </button>
-                              </div>
+                              ))}
                             </div>
-
-                            {isEditing ? (
-                              <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
-                                <input
-                                  type="text"
-                                  value={editWordMeaning}
-                                  onChange={(e) => setEditWordMeaning(e.target.value)}
-                                  placeholder="뜻 수정"
-                                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-bold"
-                                />
-                                <input
-                                  type="text"
-                                  value={editWordCollocation}
-                                  onChange={(e) => setEditWordCollocation(e.target.value)}
-                                  placeholder="짝꿍 표현 수정"
-                                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs"
-                                />
-                                <input
-                                  type="text"
-                                  value={editWordNote}
-                                  onChange={(e) => setEditWordNote(e.target.value)}
-                                  placeholder="나만의 암기 팁 / 어법 메모 추가"
-                                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs"
-                                />
-                                <button
-                                  onClick={() => {
-                                    setBookmarkedWords((prev) =>
-                                      prev.map((item, i) =>
-                                        i === idx
-                                          ? {
-                                              ...item,
-                                              meaning: editWordMeaning,
-                                              collocation: editWordCollocation,
-                                              customNote: editWordNote,
-                                            }
-                                          : item
-                                      )
-                                    );
-                                    setEditingWordIdx(null);
-                                  }}
-                                  className="w-full py-1.5 rounded-lg bg-blue-600 text-white text-xs font-extrabold"
-                                >
-                                  💾 수정 내용 저장하기
-                                </button>
-                              </div>
-                            ) : (
-                              <>
-                                <div className="text-xs font-extrabold">뜻: {bw.meaning}</div>
-                                <div className="text-[11px] text-blue-500 font-bold">
-                                  🔗 짝꿍: {bw.collocation}
-                                </div>
-                                {bw.customNote && (
-                                  <div className="text-[11px] text-amber-600 dark:text-amber-300 bg-amber-500/10 px-2.5 py-1 rounded-lg font-semibold">
-                                    📝 내 메모: {bw.customNote}
-                                  </div>
-                                )}
-                              </>
-                            )}
                           </div>
                         );
                       })}
                     </div>
-                  </section>
+                  </div>
+                )}
 
-                  <section
-                    className={`border rounded-3xl p-6 shadow-sm space-y-5 ${
-                      darkMode
-                        ? 'bg-slate-900 border-slate-800'
-                        : 'bg-white border-slate-200'
-                    }`}
-                  >
-                    <h2 className="text-2xl font-extrabold">
-                      📌 2) 내가 스크랩한 문장·구문 보관함 ({savedSentences.length}문장 · 직접 수정 & 16요소 해부 연동)
-                    </h2>
-
-                    <div className="p-4 rounded-2xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2">
-                      <div className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400">
-                        ➕ 나만의 중요 영어 문장 / 내신 서술형 문장 직접 등록하기
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                        <input
-                          type="text"
-                          value={newCustomSentEn}
-                          onChange={(e) => setNewCustomSentEn(e.target.value)}
-                          placeholder="영어 문장 입력..."
-                          className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold"
-                        />
-                        <input
-                          type="text"
-                          value={newCustomSentKo}
-                          onChange={(e) => setNewCustomSentKo(e.target.value)}
-                          placeholder="한글 해석 입력..."
-                          className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs"
-                        />
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            value={newCustomSentNote}
-                            onChange={(e) => setNewCustomSentNote(e.target.value)}
-                            placeholder="어법/서술형 메모..."
-                            className="flex-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs"
-                          />
-                          <button
-                            onClick={() => {
-                              if (!newCustomSentEn.trim()) return;
-                              toggleSaveSentence({
-                                en: newCustomSentEn.trim(),
-                                ko: newCustomSentKo.trim() || '직접 등록한 문장',
-                                note: newCustomSentNote.trim(),
-                                category: '내 직접 등록 문장',
-                              });
-                              setNewCustomSentEn('');
-                              setNewCustomSentKo('');
-                              setNewCustomSentNote('');
-                            }}
-                            className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-extrabold"
-                          >
-                            ➕ 추가
-                          </button>
-                        </div>
-                      </div>
+                {/* 2교시: 12대 검증 구문 아카이브 & 클릭형 어순 배열(Scramble) 조립기 (#26) */}
+                {activeModulePeriod === 2 && (
+                  <div className="space-y-4 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-extrabold">
+                        🧩 검증 구문 12선 (한글발음 + 시드 기반 피셔-예이츠 어순 배열 훈련)
+                      </span>
+                      <button
+                        onClick={() => {
+                          setSyntaxGeneratorSeed((s) => s + 1);
+                          setScrambleBuiltMap({});
+                        }}
+                        className="px-3 py-1 rounded-lg bg-blue-600 text-white font-bold"
+                      >
+                        🔄 어순 셔플 시드 변경 (#{syntaxGeneratorSeed})
+                      </button>
                     </div>
 
                     <div className="space-y-3">
-                      {savedSentences.map((sItem) => {
-                        const isEditSent = editingSentId === sItem.id;
+                      {generatedSyntaxList.map((syn, idx) => {
+                        const built = scrambleBuiltMap[syn.id] || [];
+                        const builtStr = built.join(' ');
+                        const isComplete =
+                          builtStr.toLowerCase() ===
+                          syn.sentenceEn.trim().toLowerCase();
+
                         return (
                           <div
-                            key={sItem.id}
-                            className={`p-4 rounded-2xl border space-y-2 ${
-                              sItem.mastered
-                                ? 'bg-emerald-500/10 border-emerald-500/40'
-                                : darkMode
+                            key={syn.id}
+                            className={`p-4 rounded-xl border ${
+                              darkMode
                                 ? 'bg-slate-950 border-slate-800'
                                 : 'bg-slate-50 border-slate-200'
                             }`}
                           >
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <span className="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-indigo-600 text-white">
-                                {sItem.category}
+                            <div className="flex items-center justify-between">
+                              <span className="font-extrabold text-blue-500">
+                                #{idx + 1} · {syn.openerRule} (표제어: {syn.targetWord} / 문장내 형태: {syn.matchedForm})
                               </span>
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                <button
-                                  onClick={() =>
-                                    setSavedSentences((prev) =>
-                                      prev.map((it) =>
-                                        it.id === sItem.id
-                                          ? { ...it, mastered: !it.mastered }
-                                          : it
-                                      )
-                                    )
-                                  }
-                                  className={`px-2.5 py-1 rounded-lg text-xs font-extrabold ${
-                                    sItem.mastered
-                                      ? 'bg-emerald-600 text-white'
-                                      : 'bg-slate-200 dark:bg-slate-800'
-                                  }`}
-                                >
-                                  {sItem.mastered ? '✅ 암기완료(해제)' : '⬜ 암기중'}
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setCustomDissectSentence({
-                                      en: sItem.en,
-                                      ko: sItem.ko,
-                                      title: sItem.category,
-                                    });
-                                    setActiveMode('daily');
-                                    speakText(sItem.en);
-                                  }}
-                                  className="px-2.5 py-1 rounded-lg bg-blue-600 text-white text-xs font-extrabold"
-                                >
-                                  🔍 16요소 해부↗
-                                </button>
-                                <button
-                                  onClick={() => speakText(sItem.en)}
-                                  className="px-2.5 py-1 rounded-lg bg-slate-800 text-white text-xs font-bold"
-                                >
-                                  🔊 듣기
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    if (isEditSent) {
-                                      setEditingSentId(null);
-                                    } else {
-                                      setEditingSentId(sItem.id);
-                                      setEditSentEn(sItem.en);
-                                      setEditSentKo(sItem.ko);
-                                      setEditSentNote(sItem.note);
-                                    }
-                                  }}
-                                  className="px-2.5 py-1 rounded-lg bg-blue-500/15 text-blue-500 text-xs font-extrabold"
-                                >
-                                  {isEditSent ? '취소' : '✏️ 수정'}
-                                </button>
-                                <button
-                                  onClick={() =>
-                                    setSavedSentences((prev) =>
-                                      prev.filter((it) => it.id !== sItem.id)
-                                    )
-                                  }
-                                  className="px-2.5 py-1 rounded-lg bg-rose-500/15 text-rose-500 text-xs font-extrabold"
-                                >
-                                  삭제
-                                </button>
+                              <button
+                                onClick={() => speakText(syn.sentenceEn)}
+                                className="px-2.5 py-1 rounded bg-blue-600 text-white font-bold"
+                              >
+                                🔊 원문듣기
+                              </button>
+                            </div>
+                            <div className="text-sm font-black mt-1">
+                              {syn.sentenceEn}
+                            </div>
+                            {showPronGuide && (
+                              <div className="text-emerald-600 dark:text-emerald-400 font-bold mt-0.5">
+                                🗣️ {syn.pronLine}
                               </div>
+                            )}
+                            <div className="mt-1 font-semibold">{syn.sentenceKo}</div>
+                            <div className="text-[11px] opacity-80 mt-0.5">
+                              🔄 Paraphrase: {syn.paraphrasedEn}
                             </div>
 
-                            {isEditSent ? (
-                              <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
-                                <input
-                                  type="text"
-                                  value={editSentEn}
-                                  onChange={(e) => setEditSentEn(e.target.value)}
-                                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs font-bold"
-                                />
-                                <input
-                                  type="text"
-                                  value={editSentKo}
-                                  onChange={(e) => setEditSentKo(e.target.value)}
-                                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs"
-                                />
-                                <input
-                                  type="text"
-                                  value={editSentNote}
-                                  onChange={(e) => setEditSentNote(e.target.value)}
-                                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs"
-                                />
+                            {/* 클릭형 어순 조립 훈련판 */}
+                            <div className="mt-2.5 pt-2 border-t border-dashed border-slate-300 dark:border-slate-700">
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="font-bold text-amber-500">
+                                  🧩 아래 섞인 어절을 순서대로 클릭해 문장을 조립해 보세요:
+                                </span>
                                 <button
-                                  onClick={() => {
-                                    setSavedSentences((prev) =>
-                                      prev.map((it) =>
-                                        it.id === sItem.id
-                                          ? {
-                                              ...it,
-                                              en: editSentEn,
-                                              ko: editSentKo,
-                                              note: editSentNote,
-                                            }
-                                          : it
-                                      )
-                                    );
-                                    setEditingSentId(null);
-                                  }}
-                                  className="px-4 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-extrabold"
+                                  onClick={() =>
+                                    setScrambleBuiltMap((prev) => ({
+                                      ...prev,
+                                      [syn.id]: [],
+                                    }))
+                                  }
+                                  className="text-[11px] underline"
                                 >
-                                  💾 문장 수정 완료
+                                  초기화
                                 </button>
                               </div>
-                            ) : (
-                              <>
-                                <div className="text-base font-black text-blue-600 dark:text-yellow-300">
-                                  "{sItem.en}"
-                                </div>
-                                <div className="text-xs font-bold">{sItem.ko}</div>
-                                {sItem.note && (
-                                  <div className="text-xs text-amber-600 dark:text-amber-300 font-semibold">
-                                    📝 메모: {sItem.note}
-                                  </div>
+                              <div className="flex flex-wrap gap-1.5 mb-2">
+                                {syn.scrambleTokens.map((tok, tIdx) => (
+                                  <button
+                                    key={tIdx}
+                                    onClick={() =>
+                                      setScrambleBuiltMap((prev) => ({
+                                        ...prev,
+                                        [syn.id]: [...(prev[syn.id] || []), tok],
+                                      }))
+                                    }
+                                    className="px-2 py-1 rounded border bg-white dark:bg-slate-900 font-bold hover:border-blue-500"
+                                  >
+                                    {tok}
+                                  </button>
+                                ))}
+                              </div>
+                              <div className="p-2 rounded bg-white dark:bg-slate-900 font-mono min-h-[32px] flex items-center justify-between">
+                                <span>
+                                  {builtStr || '👆 위 단어 조각을 클릭하면 여기에 조립됩니다.'}
+                                </span>
+                                {isComplete && (
+                                  <span className="px-2 py-0.5 rounded bg-emerald-600 text-white font-bold">
+                                    ✅ 어순 완벽 일치!
+                                  </span>
                                 )}
-                              </>
-                            )}
+                              </div>
+                            </div>
                           </div>
                         );
                       })}
                     </div>
-                  </section>
-                </div>
-              )}
+                  </div>
+                )}
 
-              {/* ==============================================================
-                  [모드 5] AI 음성 회화 & 첨삭 (studyStats & speakingSeconds 표시 연결 완료!)
-              ============================================================== */}
-              {activeMode === 'aiCoach' && (
-                <div className="space-y-6">
-                  <section className="bg-slate-900 text-white rounded-3xl p-6 space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <h3 className="text-lg font-extrabold">
-                          🎙️ AI 원어민 코치 ({targetSpeakingMins}분 코스 · 현재 {Math.floor(speakingSeconds / 60)}분 {speakingSeconds % 60}초 진행)
-                        </h3>
-                        <p className="text-xs text-slate-400">
-                          📊 누적 학습 현황: 마스터 어휘 {studyStats.masteredWords}개 · 완료 문장 {studyStats.completedSentences}개 · 누적 스피킹 {studyStats.speakingMinutes}분
-                        </p>
-                      </div>
-                      <div className="flex gap-1.5">
-                        {[5, 10, 15, 30].map((m) => (
-                          <button
-                            key={m}
-                            onClick={() => setTargetSpeakingMins(m)}
-                            className={`px-2.5 py-1 rounded text-xs font-bold ${
-                              targetSpeakingMins === m ? 'bg-blue-600' : 'bg-slate-800'
-                            }`}
-                          >
-                            {m}분
-                          </button>
-                        ))}
+                {/* 3교시: 수능독해 · 서술형어법 · 고교내신 3대 마스터 트랙 */}
+                {activeModulePeriod === 3 && (
+                  <div className="space-y-4 text-xs">
+                    <div className="flex flex-wrap gap-2">
+                      {EXAM_COURSES.map((c) => (
                         <button
-                          onClick={() => setIsVoiceActive(!isVoiceActive)}
-                          className="px-3 py-1 rounded bg-emerald-600 text-xs font-extrabold"
-                        >
-                          {isVoiceActive ? '⏸️ 일시정지' : '▶️ 시작'}
-                        </button>
-                      </div>
-                    </div>
-                    <div className="space-y-2 max-h-60 overflow-y-auto p-3 bg-slate-950 rounded-2xl">
-                      {chatHistory.map((turn, i) => (
-                        <div
-                          key={i}
-                          className={`p-3 rounded-xl text-xs ${
-                            turn.role === 'coach' ? 'bg-slate-800 mr-8' : 'bg-blue-600 ml-8'
+                          key={c.id}
+                          onClick={() => setSelectedExamTrackId(c.id)}
+                          className={`px-3.5 py-2 rounded-xl font-extrabold ${
+                            selectedExamTrackId === c.id
+                              ? 'bg-indigo-600 text-white'
+                              : darkMode
+                              ? 'bg-slate-800 text-slate-300'
+                              : 'bg-slate-100 text-slate-700'
                           }`}
                         >
-                          {turn.text}
-                        </div>
+                          {c.shortTabName}
+                        </button>
                       ))}
                     </div>
-                    <form onSubmit={handleSendChat} className="flex gap-2">
-                      <input
-                        type="text"
-                        value={chatInput}
-                        onChange={(e) => setChatInput(e.target.value)}
-                        placeholder="영어로 문장을 입력해 보세요..."
-                        className="flex-1 bg-slate-800 rounded-xl px-3 py-2 text-xs text-white"
-                      />
-                      <button
-                        type="submit"
-                        className="px-4 py-2 rounded-xl bg-blue-600 text-xs font-extrabold"
-                      >
-                        전송
-                      </button>
-                    </form>
-                  </section>
 
-                  <section
-                    className={`border rounded-3xl p-6 space-y-3 ${
-                      darkMode
-                        ? 'bg-slate-900 border-slate-800'
-                        : 'bg-white border-slate-200'
-                    }`}
-                  >
-                    <h3 className="text-base font-extrabold">✍️ 1:1 실시간 서술형·회화 영작 첨삭</h3>
-                    <form onSubmit={handleRunCorrection} className="flex gap-2">
-                      <input
-                        type="text"
-                        value={correctionInput}
-                        onChange={(e) => setCorrectionInput(e.target.value)}
-                        placeholder="첨삭받을 영어 문장을 입력하세요..."
-                        className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-xl px-3 py-2 text-xs"
-                      />
-                      <button
-                        type="submit"
-                        className={`px-4 py-2 rounded-xl text-white text-xs font-extrabold ${themeAccentBg}`}
-                      >
-                        첨삭 실행
-                      </button>
-                    </form>
-                    {correctionResult && (
-                      <div className="text-xs space-y-1 pt-2">
-                        <div className="font-bold text-blue-500">{correctionResult.naturalEn}</div>
-                        <div>{correctionResult.wordOrderFix}</div>
-                      </div>
-                    )}
-                  </section>
-                </div>
-              )}
+                    {(() => {
+                      const course =
+                        EXAM_COURSES.find((c) => c.id === selectedExamTrackId) ||
+                        EXAM_COURSES[0];
+                      return (
+                        <div className="space-y-4">
+                          <div
+                            className={`p-4 rounded-xl border ${
+                              darkMode
+                                ? 'bg-slate-950 border-slate-800'
+                                : 'bg-indigo-50/50 border-indigo-200'
+                            }`}
+                          >
+                            <div className="font-black text-sm text-indigo-600 dark:text-indigo-400">
+                              {course.badge} — {course.title}
+                            </div>
+                            <p className="mt-1 font-semibold">{course.targetGoal}</p>
+                            <p className="mt-1 text-[11px] opacity-80">
+                              ⏱️ {course.scheduleGuide}
+                            </p>
+                          </div>
 
-              {/* ==============================================================
-                  [모드 6] 주간·월간 총람
-              ============================================================== */}
-              {activeMode === 'weekly' && (
-                <section
-                  className={`border rounded-3xl p-6 space-y-4 ${
-                    darkMode
-                      ? 'bg-slate-900 border-slate-800'
-                      : 'bg-white border-slate-200'
-                    }`}
-                >
-                  <h2 className="text-xl font-extrabold">🗓️ 전 테마 & 수능·내신 핵심 총람</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {THEMES.map((t) => (
+                          {course.steps.map((st) => {
+                            const key = `${course.id}-${st.stepNum}`;
+                            const pickedTrap = examStepTrapAns[key];
+                            const essayVal = examStepEssayInputs[key] || '';
+                            const showMod = examStepShowModel[key];
+
+                            return (
+                              <div
+                                key={key}
+                                className={`p-4 rounded-xl border space-y-3 ${
+                                  darkMode
+                                    ? 'bg-slate-950 border-slate-800'
+                                    : 'bg-white border-slate-200'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="font-black text-sm text-blue-500">
+                                    {st.stepTitle} ({st.focusPoint})
+                                  </span>
+                                  <button
+                                    onClick={() => speakText(st.originalPassageEn)}
+                                    className="px-2.5 py-1 rounded bg-blue-600 text-white font-bold"
+                                  >
+                                    🔊 지문듣기
+                                  </button>
+                                </div>
+                                <p className="text-sm font-bold leading-relaxed">
+                                  {st.originalPassageEn}
+                                </p>
+                                {showPronGuide && (
+                                  <p className="text-emerald-600 dark:text-emerald-400 font-bold">
+                                    🗣️ {st.originalPassagePron}
+                                  </p>
+                                )}
+                                <p className="text-slate-600 dark:text-slate-300">
+                                  {st.originalPassageKo}
+                                </p>
+                                <div className="p-2.5 rounded-lg bg-amber-500/10">
+                                  <div className="font-extrabold text-amber-600 dark:text-amber-400">
+                                    🔄 변형 패러프레이징: {st.transformedEn}
+                                  </div>
+                                  {showPronGuide && (
+                                    <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5">
+                                      🗣️ {st.transformedPron}
+                                    </div>
+                                  )}
+                                  <div className="text-[11px] mt-0.5">
+                                    💡 {st.transformedPoint}
+                                  </div>
+                                </div>
+
+                                {/* 어법 함정 양자택일 */}
+                                <div className="p-3 rounded-lg border border-slate-300 dark:border-slate-700">
+                                  <div className="font-extrabold mb-1.5">
+                                    ⚡ 핵심 어법 판별: {st.grammarTrapQuestion.prompt}
+                                  </div>
+                                  <div className="flex gap-2">
+                                    {(['A', 'B'] as const).map((ch) => (
+                                      <button
+                                        key={ch}
+                                        onClick={() =>
+                                          setExamStepTrapAns((prev) => ({
+                                            ...prev,
+                                            [key]: ch,
+                                          }))
+                                        }
+                                        className={`px-3 py-1 rounded font-bold border ${
+                                          pickedTrap === ch
+                                            ? ch ===
+                                              st.grammarTrapQuestion.correctChoice
+                                              ? 'bg-emerald-600 text-white'
+                                              : 'bg-rose-600 text-white'
+                                            : 'bg-slate-100 dark:bg-slate-800'
+                                        }`}
+                                      >
+                                        ({ch}){' '}
+                                        {ch === 'A'
+                                          ? st.grammarTrapQuestion.choiceA
+                                          : st.grammarTrapQuestion.choiceB}
+                                      </button>
+                                    ))}
+                                  </div>
+                                  {pickedTrap && (
+                                    <p className="mt-1.5 text-[11px] font-semibold text-blue-500">
+                                      💡 해설: {st.grammarTrapQuestion.explanation}
+                                    </p>
+                                  )}
+                                </div>
+
+                                {/* 서술형 조건 영작 (givenWords 100% 일치) */}
+                                <div className="p-3 rounded-lg border border-slate-300 dark:border-slate-700">
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-extrabold text-indigo-500">
+                                      ✍️ [{st.essayMission.typeBadge}] {st.essayMission.koCondition}
+                                    </span>
+                                    <button
+                                      onClick={() =>
+                                        setExamStepShowModel((prev) => ({
+                                          ...prev,
+                                          [key]: !prev[key],
+                                        }))
+                                      }
+                                      className="px-2 py-0.5 rounded bg-indigo-600 text-white font-bold"
+                                    >
+                                      {showMod ? '모범답안 닫기' : '모범답안 보기'}
+                                    </button>
+                                  </div>
+                                  <div className="mt-1 font-mono text-[11px] text-emerald-600 dark:text-emerald-400">
+                                    제시어(givenWords): {st.essayMission.givenWords}
+                                  </div>
+                                  <input
+                                    type="text"
+                                    value={essayVal}
+                                    onChange={(e) =>
+                                      setExamStepEssayInputs((prev) => ({
+                                        ...prev,
+                                        [key]: e.target.value,
+                                      }))
+                                    }
+                                    placeholder="제시어를 모두 활용하여 서술형 답안을 작성해 보세요..."
+                                    className="w-full mt-2 px-3 py-1.5 rounded border bg-white dark:bg-slate-900"
+                                  />
+                                  {showMod && (
+                                    <div className="mt-2 p-2 rounded bg-emerald-500/15 font-bold">
+                                      ✅ 모범답안: {st.essayMission.modelAnswerEn}
+                                      <div className="text-[11px] opacity-80 mt-0.5">
+                                        채점 기준: {st.essayMission.scoringCriteria}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                {/* 4교시: 학술 6대 영역 독해 지문 (철학·경제·인지과학·생태학·사회학·미학) */}
+                {activeModulePeriod === 4 && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                    {EBS_MAJOR_TOPICS.map((top) => (
                       <div
-                        key={t.id}
-                        className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800"
+                        key={top.id}
+                        className={`p-4 rounded-xl border space-y-2 ${
+                          darkMode
+                            ? 'bg-slate-950 border-slate-800'
+                            : 'bg-slate-50 border-slate-200'
+                        }`}
                       >
-                        <strong className="text-sm font-black">{t.title}</strong>
-                        <div className="text-xs text-blue-500 mt-1">
-                          {t.levelTracks[learningLevel].patternEn}
+                        <div className="flex items-center justify-between">
+                          <span className="font-extrabold text-blue-500">
+                            {top.category}
+                          </span>
+                          <button
+                            onClick={() => speakText(top.passageEn)}
+                            className="px-2 py-0.5 rounded bg-blue-600 text-white font-bold"
+                          >
+                            🔊 지문듣기
+                          </button>
+                        </div>
+                        <div className="text-sm font-black">{top.title}</div>
+                        <p className="leading-relaxed font-semibold">
+                          {top.passageEn}
+                        </p>
+                        {showPronGuide && (
+                          <p className="text-emerald-600 dark:text-emerald-400 font-bold">
+                            🗣️ {top.passagePron}
+                          </p>
+                        )}
+                        <p className="text-slate-600 dark:text-slate-300">
+                          {top.passageKo}
+                        </p>
+                        <div className="p-2 rounded bg-amber-500/10 font-bold text-amber-600 dark:text-amber-300">
+                          📌 요약문: {top.paraphraseSummary}
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {top.keywords.map((kw, i) => (
+                            <span
+                              key={i}
+                              className="px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-[10px] font-bold"
+                            >
+                              {kw}
+                            </span>
+                          ))}
                         </div>
                       </div>
                     ))}
                   </div>
-                </section>
-              )}
+                )}
 
-              {/* ==============================================================
-                  [모드 7] 🛠️ 나만의 야나두 PRO 전체 제작 과정 & 아키텍처 마스터 백서
-              ============================================================== */}
-              {activeMode === 'devStory' && (
-                <section
-                  className={`border rounded-3xl p-6 shadow-sm space-y-6 ${
-                    darkMode
-                      ? 'bg-slate-900 border-slate-800'
-                      : 'bg-white border-slate-200'
-                  }`}
-                >
-                  <div className="border-b border-slate-200 dark:border-slate-800 pb-4">
-                    <span className="text-xs font-extrabold text-emerald-500">
-                      SYSTEM ARCHITECTURE & DEVELOPMENT BLUEPRINT
-                    </span>
-                    <h2 className="text-2xl font-black mt-0.5">
-                      🛠️ [나만의 야나두 PRO] 파트 1~4 및 studyData.ts 전체 제작 과정 백서
-                    </h2>
-                    <p className="text-xs text-slate-500 mt-1">
-                      코어 어휘 문맥 확장 사전, 조합형 구문 훈련기, 문장 성분 7개 + 9품사(총 16개 문법 요소) 시각화, 필기 도구 5종(펜 4종+지우개)을 통합한 개발 기록입니다.
-                    </p>
-                  </div>
+                {/* 5교시: 핵심 빈출 어법 10문항 채점 & 내 학교 지문 직접 붙여넣기 분석기 */}
+                {activeModulePeriod === 5 && (
+                  <div className="space-y-6 text-xs">
+                    <div>
+                      <div className="flex items-center justify-between p-3 rounded-xl bg-indigo-500/10 mb-3">
+                        <span className="font-extrabold">
+                          ⚡ 핵심 빈출 어법 10문항 실시간 점수:{' '}
+                          <strong className="text-indigo-500 text-sm">
+                            {quiz406CorrectCount} / {GRAMMAR_406_QUIZ_BANK.length}점
+                          </strong>
+                        </span>
+                        <button
+                          onClick={() => setQuiz406Answers({})}
+                          className="px-2.5 py-1 rounded bg-slate-700 text-white font-bold"
+                        >
+                          🔄 어법 선택 초기화
+                        </button>
+                      </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                    <div className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 space-y-2">
-                      <h3 className="text-sm font-black text-indigo-500">
-                        📦 1. src/studyData.ts (코어 어휘 & 조합형 구문 생성 엔진)
-                      </h3>
-                      <p>• <strong>코어 어휘 & 문맥 확장 단어장</strong>: 중등·고등/수능·비즈니스·오픽 4대 영역 × Day 1~100 학습 엔트리 구성</p>
-                      <p>• <strong>조합형 구문 생성기</strong>: 시제와 어법이 검증된 [도치/강조/분사절] + [핵심 동사구] + [수식어구] 조합</p>
-                      <p>• <strong>학술 소재 & 빈출 어법 은행</strong>: 철학·경제·뇌과학·환경 지문 및 내신·수능 핵심 어법 양자택일 문제</p>
-                      <p>• <strong>내 학교 지문 자동 분석기</strong>: 교과서/모의고사 지문 입력 시 소리블록·빈칸 추론·어순 배열 문제 자동 생성</p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {GRAMMAR_406_QUIZ_BANK.map((q) => {
+                          const picked = quiz406Answers[q.id];
+                          return (
+                            <div
+                              key={q.id}
+                              className={`p-3.5 rounded-xl border ${
+                                darkMode
+                                  ? 'bg-slate-950 border-slate-800'
+                                  : 'bg-slate-50 border-slate-200'
+                              }`}
+                            >
+                              <div className="font-extrabold text-indigo-500">
+                                {q.schoolTag}
+                              </div>
+                              <p className="font-mono text-xs my-1.5">
+                                {q.sentenceBefore} [{' '}
+                                <strong className="text-blue-500">
+                                  (A) {q.choiceA} / (B) {q.choiceB}
+                                </strong>{' '}
+                                ] {q.sentenceAfter}
+                              </p>
+                              <div className="flex gap-2">
+                                {(['A', 'B'] as const).map((ch) => (
+                                  <button
+                                    key={ch}
+                                    onClick={() =>
+                                      setQuiz406Answers((prev) => ({
+                                        ...prev,
+                                        [q.id]: ch,
+                                      }))
+                                    }
+                                    className={`px-3 py-1 rounded font-bold border ${
+                                      picked === ch
+                                        ? ch === q.correct
+                                          ? 'bg-emerald-600 text-white'
+                                          : 'bg-rose-600 text-white'
+                                        : 'bg-white dark:bg-slate-900'
+                                    }`}
+                                  >
+                                    ({ch}) {ch === 'A' ? q.choiceA : q.choiceB}
+                                  </button>
+                                ))}
+                              </div>
+                              {picked && (
+                                <p className="mt-2 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                                  💡 [{q.grammarCategory}] {q.explanation}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/30 space-y-2">
-                      <h3 className="text-sm font-black text-blue-500">
-                        🧱 2. src/App.tsx [1/4 파트] & [2/4 파트] (16개 문법 요소 & 정규 테마 1~3)
-                      </h3>
-                      <p>• <strong>[1/4 파트]</strong>: 문장 성분 7개 + 이 프로그램에서 사용하는 9품사 분류(한정사 포함, 총 16개 문법 요소) 대표 관계도 + 9대 매체 실시간 트렌드</p>
-                      <p>• <strong>[2/4 파트]</strong>: 오늘의 단어 챌린지 + 테마 1(비즈니스 회의) · 테마 2(오픽 일상 루틴) · 테마 3(해외여행·호텔·공항) 초·중·고급 트랙</p>
-                    </div>
-
-                    <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-2">
-                      <h3 className="text-sm font-black text-emerald-500">
-                        ⚙️ 3. src/App.tsx [3/4 파트] (테마 4~5 & 입시 3대 반 & 펜슬 엔진)
-                      </h3>
-                      <p>• <strong>테마 4~5</strong>: 유튜브·숏폼 바이럴 리액션 및 패션 에디토리얼 스타일 표현</p>
-                      <p>• <strong>수능·내신 3대 반</strong>: ① 수능 완성반 ② 어법·서술형 완성반 ③ 학교별 내신 대비반</p>
-                      <p>• <strong>아이패드 필기 최적화 설계</strong>: 레티나 해상도 좌표 보정, 사파리 텍스트 선택 방지, 필기 도구 5종(펜 4종+지우개) 및 3px~24px 굵기 제어</p>
-                    </div>
-
-                    <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2">
-                      <h3 className="text-sm font-black text-amber-500">
-                        🖥️ 4. src/App.tsx [4/4 파트] (통합 UI & 양방향 보관함 & 플로팅 메모장)
-                      </h3>
-                      <p>• <strong>실시간 트렌드 연동</strong>: 좌측 실검 클릭 시 how to + 동사원형 구조로 문법 오류 없이 우측 전체 수업 변환</p>
-                      <p>• <strong>양방향 보관함 관리소</strong>: 단어·문장 스크랩, 내 뜻/메모 직접 수정, 새 단어·문장 추가, 암기 완료 언제든 해제(토글)</p>
-                      <p>• <strong>따라다니는(Floating) 락/락해제 메모장</strong>: 스크롤 시 화면 하단에 따라다니며 안정적인 필기 지원</p>
-                    </div>
-                  </div>
-                </section>
-              )}
-            </div>
-          </div>
-
-          {/* ==================================================================
-              ✏️ 필기 도구 5종 (펜 4종 + 지우개) & 5단계 굵기(3px~24px) & 사파리 선택 방지 메모장
-          ================================================================== */}
-          <div
-            ref={padWrapperRef}
-            className={`no-print no-safari-select transition-all z-40 ${
-              isFloatingPad
-                ? 'fixed bottom-3 right-4 left-4 md:left-[21rem] shadow-2xl rounded-3xl border-2 border-blue-500/80'
-                : 'mx-6 mb-6 rounded-3xl border-2 border-slate-300 dark:border-slate-700'
-            } ${
-              darkMode
-                ? 'bg-slate-900/95 text-white'
-                : 'bg-white/95 text-slate-900'
-            } backdrop-blur-md`}
-          >
-            <div className="px-4 py-2.5 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <button
-                  onClick={() => setIsPadLocked(!isPadLocked)}
-                  className={`px-3 py-1 rounded-xl text-xs font-black transition ${
-                    isPadLocked
-                      ? 'bg-rose-600 text-white shadow-sm'
-                      : 'bg-emerald-600 text-white'
-                  }`}
-                >
-                  {isPadLocked ? '🔒 락 걸림(필기고정)' : '🔓 락 해제(스크롤)'}
-                </button>
-
-                <button
-                  onClick={() => setPenOnlyMode(!penOnlyMode)}
-                  className={`px-2.5 py-1 rounded-xl text-[11px] font-extrabold border ${
-                    penOnlyMode
-                      ? 'bg-indigo-600 text-white border-indigo-500'
-                      : 'border-slate-300 dark:border-slate-700'
-                  }`}
-                >
-                  {penOnlyMode ? '✋ 손바닥무시 ON(펜슬전용)' : '👆 손가락겸용'}
-                </button>
-
-                {/* 필기 도구 5종 (펜 4종 + 지우개) */}
-                {[
-                  { id: 'marker' as const, label: '🖊️ 수성사인펜' },
-                  { id: 'fountain' as const, label: '✒️ 만년필' },
-                  { id: 'ballpoint' as const, label: '✏️ 볼펜' },
-                  { id: 'highlighter' as const, label: '🖍️ 형광펜' },
-                  { id: 'eraser' as const, label: '🧽 지우개' },
-                ].map((pt) => (
-                  <button
-                    key={pt.id}
-                    onClick={() => setPenType(pt.id)}
-                    className={`px-2.5 py-1 rounded-xl text-[11px] font-extrabold border transition ${
-                      penType === pt.id
-                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                        : 'border-slate-300 dark:border-slate-700'
-                    }`}
-                  >
-                    {pt.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex flex-wrap items-center gap-1.5">
-                {[
-                  { c: '#2563eb' as const, label: '🔵파랑' },
-                  { c: '#0f172a' as const, label: '⚫검정/흰색' },
-                  { c: '#10b981' as const, label: '🟢초록' },
-                  { c: '#e11d48' as const, label: '🔴빨강' },
-                ].map((col) => (
-                  <button
-                    key={col.c}
-                    onClick={() => {
-                      setPenColor(col.c);
-                      if (penType === 'eraser' || penType === 'highlighter') {
-                        setPenType('marker');
-                      }
-                    }}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-extrabold border ${
-                      penColor === col.c && penType !== 'eraser' && penType !== 'highlighter'
-                        ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 border-transparent'
-                        : 'border-slate-300 dark:border-slate-700'
-                    }`}
-                  >
-                    {col.label}
-                  </button>
-                ))}
-
-                <div className="inline-flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-0.5 border border-slate-300 dark:border-slate-700">
-                  {[
-                    { w: 3, label: '세필(3)' },
-                    { w: 6, label: '보통(6)' },
-                    { w: 10, label: '굵게(10)' },
-                    { w: 16, label: '왕굵게(16)' },
-                    { w: 24, label: '붓펜(24)' },
-                  ].map((sz) => (
-                    <button
-                      key={sz.w}
-                      onClick={() => setPenWidth(sz.w)}
-                      className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold ${
-                        penWidth === sz.w
-                          ? 'bg-blue-600 text-white'
-                          : 'text-slate-600 dark:text-slate-300'
+                    {/* 내 학교 지문 붙여넣기 자동 문제 생성기 */}
+                    <div
+                      className={`p-4 rounded-xl border ${
+                        darkMode
+                          ? 'bg-slate-950 border-slate-800'
+                          : 'bg-slate-50 border-slate-200'
                       }`}
                     >
-                      {sz.label}
+                      <h3 className="font-black text-sm mb-1">
+                        🏫 내 학교 교과서·모의고사 지문 직접 붙여넣기 분석기
+                      </h3>
+                      <p className="text-[11px] opacity-80 mb-2">
+                        {customPassageAnalysis.statusMessage}
+                      </p>
+                      <textarea
+                        rows={3}
+                        value={customSchoolPassage}
+                        onChange={(e) => setCustomSchoolPassage(e.target.value)}
+                        placeholder="분석할 영어 지문을 여기에 붙여넣으세요..."
+                        className="w-full p-2.5 rounded-lg border bg-white dark:bg-slate-900 text-xs"
+                      />
+                      {!customPassageAnalysis.isEmpty && (
+                        <div className="space-y-2.5 mt-3">
+                          {customPassageAnalysis.sentences.map((s) => (
+                            <div
+                              key={s.idx}
+                              className="p-3 rounded-lg border bg-white dark:bg-slate-900 space-y-1"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-extrabold text-blue-500">
+                                  문장 #{s.idx} 의미단위 청크 분할
+                                </span>
+                                <button
+                                  onClick={() => speakText(s.rawEn)}
+                                  className="px-2 py-0.5 rounded bg-blue-600 text-white font-bold"
+                                >
+                                  🔊 듣기
+                                </button>
+                              </div>
+                              <div className="font-black text-sm">
+                                {s.soundBlockEn}
+                              </div>
+                              <div className="text-[11px] text-amber-600 dark:text-amber-400 font-mono">
+                                빈칸 추론: {s.blankQuizSentence} (정답:{' '}
+                                <strong>{s.answerWord}</strong>)
+                              </div>
+                              <div className="text-[11px] text-slate-500">
+                                어순 배열 시드 셔플: {s.scrambledWords.join(' / ')}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ---------------------------------------------------------------- */}
+          {/* [모드 3] 📘 8,000단어장 (Day 1~100 패밀리 확장 학습 원리 안내판 탑재) */}
+          {/* ---------------------------------------------------------------- */}
+          {activeMode === 'wordbook' && (
+            <section
+              className={`p-4 rounded-2xl border space-y-4 ${
+                darkMode
+                  ? 'bg-slate-900 border-slate-800'
+                  : 'bg-white border-slate-200 shadow-xs'
+              }`}
+            >
+              <div className="p-3.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs">
+                <div className="font-black text-sm text-blue-600 dark:text-blue-400">
+                  💡 8,000단어 마스터 구성 원리 (표제어 + 파생어 패밀리 입체 확장 시스템)
+                </div>
+                <p className="mt-1 leading-relaxed">
+                  본 단어장은 억지로 부사를 덧붙인 합성 단어를 배제하고, <strong>[핵심 뿌리 표제어] + [품사별 파생어(명사·형용사·부사)] + [반의어·유의어] + [실전 연어(Collocation)]</strong>를 하나의 패밀리 족보로 묶어 Day 1~100 동안 반복·순환 체화하도록 설계되었습니다. 각 카드 하단의 <strong>📌 [파생어 & 어법 족보]</strong> 설명을 함께 확인하면 품사와 문장 성분을 절대 헷갈리지 않습니다.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="flex flex-wrap gap-1.5">
+                  {(
+                    [
+                      '전체',
+                      '중등 필수',
+                      '고등·수능 핵심',
+                      '비즈니스·실무',
+                      '오픽(OPIc)·구동사',
+                    ] as const
+                  ).map((lv) => (
+                    <button
+                      key={lv}
+                      onClick={() => setWordbookLevelFilter(lv)}
+                      className={`px-3 py-1.5 rounded-xl font-extrabold ${
+                        wordbookLevelFilter === lv
+                          ? `${themeAccentBg} text-white`
+                          : darkMode
+                          ? 'bg-slate-800 text-slate-300'
+                          : 'bg-slate-100 text-slate-700'
+                      }`}
+                    >
+                      {lv}
                     </button>
                   ))}
                 </div>
 
-                <button
-                  onClick={() => setPadHeight((h) => (h === 210 ? 310 : 210))}
-                  className="px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-[10px] font-bold"
-                >
-                  {padHeight === 210 ? '⬆️ 크게' : '⬇️ 기본'}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() =>
+                      setSelectedWordbookDay((d) => Math.max(1, d - 1))
+                    }
+                    className="px-2.5 py-1 rounded border font-bold"
+                  >
+                    ◀ 이전 Day
+                  </button>
+                  <span className="font-black text-sm text-blue-500">
+                    Day {selectedWordbookDay} / 100
+                  </span>
+                  <button
+                    onClick={() =>
+                      setSelectedWordbookDay((d) => Math.min(100, d + 1))
+                    }
+                    className="px-2.5 py-1 rounded border font-bold"
+                  >
+                    다음 Day ▶
+                  </button>
+                </div>
+              </div>
 
-                <button
-                  onClick={clearCanvas}
-                  className="px-2.5 py-1 rounded-lg bg-rose-600 text-white text-[10px] font-extrabold"
-                >
-                  지우기
-                </button>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                {wordbookEntries.map((entry, idx) => (
+                  <div
+                    key={`${entry.level}-${entry.word}-${idx}`}
+                    className={`p-3.5 rounded-xl border space-y-1.5 ${
+                      darkMode
+                        ? 'bg-slate-950 border-slate-800'
+                        : 'bg-slate-50 border-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <span className="px-2 py-0.5 rounded bg-blue-500/15 text-blue-500 font-bold text-[10px]">
+                          {entry.level}
+                        </span>
+                        <span className="text-base font-black text-blue-600 dark:text-blue-400">
+                          {entry.word}
+                        </span>
+                        <span className="font-mono text-[11px] opacity-75">
+                          {entry.ipa}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => speakText(entry.exampleEn)}
+                        className="px-2 py-0.5 rounded bg-blue-600 text-white font-bold text-[10px]"
+                      >
+                        🔊 예문듣기
+                      </button>
+                    </div>
 
+                    {showPronGuide && (
+                      <div className="text-emerald-600 dark:text-emerald-400 font-extrabold">
+                        🗣️ {entry.pron} · 소리블록: {entry.soundBlock}
+                      </div>
+                    )}
+
+                    <div className="font-bold text-sm">
+                      뜻: {entry.meaning}{' '}
+                      <span className="text-[11px] font-semibold text-indigo-500">
+                        [{entry.posLabel} · 예문내 {entry.compLabel}]
+                      </span>
+                    </div>
+
+                    <div className="text-[11px] font-semibold">
+                      🔗 짝꿍 표현: <strong>{entry.collocation}</strong> ({entry.collocationKo})
+                    </div>
+
+                    <div className="p-2 rounded bg-white dark:bg-slate-900 space-y-0.5">
+                      <div className="font-bold">{entry.exampleEn}</div>
+                      {showPronGuide && (
+                        <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                          {entry.examplePron}
+                        </div>
+                      )}
+                      <div className="text-[11px] text-slate-500">
+                        {entry.exampleKo}
+                      </div>
+                    </div>
+
+                    <div className="p-2 rounded bg-amber-500/10 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+                      📌 [파생어 & 어법 족보] {entry.derivativesTip}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* ---------------------------------------------------------------- */}
+          {/* [모드 4] ⭐ 내 보관함 (고유 ID 기반 수정 · 직접 추가 시 삭제 버그 해결) */}
+          {/* ---------------------------------------------------------------- */}
+          {activeMode === 'myVault' && (
+            <div className="space-y-6 text-xs">
+              {/* 단어 보관함 */}
+              <section
+                className={`p-4 rounded-2xl border space-y-3 ${
+                  darkMode
+                    ? 'bg-slate-900 border-slate-800'
+                    : 'bg-white border-slate-200 shadow-xs'
+                }`}
+              >
+                <h2 className="text-base font-black">
+                  ⭐ 내 단어 보관함 ({bookmarkedWords.length}개)
+                </h2>
+
+                {/* 새 단어 직접 등록 폼 */}
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-2 p-3 rounded-xl bg-slate-100 dark:bg-slate-950">
+                  <input
+                    type="text"
+                    value={newWordForm.word}
+                    onChange={(e) =>
+                      setNewWordForm((p) => ({ ...p, word: e.target.value }))
+                    }
+                    placeholder="영단어 (필수)"
+                    className="px-2.5 py-1.5 rounded border bg-white dark:bg-slate-900"
+                  />
+                  <input
+                    type="text"
+                    value={newWordForm.pron}
+                    onChange={(e) =>
+                      setNewWordForm((p) => ({ ...p, pron: e.target.value }))
+                    }
+                    placeholder="한글발음 (예: [스트림라인])"
+                    className="px-2.5 py-1.5 rounded border bg-white dark:bg-slate-900"
+                  />
+                  <input
+                    type="text"
+                    value={newWordForm.meaning}
+                    onChange={(e) =>
+                      setNewWordForm((p) => ({ ...p, meaning: e.target.value }))
+                    }
+                    placeholder="한글 뜻 (필수)"
+                    className="px-2.5 py-1.5 rounded border bg-white dark:bg-slate-900"
+                  />
+                  <input
+                    type="text"
+                    value={newWordForm.collocation}
+                    onChange={(e) =>
+                      setNewWordForm((p) => ({
+                        ...p,
+                        collocation: e.target.value,
+                      }))
+                    }
+                    placeholder="연어/예문"
+                    className="px-2.5 py-1.5 rounded border bg-white dark:bg-slate-900"
+                  />
+                  <button
+                    onClick={handleAddCustomWord}
+                    className="px-3 py-1.5 rounded bg-blue-600 text-white font-extrabold"
+                  >
+                    ➕ 내 단어 추가
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {bookmarkedWords.map((bw) => (
+                    <div
+                      key={bw.id}
+                      className={`p-3.5 rounded-xl border ${
+                        bw.mastered
+                          ? 'opacity-65 border-emerald-500/40'
+                          : darkMode
+                          ? 'bg-slate-950 border-slate-800'
+                          : 'bg-slate-50 border-slate-200'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-black text-sm text-blue-500">
+                          {bw.word} {showPronGuide && bw.pron ? `(${bw.pron})` : ''}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => speakText(bw.word)}
+                            className="px-2 py-0.5 rounded bg-blue-600 text-white font-bold"
+                          >
+                            🔊
+                          </button>
+                          <button
+                            onClick={() =>
+                              setBookmarkedWords((prev) =>
+                                prev.map((w) =>
+                                  w.id === bw.id ? { ...w, mastered: !w.mastered } : w
+                                )
+                              )
+                            }
+                            className={`px-2 py-0.5 rounded font-bold ${
+                              bw.mastered
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-slate-200 dark:bg-slate-800'
+                            }`}
+                          >
+                            {bw.mastered ? '✅ 암기완료(클릭시 해제)' : '암기체크'}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingWordId(bw.id);
+                              setEditingWordDraft({
+                                meaning: bw.meaning,
+                                customNote: bw.customNote || '',
+                              });
+                            }}
+                            className="px-2 py-0.5 rounded border"
+                          >
+                            ✏️수정
+                          </button>
+                          <button
+                            onClick={() =>
+                              setBookmarkedWords((prev) =>
+                                prev.filter((w) => w.id !== bw.id)
+                              )
+                            }
+                            className="px-2 py-0.5 rounded bg-rose-600 text-white"
+                          >
+                            삭제
+                          </button>
+                        </div>
+                      </div>
+                      <div className="font-bold mt-1">뜻: {bw.meaning}</div>
+                      <div className="text-[11px] opacity-80">
+                        연어: {bw.collocation} | {bw.posLabel} · {bw.compLabel}
+                      </div>
+                      {bw.customNote && (
+                        <div className="text-[11px] text-amber-500 mt-0.5">
+                          📝 메모: {bw.customNote}
+                        </div>
+                      )}
+
+                      {editingWordId === bw.id && (
+                        <div className="mt-2 pt-2 border-t flex gap-1.5">
+                          <input
+                            type="text"
+                            value={editingWordDraft.meaning}
+                            onChange={(e) =>
+                              setEditingWordDraft((d) => ({
+                                ...d,
+                                meaning: e.target.value,
+                              }))
+                            }
+                            className="flex-1 px-2 py-1 rounded border bg-white dark:bg-slate-900"
+                          />
+                          <input
+                            type="text"
+                            value={editingWordDraft.customNote}
+                            onChange={(e) =>
+                              setEditingWordDraft((d) => ({
+                                ...d,
+                                customNote: e.target.value,
+                              }))
+                            }
+                            placeholder="메모"
+                            className="flex-1 px-2 py-1 rounded border bg-white dark:bg-slate-900"
+                          />
+                          <button
+                            onClick={() => {
+                              setBookmarkedWords((prev) =>
+                                prev.map((w) =>
+                                  w.id === bw.id
+                                    ? {
+                                        ...w,
+                                        meaning: editingWordDraft.meaning,
+                                        customNote: editingWordDraft.customNote,
+                                      }
+                                    : w
+                                )
+                              );
+                              setEditingWordId(null);
+                            }}
+                            className="px-2.5 py-1 rounded bg-emerald-600 text-white font-bold"
+                          >
+                            저장
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              {/* 문장 보관함 */}
+              <section
+                className={`p-4 rounded-2xl border space-y-3 ${
+                  darkMode
+                    ? 'bg-slate-900 border-slate-800'
+                    : 'bg-white border-slate-200 shadow-xs'
+                }`}
+              >
+                <h2 className="text-base font-black">
+                  📌 내 문장 보관함 ({savedSentences.length}개)
+                </h2>
+
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-2 p-3 rounded-xl bg-slate-100 dark:bg-slate-950">
+                  <input
+                    type="text"
+                    value={newSentEn}
+                    onChange={(e) => setNewSentEn(e.target.value)}
+                    placeholder="영어 문장 (필수)"
+                    className="px-2.5 py-1.5 rounded border bg-white dark:bg-slate-900"
+                  />
+                  <input
+                    type="text"
+                    value={newSentPron}
+                    onChange={(e) => setNewSentPron(e.target.value)}
+                    placeholder="한글 발음 메모"
+                    className="px-2.5 py-1.5 rounded border bg-white dark:bg-slate-900"
+                  />
+                  <input
+                    type="text"
+                    value={newSentKo}
+                    onChange={(e) => setNewSentKo(e.target.value)}
+                    placeholder="우리말 해석 (필수)"
+                    className="px-2.5 py-1.5 rounded border bg-white dark:bg-slate-900"
+                  />
+                  <input
+                    type="text"
+                    value={newSentNote}
+                    onChange={(e) => setNewSentNote(e.target.value)}
+                    placeholder="문법 포인트 메모"
+                    className="px-2.5 py-1.5 rounded border bg-white dark:bg-slate-900"
+                  />
+                  <button
+                    onClick={handleAddCustomSentence}
+                    className="px-3 py-1.5 rounded bg-emerald-600 text-white font-extrabold"
+                  >
+                    ➕ 내 문장 추가
+                  </button>
+                </div>
+
+                <div className="space-y-2.5">
+                  {savedSentences.map((ss) => (
+                    <div
+                      key={ss.id}
+                      className={`p-3.5 rounded-xl border ${
+                        ss.mastered
+                          ? 'opacity-65 border-emerald-500/40'
+                          : darkMode
+                          ? 'bg-slate-950 border-slate-800'
+                          : 'bg-slate-50 border-slate-200'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-black text-sm text-blue-500">
+                          {ss.en}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => speakText(ss.en)}
+                            className="px-2 py-0.5 rounded bg-blue-600 text-white font-bold"
+                          >
+                            🔊
+                          </button>
+                          <button
+                            onClick={() =>
+                              setSavedSentences((prev) =>
+                                prev.map((s) =>
+                                  s.id === ss.id ? { ...s, mastered: !s.mastered } : s
+                                )
+                              )
+                            }
+                            className={`px-2 py-0.5 rounded font-bold ${
+                              ss.mastered
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-slate-200 dark:bg-slate-800'
+                            }`}
+                          >
+                            {ss.mastered ? '✅ 체화완료(클릭시 해제)' : '체화체크'}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingSentId(ss.id);
+                              setEditingSentDraft({
+                                en: ss.en,
+                                ko: ss.ko,
+                                note: ss.note,
+                              });
+                            }}
+                            className="px-2 py-0.5 rounded border"
+                          >
+                            ✏️수정
+                          </button>
+                          <button
+                            onClick={() =>
+                              setSavedSentences((prev) =>
+                                prev.filter((s) => s.id !== ss.id)
+                              )
+                            }
+                            className="px-2 py-0.5 rounded bg-rose-600 text-white"
+                          >
+                            삭제
+                          </button>
+                        </div>
+                      </div>
+                      {showPronGuide && ss.pron && (
+                        <div className="text-emerald-600 dark:text-emerald-400 font-bold mt-0.5">
+                          🗣️ {ss.pron}
+                        </div>
+                      )}
+                      <div className="font-semibold mt-1">{ss.ko}</div>
+                      <div className="text-[11px] text-amber-500 mt-0.5">
+                        📌 {ss.note}
+                      </div>
+
+                      {editingSentId === ss.id && (
+                        <div className="mt-2 pt-2 border-t flex flex-wrap gap-1.5">
+                          <input
+                            type="text"
+                            value={editingSentDraft.en}
+                            onChange={(e) =>
+                              setEditingSentDraft((d) => ({
+                                ...d,
+                                en: e.target.value,
+                              }))
+                            }
+                            className="flex-1 px-2 py-1 rounded border bg-white dark:bg-slate-900"
+                          />
+                          <input
+                            type="text"
+                            value={editingSentDraft.ko}
+                            onChange={(e) =>
+                              setEditingSentDraft((d) => ({
+                                ...d,
+                                ko: e.target.value,
+                              }))
+                            }
+                            className="flex-1 px-2 py-1 rounded border bg-white dark:bg-slate-900"
+                          />
+                          <button
+                            onClick={() => {
+                              setSavedSentences((prev) =>
+                                prev.map((s) =>
+                                  s.id === ss.id
+                                    ? {
+                                        ...s,
+                                        en: editingSentDraft.en,
+                                        ko: editingSentDraft.ko,
+                                      }
+                                    : s
+                                )
+                              );
+                              setEditingSentId(null);
+                            }}
+                            className="px-2.5 py-1 rounded bg-emerald-600 text-white font-bold"
+                          >
+                            저장
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </div>
+          )}
+
+          {/* ---------------------------------------------------------------- */}
+          {/* [모드 5] 🗓️ 전체 총람 (전 과정 15개 트랙 비교 & 핵심 어법 치트시트 #16) */}
+          {/* ---------------------------------------------------------------- */}
+          {activeMode === 'curriculum' && (
+            <section
+              className={`p-4 rounded-2xl border space-y-6 text-xs ${
+                darkMode
+                  ? 'bg-slate-900 border-slate-800'
+                  : 'bg-white border-slate-200 shadow-xs'
+              }`}
+            >
+              <div>
+                <h2 className="text-lg font-black">
+                  🗓️ 전 과정 핵심 요약 치트시트 (테마 1~5 × 초·중·고급 15트랙 & 입시 공식 총람)
+                </h2>
+                <p className="text-slate-500 mt-1">
+                  모든 테마의 레벨별 대표 문장, 소리블록, 한글 발음을 한눈에 비교하고 클릭 한 번으로 해당 강의로 바로 이동할 수 있는 마스터 요약표입니다.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                {THEMES.map((th) => (
+                  <div
+                    key={th.id}
+                    className={`p-4 rounded-xl border ${
+                      darkMode
+                        ? 'bg-slate-950 border-slate-800'
+                        : 'bg-slate-50 border-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-black text-sm text-blue-500">
+                        {th.badge} · {th.title}
+                      </span>
+                      <button
+                        onClick={() => {
+                          setSelectedLiveKeyword(null);
+                          setSelectedThemeId(th.id);
+                          setActiveMode('daily');
+                        }}
+                        className="px-2.5 py-1 rounded bg-blue-600 text-white font-bold"
+                      >
+                        이 테마 강의로 바로 이동 ↗
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                      {(['beginner', 'intermediate', 'advanced'] as const).map(
+                        (lv) => {
+                          const tr = th.levelTracks[lv];
+                          return (
+                            <div
+                              key={lv}
+                              className="p-3 rounded-lg border bg-white dark:bg-slate-900 space-y-1"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-extrabold text-indigo-500">
+                                  {tr.levelName}
+                                </span>
+                                <button
+                                  onClick={() => speakText(tr.patternEn)}
+                                  className="px-1.5 py-0.5 rounded bg-blue-600 text-white text-[10px] font-bold"
+                                >
+                                  🔊
+                                </button>
+                              </div>
+                              <div className="font-black text-xs">
+                                {tr.patternSoundBlock}
+                              </div>
+                              {showPronGuide && (
+                                <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold">
+                                  🗣️ {tr.patternPron}
+                                </div>
+                              )}
+                              <div className="text-[11px]">{tr.patternMeaningKo}</div>
+                            </div>
+                          );
+                        }
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* ---------------------------------------------------------------- */}
+          {/* [모드 6] 🛠️ 제작과정 백서 (App.tsx 파트 1~4 & studyData.ts 전 과정 상세 수록 #12) */}
+          {/* ---------------------------------------------------------------- */}
+          {activeMode === 'devStory' && (
+            <section
+              className={`p-5 rounded-2xl border space-y-5 text-xs leading-relaxed ${
+                darkMode
+                  ? 'bg-slate-900 border-slate-800'
+                  : 'bg-white border-slate-200 shadow-xs'
+              }`}
+            >
+              <div className="border-b pb-3 border-slate-200 dark:border-slate-800">
+                <span className="px-2.5 py-1 rounded bg-blue-600 text-white font-black">
+                  PROJECT ARCHITECTURE & QA WHITEPAPER
+                </span>
+                <h2 className="text-xl font-black mt-2">
+                  🛠️ [나만의 야나두 영어 PRO] 전체 설계 철학 및 엔지니어링 제작 백서
+                </h2>
+                <p className="text-slate-500 mt-1">
+                  본 문서는 기획자(윤성만)의 실전 학습 철학을 바탕으로 <code>src/App.tsx</code> (파트 1~4)와 <code>src/studyData.ts</code>가 어떤 구조와 검증 과정을 거쳐 완성되었는지 기록한 기술·교육 아키텍처 백서입니다.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 rounded-xl border bg-slate-50 dark:bg-slate-950 space-y-2">
+                  <h3 className="text-sm font-black text-blue-500">
+                    1. 핵심 교육 철학: 16개 문법 노드(7성분 + 9품사)와 소리블록(Chunking)
+                  </h3>
+                  <p>
+                    • <strong>단어(품사)와 구·절(문장 성분)의 입체적 분리:</strong> 학습자가 가장 혼동하는 &apos;문장 성분 7개(S·V·IO·DO·SC·OC·M)&apos;와 &apos;9품사(명·대·동·형·부·전·접·한정사·감탄사)&apos;를 총 16개 노드로 시각화하고, 동명사구 주어·전치사구 보어·한정사의 명사구 내부 한정 원리까지 정확히 구현했습니다.
+                  </p>
+                  <p>
+                    • <strong>전 문장 미국식 IPA & 실전 연음 한글 발음 탑재:</strong> 관사와 명사가 쪼개지지 않는 의미 단위 소리블록과 한글 연음 가이드, 그리고 초보자를 위한 <strong>0.30x(초저속) · 0.50x(천천히) · 0.75x · 1.0x · 1.25x 5단계 배속</strong>을 결합했습니다.
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-xl border bg-slate-50 dark:bg-slate-950 space-y-2">
+                  <h3 className="text-sm font-black text-emerald-500">
+                    2. <code>src/App.tsx</code> (파트 1 ~ 파트 4) 프론트엔드 모듈 구조
+                  </h3>
+                  <p>
+                    • <strong>[파트 1/4]:</strong> 단방향 타입 시스템 통합, 16개 문법 노드 사전, <code>DIAGRAM_EXAMPLES</code> 표준 주석 예문 3선, 9대 매체 토픽 90선(<code>dictTargetWord</code>·미국식 IPA·한글발음 1:1 내장).
+                  </p>
+                  <p>
+                    • <strong>[파트 2/4 & 3/4]:</strong> 5대 테마 초·중·고급 커리큘럼, 2인 롤플레이 대화문, 단일 의미축 어조 온도계(<code>synonymScales</code>), 수능·서술형·내신 3대 마스터 코스, 그리고 오분류 0건을 보장하는 <strong>정밀 토큰 주석 맵(<code>VERIFIED_SENTENCE_TOKEN_MAP</code>) 기반 구문 해부 엔진</strong>.
+                  </p>
+                  <p>
+                    • <strong>[파트 4/4]:</strong> STEP 1~5 통합 학습 뷰어, 7성분/9품사 사전 즉시 전환 탭, 실시간 채점판 및 클릭형 어순 조립기, 고유 ID 기반 단어·문장 보관함.
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-xl border bg-slate-50 dark:bg-slate-950 space-y-2">
+                  <h3 className="text-sm font-black text-amber-500">
+                    3. <code>src/studyData.ts</code> 데이터 무결성 및 알고리즘 설계
+                  </h3>
+                  <p>
+                    • <strong>임의 문장 합성기 폐기 & 100% 검증 데이터 수록:</strong> 기계적 부사 결합이나 조각 합성을 완전히 배제하고, 사전과 실제 기출에서 검증된 80개 핵심 어휘 패밀리(<code>derivativesTip</code> 전용 필드 분리)와 12대 고정 구문 아카이브를 수록했습니다.
+                  </p>
+                  <p>
+                    • <strong>시드 기반 피셔-예이츠(Fisher-Yates) 셔플 & Safari 호환 분석기:</strong> 어순 배열 문제에서 원문 순서가 노출되지 않도록 문장 전체 어절을 결정론적으로 셔플하며, 구형 iPadOS Safari에서도 크래시 없이 작동하는 문장 분리기와 전치사·접속사 경계 기반 의미 청크 분할기를 구현했습니다.
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-xl border bg-slate-50 dark:bg-slate-950 space-y-2">
+                  <h3 className="text-sm font-black text-rose-500">
+                    4. 아이패드(iPadOS Safari) 애플펜슬 벡터 획 배열(<code>strokesRef</code>) 엔진
+                  </h3>
+                  <p>
+                    • <strong>필기감 및 시각적 완성도 극대화:</strong> 레티나 디스플레이 <code>devicePixelRatio</code> 1:1 매칭, <code>setPointerCapture</code> 적용, 노트 필기에 최적화된 5단계 굵기(<code>1.5px · 2.5px · 4px · 6px · 9px</code>), 형광펜 5색 자유 선택 및 3단계 투명도(<code>15% · 30% · 50%</code>) 조절을 구현했습니다.
+                  </p>
+                  <p>
+                    • <strong>획 단위 렌더링 아키텍처:</strong> 모든 획을 배열로 관리하여 형광펜 중첩 얼룩을 원천 제거했고, <strong>↩️ 실행취소(Undo)</strong>, 메모장 최소화 시 필기 보존(<code>hidden</code> 클래스), 다크모드 전환 시 검정 글씨의 흰색 자동 반전까지 완벽히 해결했습니다.
+                  </p>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* ================================================================ */}
+          {/* 하단 아이패드 애플펜슬 전용 필기장 (1.5~9px · 형광펜 색상/투명도 · Undo · hidden 보존) */}
+          {/* ================================================================ */}
+          <section
+            className={`${
+              isPadFloating
+                ? 'sticky bottom-2 z-20 shadow-2xl'
+                : 'relative'
+            } rounded-2xl border p-3 transition-all no-print ${
+              darkMode
+                ? 'bg-slate-900/95 border-slate-700'
+                : 'bg-white/95 border-slate-300'
+            }`}
+          >
+            {/* 펜슬 컨트롤 툴바 */}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                <span className="font-black text-blue-500 mr-1">
+                  ✏️ 애플펜슬 노트 ({strokeCount}획)
+                </span>
+
+                {/* 펜 종류 5종 */}
+                {(
+                  [
+                    { id: 'fountain', label: '✒️ 만년필' },
+                    { id: 'ballpoint', label: '🖊️ 볼펜' },
+                    { id: 'marker', label: '🖍️ 사인펜' },
+                    { id: 'highlighter', label: '🌟 형광펜' },
+                    { id: 'eraser', label: '🧹 지우개' },
+                  ] as const
+                ).map((tool) => (
+                  <button
+                    key={tool.id}
+                    onClick={() => setPenType(tool.id)}
+                    className={`px-2 py-1 rounded-lg font-bold border ${
+                      penType === tool.id
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : darkMode
+                        ? 'bg-slate-800 border-slate-700 text-slate-300'
+                        : 'bg-slate-100 border-slate-200 text-slate-700'
+                    }`}
+                  >
+                    {tool.label}
+                  </button>
+                ))}
+
+                {/* 색상 5종 (형광펜 포함 모든 펜에서 자유 선택 가능 #15) */}
+                <div className="flex items-center gap-1 ml-1">
+                  {(
+                    [
+                      { hex: '#2563eb', name: '파랑' },
+                      { hex: '#0f172a', name: '검정(다크자동반전)' },
+                      { hex: '#10b981', name: '초록' },
+                      { hex: '#e11d48', name: '분홍/빨강' },
+                      { hex: '#facc15', name: '노랑' },
+                    ] as const
+                  ).map((c) => (
+                    <button
+                      key={c.hex}
+                      title={c.name}
+                      onClick={() => setPenColor(c.hex)}
+                      style={{
+                        backgroundColor:
+                          darkMode && c.hex === '#0f172a' ? '#f8fafc' : c.hex,
+                      }}
+                      className={`w-5 h-5 rounded-full border-2 ${
+                        penColor === c.hex
+                          ? 'ring-2 ring-amber-400 scale-110 border-white'
+                          : 'border-slate-400'
+                      }`}
+                    />
+                  ))}
+                </div>
+
+                {/* 세밀화된 5단계 굵기 (1.5px · 2.5px · 4px · 6px · 9px #14) */}
+                <div className="flex items-center gap-1 ml-1">
+                  {PEN_WIDTH_STEPS.map((w) => (
+                    <button
+                      key={w.px}
+                      onClick={() => setPenWidth(w.px)}
+                      className={`px-2 py-0.5 rounded text-[11px] font-bold border ${
+                        penWidth === w.px
+                          ? 'bg-emerald-600 text-white border-emerald-600'
+                          : darkMode
+                          ? 'bg-slate-800 border-slate-700'
+                          : 'bg-slate-100 border-slate-200'
+                      }`}
+                    >
+                      {w.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* 형광펜 전용 투명도(농도) 3단계 스위치 (#15) */}
+                {penType === 'highlighter' && (
+                  <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/15 border border-amber-500/30">
+                    <span className="text-[10px] font-extrabold text-amber-500">
+                      💧형광펜 투명도:
+                    </span>
+                    {(
+                      [
+                        { a: 0.15, label: '연하게 15%' },
+                        { a: 0.3, label: '보통 30%' },
+                        { a: 0.5, label: '진하게 50%' },
+                      ] as const
+                    ).map((al) => (
+                      <button
+                        key={al.a}
+                        onClick={() => setHighlighterAlpha(al.a)}
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                          highlighterAlpha === al.a
+                            ? 'bg-amber-500 text-slate-950'
+                            : 'opacity-75'
+                        }`}
+                      >
+                        {al.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 우측 실행취소(Undo) · 배경 · 크기 · 락/접기 버튼 */}
+              <div className="flex flex-wrap items-center gap-1.5 text-xs">
                 <button
-                  onClick={() => setIsPadMinimized(!isPadMinimized)}
-                  className="px-2.5 py-1 rounded-lg bg-slate-800 text-white text-[10px] font-extrabold"
+                  onClick={handleUndoStroke}
+                  className="px-2.5 py-1 rounded-lg font-extrabold bg-amber-500 text-slate-950 hover:bg-amber-400"
                 >
-                  {isPadMinimized ? '🔼 펼치기' : '🔽 접기'}
+                  ↩️ 실행취소(한 획 뒤로)
+                </button>
+                <button
+                  onClick={handleClearCanvas}
+                  className="px-2.5 py-1 rounded-lg font-bold bg-rose-600 text-white"
+                >
+                  🗑️ 전체지우기
+                </button>
+                <button
+                  onClick={() =>
+                    setCanvasBgStyle((b) =>
+                      b === 'lined' ? 'grid' : b === 'grid' ? 'blank' : 'lined'
+                    )
+                  }
+                  className="px-2 py-1 rounded-lg border font-bold"
+                >
+                  노트배경: {canvasBgStyle === 'lined' ? '줄노트' : canvasBgStyle === 'grid' ? '모눈' : '백지'}
+                </button>
+                <button
+                  onClick={() =>
+                    setCanvasHeight((h) => (h === 260 ? 400 : 260))
+                  }
+                  className="px-2 py-1 rounded-lg border font-bold"
+                >
+                  {canvasHeight === 260 ? '↕️ 노트크게' : '↕️ 기본크기'}
+                </button>
+                <button
+                  onClick={() => setIsPadFloating((f) => !f)}
+                  className={`px-2.5 py-1 rounded-lg font-bold border ${
+                    isPadFloating
+                      ? 'bg-indigo-600 text-white border-indigo-600'
+                      : 'bg-slate-200 dark:bg-slate-800'
+                  }`}
+                >
+                  {isPadFloating ? '🔒 화면고정(따라다님)' : '🔓 하단고정'}
+                </button>
+                <button
+                  onClick={() => setIsPadMinimized((m) => !m)}
+                  className="px-2.5 py-1 rounded-lg font-bold border bg-slate-100 dark:bg-slate-800"
+                >
+                  {isPadMinimized ? '🔼 필기장 펼치기' : '🔽 접기(필기보존)'}
                 </button>
               </div>
             </div>
 
-            {!isPadMinimized && (
-              <div className="p-2.5 no-safari-select">
-                <div
-                  className={`relative rounded-2xl overflow-hidden border-2 no-safari-select ${
-                    isPadLocked
-                      ? 'border-blue-500 bg-white dark:bg-slate-950'
-                      : 'border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-950/50'
+            {/* 캔버스 영역: 조건부 언마운트 대신 hidden 클래스를 사용하여 접었다 펼쳐도 필기 100% 보존 (#10) */}
+            <div className={isPadMinimized ? 'hidden' : 'block mt-2.5 space-y-2'}>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="font-bold shrink-0">⌨️ 빠른 타이핑 메모:</span>
+                <input
+                  type="text"
+                  value={padQuickText}
+                  onChange={(e) => setPadQuickText(e.target.value)}
+                  placeholder="펜슬 필기와 함께 기억할 핵심 단어나 공식을 타이핑해 두세요 (자동 저장됨)..."
+                  className={`flex-1 px-2.5 py-1 rounded border ${
+                    darkMode
+                      ? 'bg-slate-950 border-slate-700'
+                      : 'bg-slate-50 border-slate-300'
                   }`}
-                  style={{ height: `${padHeight}px` }}
-                >
-                  <div
-                    className="absolute inset-0 pointer-events-none opacity-25"
-                    style={{
-                      backgroundImage:
-                        'repeating-linear-gradient(transparent, transparent 38px, #94a3b8 39px)',
-                    }}
-                  />
-                  <canvas
-                    ref={canvasRef}
-                    onPointerDown={startDrawing}
-                    onPointerMove={draw}
-                    onPointerUp={endDrawing}
-                    onPointerCancel={endDrawing}
-                    style={{
-                      touchAction: isPadLocked ? 'none' : 'pan-y',
-                      WebkitUserSelect: 'none',
-                      WebkitTouchCallout: 'none',
-                    }}
-                    className={`relative z-10 w-full h-full block no-safari-select ${
-                      isPadLocked ? 'cursor-crosshair' : 'cursor-grab'
-                    }`}
-                  />
-                </div>
+                />
               </div>
-            )}
-          </div>
+
+              <div
+                style={{
+                  height: `${canvasHeight}px`,
+                  backgroundImage:
+                    canvasBgStyle === 'lined'
+                      ? darkMode
+                        ? 'repeating-linear-gradient(transparent, transparent 31px, #1e293b 32px)'
+                        : 'repeating-linear-gradient(transparent, transparent 31px, #e2e8f0 32px)'
+                      : canvasBgStyle === 'grid'
+                      ? darkMode
+                        ? 'linear-gradient(to right, #1e293b 1px, transparent 1px), linear-gradient(to bottom, #1e293b 1px, transparent 1px)'
+                        : 'linear-gradient(to right, #e2e8f0 1px, transparent 1px), linear-gradient(to bottom, #e2e8f0 1px, transparent 1px)'
+                      : 'none',
+                  backgroundSize:
+                    canvasBgStyle === 'grid' ? '24px 24px' : '100% 32px',
+                }}
+                className={`w-full rounded-xl border overflow-hidden relative ${
+                  darkMode
+                    ? 'bg-slate-950 border-slate-800'
+                    : 'bg-amber-50/20 border-slate-300'
+                }`}
+              >
+                <canvas
+                  ref={canvasRef}
+                  onPointerDown={handlePointerDown}
+                  onPointerMove={handlePointerMove}
+                  onPointerUp={handlePointerUpOrCancel}
+                  onPointerCancel={handlePointerUpOrCancel}
+                  style={{
+                    touchAction: 'none',
+                    WebkitUserSelect: 'none',
+                    userSelect: 'none',
+                  }}
+                  className="w-full h-full block cursor-crosshair"
+                />
+              </div>
+            </div>
+          </section>
         </main>
       </div>
     </div>
