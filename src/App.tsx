@@ -6804,7 +6804,7 @@ try {
                 : 'bg-slate-100 border-slate-300 text-slate-700'
             }`}
           >
-<style>{`
+            <style>{`
               html[data-density="compact"] main {
                 max-width: 64rem !important;
                 padding: 0.5rem 0.65rem !important;
@@ -6831,7 +6831,6 @@ try {
               ${
                 darkMode
                   ? `
-                /* 1. 다크모드에서 하얗게 뜨는 카드·배경 박스 어둡게 보정 */
                 main div.bg-white,
                 main div.bg-slate-50,
                 main div.bg-slate-100,
@@ -6841,7 +6840,6 @@ try {
                   color: #e2e8f0 !important;
                   border-color: #334155 !important;
                 }
-                /* 2. 다크모드에서 하얗게 남던 버튼(필기장 접기 등)을 다크 슬레이트 버튼으로 통일 */
                 main button.bg-white,
                 main button.bg-slate-50,
                 main button.bg-slate-100,
@@ -6850,7 +6848,6 @@ try {
                   color: #f1f5f9 !important;
                   border-color: #475569 !important;
                 }
-                /* 3. 어두운 배경 위 어두운 글씨만 밝게 보정 (노란색 등 밝은 컬러 버튼 내부는 제외) */
                 main .text-slate-900:not(button),
                 main .text-slate-800:not(button),
                 main .text-slate-700:not(button),
@@ -6859,7 +6856,6 @@ try {
                 }
               `
                   : `
-                /* 라이트모드에서 기기 다크모드 영향으로 어두워지는 박스·글씨 보정 */
                 main .dark\\:bg-slate-950,
                 main .dark\\:bg-slate-900,
                 main .dark\\:bg-slate-800\\/60 {
@@ -6874,7 +6870,6 @@ try {
               `
               }
             `}</style>
-            
             <span className="text-[11px] font-extrabold px-1 text-blue-500">
               {DENSITY_STYLES.label.split(' ')[0]}
             </span>
@@ -6903,10 +6898,9 @@ try {
                 </button>
               );
             })}
-          </div>            
-{/* ==================================================================== */}
+          </div>
+
           {/* [즉석 붙여넣기 단어·문장 스피커 & 여성/남성 다중 음성 선택 컨트롤러] */}
-          {/* ==================================================================== */}
           <div
             className={`w-full mt-1.5 p-2 rounded-xl border flex flex-wrap items-center gap-2 ${
               darkMode
@@ -6914,7 +6908,6 @@ try {
                 : 'bg-slate-50 border-slate-300 text-slate-800'
             }`}
           >
-            {/* 1. 여성 / 남성 / 다중 음성 선택기 (페이지 전체 적용) */}
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-[11px] font-extrabold px-2 py-0.5 rounded bg-purple-600 text-white">
                 🎙️ 음성 선택
@@ -7035,7 +7028,6 @@ try {
               </select>
             </div>
 
-            {/* 2. 즉석 복사·붙여넣기 단어/문장 해석 & 스피커 바 */}
             <div className="flex-1 min-w-[260px] flex flex-wrap items-center gap-1.5">
               <input
                 id="yanadu-instant-input"
@@ -7075,7 +7067,6 @@ try {
 
                   resultEl.textContent = '⏳ 뜻 검색 및 발음 출력 중...';
 
-                  // 1) 즉시 영어 음성 발화
                   window.speechSynthesis.cancel();
                   const utterEn = new SpeechSynthesisUtterance(text);
                   const pref = (window as unknown as Record<string, unknown>).__yanaduVoice as
@@ -7090,7 +7081,6 @@ try {
                   utterEn.rate = ttsRate;
                   window.speechSynthesis.speak(utterEn);
 
-                  // 2) 실시간 한글 뜻 번역 조회 후 화면 표시 & 한국어 음성 이어서 읽기
                   try {
                     const res = await fetch(
                       `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ko&dt=t&dt=bd&q=${encodeURIComponent(
@@ -7141,14 +7131,13 @@ try {
               </button>
             </div>
 
-            {/* 3. 즉석 해석 결과 표시줄 (페이지 이동 없이 바로 아래에 노출) */}
             <div
               id="yanadu-instant-result"
               className="w-full text-xs font-extrabold text-amber-400 px-1 truncate"
             >
               💡 책이나 웹에서 복사한 영어 단어·문장을 붙여넣으면 이곳에 즉시 한글 뜻이 표시되고 스피커로 읽어줍니다.
-          </div>
             </div>
+          </div>
             <button
               onClick={() => setDarkMode((d) => !d)}
               className={`px-2 py-1 rounded-md font-bold border ${
