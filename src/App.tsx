@@ -7148,6 +7148,7 @@ try {
             >
               💡 책이나 웹에서 복사한 영어 단어·문장을 붙여넣으면 이곳에 즉시 한글 뜻이 표시되고 스피커로 읽어줍니다.
           </div>
+            </div>
             <button
               onClick={() => setDarkMode((d) => !d)}
               className={`px-2 py-1 rounded-md font-bold border ${
