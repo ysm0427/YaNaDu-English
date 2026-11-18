@@ -6900,242 +6900,469 @@ try {
             })}
           </div>
 
-          {/* [즉석 붙여넣기 단어·문장 스피커 & 여성/남성 다중 음성 선택 컨트롤러] */}
+{/* [즉석 붙여넣기 단어·문장 스피커 & 에어팟 실시간 통역 & 2단 아코디언 컨트롤러] */}
           <div
-            className={`w-full mt-1.5 p-2 rounded-xl border flex flex-wrap items-center gap-2 ${
+            translate="no"
+            className={`notranslate w-full mt-1.5 p-2 rounded-xl border flex flex-col gap-2 ${
               darkMode
                 ? 'bg-slate-900/95 border-slate-700 text-slate-100'
                 : 'bg-slate-50 border-slate-300 text-slate-800'
             }`}
           >
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[11px] font-extrabold px-2 py-0.5 rounded bg-purple-600 text-white">
-                🎙️ 음성 선택
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  const voices = window.speechSynthesis.getVoices().filter((v) => v.lang.startsWith('en'));
-                  const female =
-                    voices.find((v) =>
-                      /Samantha|Ava|Allison|Susan|Victoria|Karen|Moira|Tessa|Zira|Aria|Jenny|Female|Google US English/i.test(
-                        v.name
-                      )
-                    ) || voices[1] || voices[0];
-                  if (female) {
-                    setSelectedVoiceURI(female.voiceURI);
-                    (window as unknown as Record<string, unknown>).__yanaduVoice = female;
-                    const sel = document.getElementById('yanadu-voice-select') as HTMLSelectElement | null;
-                    if (sel) sel.value = female.voiceURI;
-                    window.speechSynthesis.cancel();
-                    const u = new SpeechSynthesisUtterance('Hello! Female voice is now active.');
-                    u.voice = female;
-                    u.lang = female.lang;
-                    u.rate = ttsRate;
-                    window.speechSynthesis.speak(u);
-                  }
-                }}
-                className="px-2 py-1 rounded-md text-xs font-bold bg-pink-600 hover:bg-pink-500 text-white shadow-sm"
-              >
-                👩 여성 대표음성
-              </button>
+            <div className="w-full flex flex-wrap items-center justify-between gap-2">
+              {/* 1. 여성 / 남성 / 기기 내장 다중 음성 선택기 */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[11px] font-extrabold px-2 py-0.5 rounded bg-purple-600 text-white">
+                  🎙️ 음성 선택
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const voices = window.speechSynthesis.getVoices().filter((v) => v.lang.startsWith('en'));
+                    const female =
+                      voices.find((v) =>
+                        /Samantha|Ava|Allison|Susan|Victoria|Karen|Moira|Tessa|Zira|Aria|Jenny|Female|Google US English/i.test(
+                          v.name
+                        )
+                      ) || voices[1] || voices[0];
+                    if (female) {
+                      setSelectedVoiceURI(female.voiceURI);
+                      const w = window as unknown as Record<string, unknown>;
+                      w.__yanaduVoice = female;
+                      if (!w.__yanaduPatched) {
+                        const origSpeak = window.speechSynthesis.speak.bind(window.speechSynthesis);
+                        window.speechSynthesis.speak = (utter: SpeechSynthesisUtterance) => {
+                          const pref = w.__yanaduVoice as SpeechSynthesisVoice | undefined;
+                          if (pref && (!utter.lang || utter.lang.startsWith('en'))) {
+                            utter.voice = pref;
+                            utter.lang = pref.lang;
+                          }
+                          return origSpeak(utter);
+                        };
+                        w.__yanaduPatched = true;
+                      }
+                      const sel = document.getElementById('yanadu-voice-select') as HTMLSelectElement | null;
+                      if (sel) sel.value = female.voiceURI;
+                      window.speechSynthesis.cancel();
+                      const u = new SpeechSynthesisUtterance('Female voice is now active.');
+                      u.voice = female;
+                      u.lang = female.lang;
+                      u.rate = ttsRate;
+                      window.speechSynthesis.speak(u);
+                    }
+                  }}
+                  className="px-2 py-1 rounded-md text-xs font-bold bg-pink-600 hover:bg-pink-500 text-white shadow-sm"
+                >
+                  👩 여성 대표음성
+                </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  const voices = window.speechSynthesis.getVoices().filter((v) => v.lang.startsWith('en'));
-                  const male =
-                    voices.find((v) =>
-                      /Aaron|Alex|Daniel|Arthur|Fred|David|Mark|Guy|Male/i.test(v.name)
-                    ) || voices[0];
-                  if (male) {
-                    setSelectedVoiceURI(male.voiceURI);
-                    (window as unknown as Record<string, unknown>).__yanaduVoice = male;
-                    const sel = document.getElementById('yanadu-voice-select') as HTMLSelectElement | null;
-                    if (sel) sel.value = male.voiceURI;
-                    window.speechSynthesis.cancel();
-                    const u = new SpeechSynthesisUtterance('Hello! Male voice is now active.');
-                    u.voice = male;
-                    u.lang = male.lang;
-                    u.rate = ttsRate;
-                    window.speechSynthesis.speak(u);
-                  }
-                }}
-                className="px-2 py-1 rounded-md text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm"
-              >
-                👨 남성 대표음성
-              </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const voices = window.speechSynthesis.getVoices().filter((v) => v.lang.startsWith('en'));
+                    const male =
+                      voices.find((v) =>
+                        /Aaron|Alex|Daniel|Arthur|Fred|David|Mark|Guy|Male/i.test(v.name)
+                      ) || voices[0];
+                    if (male) {
+                      setSelectedVoiceURI(male.voiceURI);
+                      const w = window as unknown as Record<string, unknown>;
+                      w.__yanaduVoice = male;
+                      if (!w.__yanaduPatched) {
+                        const origSpeak = window.speechSynthesis.speak.bind(window.speechSynthesis);
+                        window.speechSynthesis.speak = (utter: SpeechSynthesisUtterance) => {
+                          const pref = w.__yanaduVoice as SpeechSynthesisVoice | undefined;
+                          if (pref && (!utter.lang || utter.lang.startsWith('en'))) {
+                            utter.voice = pref;
+                            utter.lang = pref.lang;
+                          }
+                          return origSpeak(utter);
+                        };
+                        w.__yanaduPatched = true;
+                      }
+                      const sel = document.getElementById('yanadu-voice-select') as HTMLSelectElement | null;
+                      if (sel) sel.value = male.voiceURI;
+                      window.speechSynthesis.cancel();
+                      const u = new SpeechSynthesisUtterance('Male voice is now active.');
+                      u.voice = male;
+                      u.lang = male.lang;
+                      u.rate = ttsRate;
+                      window.speechSynthesis.speak(u);
+                    }
+                  }}
+                  className="px-2 py-1 rounded-md text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm"
+                >
+                  👨 남성 대표음성
+                </button>
 
-              <select
-                id="yanadu-voice-select"
-                value={selectedVoiceURI}
-                onFocus={(e) => {
-                  const selectEl = e.currentTarget;
-                  const voices = window.speechSynthesis.getVoices().filter((v) => v.lang.startsWith('en'));
-                  if (selectEl.options.length <= 1 && voices.length > 0) {
-                    selectEl.innerHTML = '';
-                    voices.forEach((v) => {
-                      const opt = document.createElement('option');
-                      const isFemale =
-                        /Samantha|Ava|Allison|Susan|Victoria|Karen|Moira|Tessa|Zira|Aria|Jenny|Sonia|Female|Flo|Sandy|Shelley/i.test(
+                <select
+                  id="yanadu-voice-select"
+                  value={selectedVoiceURI}
+                  onFocus={(e) => {
+                    const selectEl = e.currentTarget;
+                    const voices = window.speechSynthesis.getVoices().filter((v) => v.lang.startsWith('en'));
+                    if (selectEl.options.length <= 1 && voices.length > 0) {
+                      selectEl.innerHTML = '';
+                      voices.forEach((v) => {
+                        const opt = document.createElement('option');
+                        const isFemale =
+                          /Samantha|Ava|Allison|Susan|Victoria|Karen|Moira|Tessa|Zira|Aria|Jenny|Sonia|Female|Flo|Sandy|Shelley/i.test(
+                            v.name
+                          );
+                        const isMale = /Aaron|Alex|Daniel|Arthur|Fred|David|Mark|Guy|Reed|Rocko|Eddy|Male/i.test(
                           v.name
                         );
-                      const isMale = /Aaron|Alex|Daniel|Arthur|Fred|David|Mark|Guy|Reed|Rocko|Eddy|Male/i.test(
-                        v.name
-                      );
-                      const genderTag = isFemale ? '👩 여성' : isMale ? '👨 남성' : '🔊 기본';
-                      opt.value = v.voiceURI;
-                      opt.textContent = `${genderTag} · ${v.name} (${v.lang})`;
-                      selectEl.appendChild(opt);
-                    });
-                  }
-                }}
-                onChange={(e) => {
-                  const uri = e.target.value;
-                  setSelectedVoiceURI(uri);
-                  const voices = window.speechSynthesis.getVoices();
-                  const picked = voices.find((v) => v.voiceURI === uri);
-                  if (picked) {
-                    (window as unknown as Record<string, unknown>).__yanaduVoice = picked;
-                    const w = window as unknown as Record<string, unknown>;
-                    if (!w.__yanaduPatched) {
-                      const origSpeak = window.speechSynthesis.speak.bind(window.speechSynthesis);
-                      window.speechSynthesis.speak = (utter: SpeechSynthesisUtterance) => {
-                        const pref = w.__yanaduVoice as SpeechSynthesisVoice | undefined;
-                        if (pref && (!utter.lang || utter.lang.startsWith('en'))) {
-                          utter.voice = pref;
-                          utter.lang = pref.lang;
-                        }
-                        return origSpeak(utter);
-                      };
-                      w.__yanaduPatched = true;
+                        const genderTag = isFemale ? '👩 여성' : isMale ? '👨 남성' : '🔊 기본';
+                        opt.value = v.voiceURI;
+                        opt.textContent = `${genderTag} · ${v.name} (${v.lang})`;
+                        selectEl.appendChild(opt);
+                      });
                     }
-                    window.speechSynthesis.cancel();
-                    const u = new SpeechSynthesisUtterance('Voice changed successfully.');
-                    u.voice = picked;
-                    u.lang = picked.lang;
-                    u.rate = ttsRate;
-                    window.speechSynthesis.speak(u);
-                  }
-                }}
-                className={`px-2 py-1 rounded-md text-xs font-bold border ${
-                  darkMode
-                    ? 'bg-slate-800 border-slate-600 text-slate-100'
-                    : 'bg-white border-slate-300 text-slate-800'
-                }`}
-              >
-                <option value="">🔊 기기 내장 영어 목소리 전체 선택 (클릭)</option>
-              </select>
-            </div>
+                  }}
+                  onChange={(e) => {
+                    const uri = e.target.value;
+                    setSelectedVoiceURI(uri);
+                    const voices = window.speechSynthesis.getVoices();
+                    const picked = voices.find((v) => v.voiceURI === uri);
+                    if (picked) {
+                      const w = window as unknown as Record<string, unknown>;
+                      w.__yanaduVoice = picked;
+                      if (!w.__yanaduPatched) {
+                        const origSpeak = window.speechSynthesis.speak.bind(window.speechSynthesis);
+                        window.speechSynthesis.speak = (utter: SpeechSynthesisUtterance) => {
+                          const pref = w.__yanaduVoice as SpeechSynthesisVoice | undefined;
+                          if (pref && (!utter.lang || utter.lang.startsWith('en'))) {
+                            utter.voice = pref;
+                            utter.lang = pref.lang;
+                          }
+                          return origSpeak(utter);
+                        };
+                        w.__yanaduPatched = true;
+                      }
+                      window.speechSynthesis.cancel();
+                      const u = new SpeechSynthesisUtterance('Voice changed successfully.');
+                      u.voice = picked;
+                      u.lang = picked.lang;
+                      u.rate = ttsRate;
+                      window.speechSynthesis.speak(u);
+                    }
+                  }}
+                  className={`px-2 py-1 rounded-md text-xs font-bold border ${
+                    darkMode
+                      ? 'bg-slate-800 border-slate-600 text-slate-100'
+                      : 'bg-white border-slate-300 text-slate-800'
+                  }`}
+                >
+                  <option value="">🔊 기기 내장 영어 목소리 전체 선택 (클릭)</option>
+                </select>
+              </div>
 
-            <div className="flex-1 min-w-[260px] flex flex-wrap items-center gap-1.5">
-              <input
-                id="yanadu-instant-input"
-                type="text"
-                placeholder="궁금한 영어 단어·문장을 붙여넣으세요 (자동 뜻 풀이 + 스피커 발음)"
-                onPaste={(e) => {
-                  const pasted = e.clipboardData.getData('text').trim();
-                  if (pasted) {
-                    setTimeout(() => {
+              {/* 2. 단어·긴 문장 입력창 & 원터치 붙여넣기 & 에어팟 실시간 음성 통역 버튼 */}
+              <div className="flex-1 min-w-[280px] flex flex-wrap items-center gap-1.5">
+                <input
+                  id="yanadu-instant-input"
+                  type="text"
+                  placeholder="영어 단어·긴 문장 붙여넣기 또는 에어팟 음성 버튼 클릭"
+                  onPaste={(e) => {
+                    const pasted = e.clipboardData.getData('text').trim();
+                    if (pasted) {
+                      setTimeout(() => {
+                        const btn = document.getElementById('yanadu-instant-speak-btn');
+                        if (btn) btn.click();
+                      }, 60);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
                       const btn = document.getElementById('yanadu-instant-speak-btn');
                       if (btn) btn.click();
-                    }, 60);
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    const btn = document.getElementById('yanadu-instant-speak-btn');
-                    if (btn) btn.click();
-                  }
-                }}
-                className={`flex-1 min-w-[180px] px-2.5 py-1 rounded-md text-xs font-bold border ${
-                  darkMode
-                    ? 'bg-slate-800 border-slate-600 text-white placeholder-slate-400'
-                    : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
-                }`}
+                    }
+                  }}
+                  className={`flex-1 min-w-[180px] px-2.5 py-1 rounded-md text-xs font-bold border ${
+                    darkMode
+                      ? 'bg-slate-800 border-slate-600 text-white placeholder-slate-400'
+                      : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
+                  }`}
+                />
+
+                <button
+                  id="yanadu-instant-speak-btn"
+                  type="button"
+                  onClick={async () => {
+                    const inputEl = document.getElementById('yanadu-instant-input') as HTMLInputElement | null;
+                    const hintEl = document.getElementById('yanadu-instant-hint');
+                    const accEl = document.getElementById('yanadu-instant-accordion');
+                    const enEl = document.getElementById('yanadu-instant-en');
+                    const koEl = document.getElementById('yanadu-instant-ko');
+                    if (!inputEl || !enEl || !koEl || !accEl) return;
+                    const text = inputEl.value.trim();
+                    if (!text) return;
+
+                    if (hintEl) hintEl.classList.add('hidden');
+                    accEl.classList.remove('hidden');
+                    enEl.textContent = text;
+                    koEl.textContent = '⏳ 한글 뜻을 분석하고 있습니다...';
+
+                    // 1) 영어 원어민 발음만 깔끔하게 출력 (어색한 한글 기계음 제거)
+                    window.speechSynthesis.cancel();
+                    const utterEn = new SpeechSynthesisUtterance(text);
+                    const pref = (window as unknown as Record<string, unknown>).__yanaduVoice as
+                      | SpeechSynthesisVoice
+                      | undefined;
+                    if (pref) {
+                      utterEn.voice = pref;
+                      utterEn.lang = pref.lang;
+                    } else {
+                      utterEn.lang = ttsAccent;
+                    }
+                    utterEn.rate = ttsRate;
+                    window.speechSynthesis.speak(utterEn);
+
+                    // 2) 단어/긴 문장 맞춤 한글 번역 표시 (2단 아코디언 전체 표시)
+                    try {
+                      const res = await fetch(
+                        `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ko&dt=t&dt=bd&q=${encodeURIComponent(
+                          text
+                        )}`
+                      );
+                      const data = await res.json();
+                      const koMeaning = Array.isArray(data?.[0])
+                        ? data[0].map((item: unknown[]) => item?.[0] || '').join('')
+                        : '뜻을 불러오지 못했습니다.';
+                      const wordCount = text.split(/\s+/).length;
+                      const dictExtra =
+                        wordCount <= 2 && Array.isArray(data?.[1]) && data[1][0]?.[1]
+                          ? ` · [${data[1][0][0]}: ${data[1][0][1].slice(0, 4).join(', ')}]`
+                          : '';
+                      koEl.textContent = `💡 ${koMeaning}${dictExtra}`;
+                    } catch {
+                      koEl.textContent = '⚠️ 네트워크 연결을 확인해 주세요.';
+                    }
+                  }}
+                  className="px-2.5 py-1 rounded-md text-xs font-extrabold bg-blue-600 hover:bg-blue-500 text-white shadow-sm"
+                >
+                  🔊 영어 듣기 + 뜻
+                </button>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const clip = await navigator.clipboard.readText();
+                      const inputEl = document.getElementById('yanadu-instant-input') as HTMLInputElement | null;
+                      if (inputEl && clip.trim()) {
+                        inputEl.value = clip.trim();
+                        const btn = document.getElementById('yanadu-instant-speak-btn');
+                        if (btn) btn.click();
+                      }
+                    } catch {
+                      alert('입력창을 길게 눌러 붙여넣기 해주세요.');
+                    }
+                  }}
+                  className="px-2.5 py-1 rounded-md text-xs font-extrabold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm"
+                >
+                  📋 바로 붙여넣기
+                </button>
+
+                {/* 3. 에어팟 실시간 영어 음성 인식 -> 한글 해석 */}
+                <button
+                  id="yanadu-mic-en-btn"
+                  type="button"
+                  onClick={() => {
+                    type SpeechRec = {
+                      lang: string;
+                      interimResults: boolean;
+                      onstart: (() => void) | null;
+                      onresult: ((ev: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+                      onend: (() => void) | null;
+                      start: () => void;
+                    };
+                    const w = window as unknown as Record<string, new () => SpeechRec>;
+                    const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
+                    if (!SR) {
+                      alert('현재 브라우저에서 음성 인식을 지원하지 않습니다. Safari 또는 Chrome을 사용해 주세요.');
+                      return;
+                    }
+                    const rec = new SR();
+                    rec.lang = ttsAccent || 'en-US';
+                    rec.interimResults = false;
+                    const micBtn = document.getElementById('yanadu-mic-en-btn');
+                    rec.onstart = () => {
+                      if (micBtn) micBtn.textContent = '🔴 영어 듣는 중...';
+                    };
+                    rec.onresult = (ev) => {
+                      const transcript = ev.results?.[0]?.[0]?.transcript || '';
+                      const inputEl = document.getElementById('yanadu-instant-input') as HTMLInputElement | null;
+                      if (inputEl && transcript) {
+                        inputEl.value = transcript;
+                        const btn = document.getElementById('yanadu-instant-speak-btn');
+                        if (btn) btn.click();
+                      }
+                    };
+                    rec.onend = () => {
+                      if (micBtn) micBtn.textContent = '🎤 영어 말하기';
+                    };
+                    rec.start();
+                  }}
+                  className="px-2.5 py-1 rounded-md text-xs font-extrabold bg-amber-600 hover:bg-amber-500 text-white shadow-sm"
+                >
+                  🎤 영어 말하기
+                </button>
+
+                {/* 4. 에어팟 실시간 한국어 말하기 -> 영어 문장 변환 & 원어민 발음 재생 */}
+                <button
+                  id="yanadu-mic-ko-btn"
+                  type="button"
+                  onClick={() => {
+                    type SpeechRec = {
+                      lang: string;
+                      interimResults: boolean;
+                      onstart: (() => void) | null;
+                      onresult: ((ev: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+                      onend: (() => void) | null;
+                      start: () => void;
+                    };
+                    const w = window as unknown as Record<string, new () => SpeechRec>;
+                    const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
+                    if (!SR) {
+                      alert('현재 브라우저에서 음성 인식을 지원하지 않습니다. Safari 또는 Chrome을 사용해 주세요.');
+                      return;
+                    }
+                    const rec = new SR();
+                    rec.lang = 'ko-KR';
+                    rec.interimResults = false;
+                    const micBtn = document.getElementById('yanadu-mic-ko-btn');
+                    rec.onstart = () => {
+                      if (micBtn) micBtn.textContent = '🔴 한국어 듣는 중...';
+                    };
+                    rec.onresult = async (ev) => {
+                      const koSpeech = ev.results?.[0]?.[0]?.transcript || '';
+                      if (!koSpeech) return;
+                      const inputEl = document.getElementById('yanadu-instant-input') as HTMLInputElement | null;
+                      const hintEl = document.getElementById('yanadu-instant-hint');
+                      const accEl = document.getElementById('yanadu-instant-accordion');
+                      const enEl = document.getElementById('yanadu-instant-en');
+                      const koEl = document.getElementById('yanadu-instant-ko');
+                      if (hintEl) hintEl.classList.add('hidden');
+                      if (accEl) accEl.classList.remove('hidden');
+                      if (koEl) koEl.textContent = `🇰🇷 내가 한 말: ${koSpeech}`;
+                      if (enEl) enEl.textContent = '⏳ 영어로 변환 중...';
+
+                      try {
+                        const res = await fetch(
+                          `https://translate.googleapis.com/translate_a/single?client=gtx&sl=ko&tl=en&dt=t&q=${encodeURIComponent(
+                            koSpeech
+                          )}`
+                        );
+                        const data = await res.json();
+                        const enTranslated = Array.isArray(data?.[0])
+                          ? data[0].map((item: unknown[]) => item?.[0] || '').join('')
+                          : '';
+                        if (enTranslated) {
+                          if (inputEl) inputEl.value = enTranslated;
+                          if (enEl) enEl.textContent = enTranslated;
+                          window.speechSynthesis.cancel();
+                          const utterEn = new SpeechSynthesisUtterance(enTranslated);
+                          const pref = (window as unknown as Record<string, unknown>).__yanaduVoice as
+                            | SpeechSynthesisVoice
+                            | undefined;
+                          if (pref) {
+                            utterEn.voice = pref;
+                            utterEn.lang = pref.lang;
+                          } else {
+                            utterEn.lang = ttsAccent;
+                          }
+                          utterEn.rate = ttsRate;
+                          window.speechSynthesis.speak(utterEn);
+                        }
+                      } catch {
+                        if (enEl) enEl.textContent = '⚠️ 번역 연결을 확인해 주세요.';
+                      }
+                    };
+                    rec.onend = () => {
+                      if (micBtn) micBtn.textContent = '🎤 한→영 통역';
+                    };
+                    rec.start();
+                  }}
+                  className="px-2.5 py-1 rounded-md text-xs font-extrabold bg-rose-600 hover:bg-rose-500 text-white shadow-sm"
+                >
+                  🎤 한→영 통역
+                </button>
+              </div>
+            </div>
+
+            {/* 평상시 1줄 안내 바 (단어·문장 입력 전) */}
+            <div id="yanadu-instant-hint" className="w-full text-xs font-bold text-slate-400 px-1">
+              💡 영어 단어·긴 문장을 붙여넣거나 [🎤 영어 말하기 / 🎤 한→영 통역]을 누르면 아래에 2단 전체 해석 박스가 열립니다.
+            </div>
+
+            {/* 자동 확장형 2단 아코디언 결과 박스 (긴 문장도 잘림 없이 전체 표시) */}
+            <div
+              id="yanadu-instant-accordion"
+              className={`hidden w-full rounded-lg border p-3 transition-all ${
+                darkMode
+                  ? 'bg-slate-950/90 border-blue-500/40 text-slate-100'
+                  : 'bg-white border-blue-300 text-slate-900 shadow-sm'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2 mb-1.5 pb-1 border-b border-slate-700/40">
+                <span className="text-[11px] font-extrabold text-blue-400">
+                  📖 즉석 원문 & 한글 해석 (자동 확장 뷰)
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const enEl = document.getElementById('yanadu-instant-en');
+                      const text = enEl?.textContent?.trim();
+                      if (!text) return;
+                      window.speechSynthesis.cancel();
+                      const utterEn = new SpeechSynthesisUtterance(text);
+                      const pref = (window as unknown as Record<string, unknown>).__yanaduVoice as
+                        | SpeechSynthesisVoice
+                        | undefined;
+                      if (pref) {
+                        utterEn.voice = pref;
+                        utterEn.lang = pref.lang;
+                      } else {
+                        utterEn.lang = ttsAccent;
+                      }
+                      utterEn.rate = ttsRate;
+                      window.speechSynthesis.speak(utterEn);
+                    }}
+                    className="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-600/20 text-blue-400 hover:bg-blue-600/30"
+                  >
+                    🔊 영어만 다시 듣기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const accEl = document.getElementById('yanadu-instant-accordion');
+                      const hintEl = document.getElementById('yanadu-instant-hint');
+                      const inputEl = document.getElementById('yanadu-instant-input') as HTMLInputElement | null;
+                      if (accEl) accEl.classList.add('hidden');
+                      if (hintEl) hintEl.classList.remove('hidden');
+                      if (inputEl) inputEl.value = '';
+                      window.speechSynthesis.cancel();
+                    }}
+                    className="px-2 py-0.5 rounded text-[11px] font-bold bg-slate-700/50 text-slate-300 hover:bg-slate-700"
+                  >
+                    ✕ 접기
+                  </button>
+                </div>
+              </div>
+
+              {/* 1단: 영어 원문 전체 (줄바꿈 자동 확장) */}
+              <div
+                id="yanadu-instant-en"
+                className="text-sm sm:text-base font-extrabold leading-relaxed break-words whitespace-pre-wrap mb-1.5"
               />
 
-              <button
-                id="yanadu-instant-speak-btn"
-                type="button"
-                onClick={async () => {
-                  const inputEl = document.getElementById('yanadu-instant-input') as HTMLInputElement | null;
-                  const resultEl = document.getElementById('yanadu-instant-result');
-                  if (!inputEl || !resultEl) return;
-                  const text = inputEl.value.trim();
-                  if (!text) return;
-
-                  resultEl.textContent = '⏳ 뜻 검색 및 발음 출력 중...';
-
-                  window.speechSynthesis.cancel();
-                  const utterEn = new SpeechSynthesisUtterance(text);
-                  const pref = (window as unknown as Record<string, unknown>).__yanaduVoice as
-                    | SpeechSynthesisVoice
-                    | undefined;
-                  if (pref) {
-                    utterEn.voice = pref;
-                    utterEn.lang = pref.lang;
-                  } else {
-                    utterEn.lang = ttsAccent;
-                  }
-                  utterEn.rate = ttsRate;
-                  window.speechSynthesis.speak(utterEn);
-
-                  try {
-                    const res = await fetch(
-                      `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ko&dt=t&dt=bd&q=${encodeURIComponent(
-                        text
-                      )}`
-                    );
-                    const data = await res.json();
-                    const koMeaning = Array.isArray(data?.[0])
-                      ? data[0].map((item: unknown[]) => item?.[0] || '').join('')
-                      : '뜻을 불러오지 못했습니다.';
-                    const dictExtra =
-                      Array.isArray(data?.[1]) && data[1][0]?.[1]
-                        ? ` (${data[1][0][0]}: ${data[1][0][1].slice(0, 3).join(', ')})`
-                        : '';
-                    resultEl.textContent = `💡 뜻: ${koMeaning}${dictExtra}`;
-
-                    const utterKo = new SpeechSynthesisUtterance(koMeaning);
-                    utterKo.lang = 'ko-KR';
-                    utterKo.rate = 1.05;
-                    window.speechSynthesis.speak(utterKo);
-                  } catch {
-                    resultEl.textContent = '⚠️ 네트워크 상태를 확인해 주세요.';
-                  }
-                }}
-                className="px-2.5 py-1 rounded-md text-xs font-extrabold bg-blue-600 hover:bg-blue-500 text-white shadow-sm"
-              >
-                🔊 바로 듣기 + 뜻
-              </button>
-
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    const clip = await navigator.clipboard.readText();
-                    const inputEl = document.getElementById('yanadu-instant-input') as HTMLInputElement | null;
-                    if (inputEl && clip.trim()) {
-                      inputEl.value = clip.trim();
-                      const btn = document.getElementById('yanadu-instant-speak-btn');
-                      if (btn) btn.click();
-                    }
-                  } catch {
-                    alert('입력창을 길게 눌러 붙여넣기 해주세요.');
-                  }
-                }}
-                className="px-2.5 py-1 rounded-md text-xs font-extrabold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm"
-              >
-                📋 복사한 글 바로 붙여넣기
-              </button>
-            </div>
-
-            <div
-              id="yanadu-instant-result"
-              className="w-full text-xs font-extrabold text-amber-400 px-1 truncate"
-            >
-              💡 책이나 웹에서 복사한 영어 단어·문장을 붙여넣으면 이곳에 즉시 한글 뜻이 표시되고 스피커로 읽어줍니다.
+              {/* 2단: 한글 뜻 전체 (줄바꿈 자동 확장) */}
+              <div
+                id="yanadu-instant-ko"
+                className="text-sm sm:text-base font-bold text-amber-400 leading-relaxed break-words whitespace-pre-wrap"
+              />
             </div>
           </div>
             <button
